@@ -143,7 +143,7 @@
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
     <script>
-        document.querySelector('input[type="file"]')
+        document.getElementById('Photo')
             .addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
