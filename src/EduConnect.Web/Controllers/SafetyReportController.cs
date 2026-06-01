@@ -145,6 +145,10 @@ namespace EduConnect.Web.Controllers
                     ? "No specific location"
                     : report.Location;
 
+                var safeBuilding = System.Net.WebUtility.HtmlEncode(report.IncidentType);
+                var safeLocation = System.Net.WebUtility.HtmlEncode(locationPart);
+                var safeDescription = System.Net.WebUtility.HtmlEncode(report.Description);
+
                 var message =
                     $"New safety report submitted — " +
                     $"{report.IncidentType}: {locationPart}";
@@ -168,7 +172,7 @@ namespace EduConnect.Web.Controllers
                         .Select(u => new { u.FirstName, u.LastName })
                         .FirstOrDefaultAsync();
                     reporterLine = reporter != null
-                        ? $"<p><strong>Reported by:</strong> {reporter.FirstName} {reporter.LastName}</p>"
+                        ? $"<p><strong>Reported by:</strong> {System.Net.WebUtility.HtmlEncode($"{reporter.FirstName} {reporter.LastName}")}</p>"
                         : "";
                 }
 
@@ -176,11 +180,11 @@ namespace EduConnect.Web.Controllers
 <h2 style='color:#0d6efd'>New Campus Safety Report</h2>
 <table style='border-collapse:collapse;width:100%'>
   <tr><td style='padding:6px;font-weight:bold'>Building</td>
-      <td style='padding:6px'>{report.IncidentType}</td></tr>
+      <td style='padding:6px'>{safeBuilding}</td></tr>
   <tr><td style='padding:6px;font-weight:bold'>Specific Location</td>
-      <td style='padding:6px'>{locationPart}</td></tr>
+      <td style='padding:6px'>{safeLocation}</td></tr>
   <tr><td style='padding:6px;font-weight:bold'>Description</td>
-      <td style='padding:6px'>{report.Description}</td></tr>
+      <td style='padding:6px'>{safeDescription}</td></tr>
   <tr><td style='padding:6px;font-weight:bold'>Submitted At</td>
       <td style='padding:6px'>{report.ReportedAt:yyyy-MM-dd HH:mm}</td></tr>
 </table>
