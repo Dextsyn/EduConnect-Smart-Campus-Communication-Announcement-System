@@ -8,14 +8,10 @@ namespace EduConnect.Web.Controllers
     public class StaffController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<StaffController> _logger;
 
-        public StaffController(
-            ApplicationDbContext context,
-            ILogger<StaffController> logger)
+        public StaffController(ApplicationDbContext context)
         {
             _context = context;
-            _logger = logger;
         }
 
         private bool IsStaffOrAdmin()
