@@ -156,9 +156,21 @@ namespace EduConnect.Web.Controllers
                 await _notificationService.SendToManyAsync(
                     staffIds, "SafetyReport", message, link);
 
-                var reporterLine = report.IsAnonymous
-                    ? "<p><em>Submitted anonymously.</em></p>"
-                    : "";
+                string reporterLine;
+                if (report.IsAnonymous)
+                {
+                    reporterLine = "";
+                }
+                else
+                {
+                    var reporter = await _context.Users
+                        .Where(u => u.UserID == report.ReportedByID)
+                        .Select(u => new { u.FirstName, u.LastName })
+                        .FirstOrDefaultAsync();
+                    reporterLine = reporter != null
+                        ? $"<p><strong>Reported by:</strong> {reporter.FirstName} {reporter.LastName}</p>"
+                        : "";
+                }
 
                 var emailBody = $@"
 <h2 style='color:#0d6efd'>New Campus Safety Report</h2>
