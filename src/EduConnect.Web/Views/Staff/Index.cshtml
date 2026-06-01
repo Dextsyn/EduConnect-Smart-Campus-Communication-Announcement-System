@@ -35,22 +35,22 @@
                 <label class="form-label small fw-semibold mb-1">Building</label>
                 <select name="Building" class="form-select form-select-sm">
                     <option value="">All Buildings</option>
-                    <option value="SV" selected="@(filter.Building == "SV")">SV</option>
-                    <option value="ST" selected="@(filter.Building == "ST")">ST</option>
-                    <option value="OZ" selected="@(filter.Building == "OZ")">OZ</option>
-                    <option value="CS" selected="@(filter.Building == "CS")">CS</option>
-                    <option value="CT" selected="@(filter.Building == "CT")">CT</option>
-                    <option value="Other" selected="@(filter.Building == "Other")">Other</option>
+                    <option value="SV" selected="@(filter.Building == "SV" ? "selected" : null)">SV</option>
+                    <option value="ST" selected="@(filter.Building == "ST" ? "selected" : null)">ST</option>
+                    <option value="OZ" selected="@(filter.Building == "OZ" ? "selected" : null)">OZ</option>
+                    <option value="CS" selected="@(filter.Building == "CS" ? "selected" : null)">CS</option>
+                    <option value="CT" selected="@(filter.Building == "CT" ? "selected" : null)">CT</option>
+                    <option value="Other" selected="@(filter.Building == "Other" ? "selected" : null)">Other</option>
                 </select>
             </div>
             <div class="col-12 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Status</label>
                 <select name="Status" class="form-select form-select-sm">
                     <option value="">All Statuses</option>
-                    <option value="Pending" selected="@(filter.Status == "Pending")">Pending</option>
-                    <option value="Investigating" selected="@(filter.Status == "Investigating")">Investigating</option>
-                    <option value="Resolved" selected="@(filter.Status == "Resolved")">Resolved</option>
-                    <option value="Dismissed" selected="@(filter.Status == "Dismissed")">Dismissed</option>
+                    <option value="Pending" selected="@(filter.Status == "Pending" ? "selected" : null)">Pending</option>
+                    <option value="Investigating" selected="@(filter.Status == "Investigating" ? "selected" : null)">Investigating</option>
+                    <option value="Resolved" selected="@(filter.Status == "Resolved" ? "selected" : null)">Resolved</option>
+                    <option value="Dismissed" selected="@(filter.Status == "Dismissed" ? "selected" : null)">Dismissed</option>
                 </select>
             </div>
             <div class="col-12 col-sm-4">

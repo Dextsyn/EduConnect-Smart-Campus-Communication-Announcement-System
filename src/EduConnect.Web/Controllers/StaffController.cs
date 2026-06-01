@@ -86,6 +86,8 @@ namespace EduConnect.Web.Controllers
 
             if (status == "Resolved" || status == "Dismissed")
                 report.ResolvedAt = DateTime.Now;
+            else
+                report.ResolvedAt = null;
 
             await _context.SaveChangesAsync();
 

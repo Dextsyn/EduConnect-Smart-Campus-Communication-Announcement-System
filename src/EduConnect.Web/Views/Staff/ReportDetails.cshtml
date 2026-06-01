@@ -150,16 +150,16 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Status</label>
                         <select name="status" class="form-select">
-                            <option value="Pending" selected="@(Model.Status == "Pending")">
+                            <option value="Pending" selected="@(Model.Status == "Pending" ? "selected" : null)">
                                 Pending
                             </option>
-                            <option value="Investigating" selected="@(Model.Status == "Investigating")">
+                            <option value="Investigating" selected="@(Model.Status == "Investigating" ? "selected" : null)">
                                 Investigating
                             </option>
-                            <option value="Resolved" selected="@(Model.Status == "Resolved")">
+                            <option value="Resolved" selected="@(Model.Status == "Resolved" ? "selected" : null)">
                                 Resolved
                             </option>
-                            <option value="Dismissed" selected="@(Model.Status == "Dismissed")">
+                            <option value="Dismissed" selected="@(Model.Status == "Dismissed" ? "selected" : null)">
                                 Dismissed
                             </option>
                         </select>
