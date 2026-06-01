@@ -1,0 +1,189 @@
+@model EduConnect.Web.Models.IncidentReport
+@{
+    ViewData["Title"] = $"Report #{Model.ReportID}";
+    var (badgeClass, badgeLabel) = Model.Status switch
+    {
+        "Pending"       => ("bg-warning text-dark", "Pending"),
+        "Investigating" => ("bg-primary",           "Investigating"),
+        "Resolved"      => ("bg-success",           "Resolved"),
+        "Dismissed"     => ("bg-secondary",         "Dismissed"),
+        _               => ("bg-light text-dark",   Model.Status)
+    };
+}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-file-earmark-text me-2 text-warning"></i>
+            Report #@Model.ReportID
+        </h4>
+        <small class="text-muted">
+            <span class="badge bg-secondary me-1">@Model.IncidentType</span>
+            <span class="badge @badgeClass">@badgeLabel</span>
+        </small>
+    </div>
+    <a href="/Staff" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back to Reports
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row g-4">
+
+    <!-- Left: Report Details -->
+    <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+
+                <h6 class="text-muted text-uppercase fw-bold mb-3 small">
+                    Report Details
+                </h6>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted small">Building</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-secondary">@Model.IncidentType</span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted small">Specific Location</dt>
+                    <dd class="col-sm-8 small">
+                        @(string.IsNullOrWhiteSpace(Model.Location)
+                            ? "Not specified"
+                            : Model.Location)
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted small">Reporter</dt>
+                    <dd class="col-sm-8 small">
+                        @if (Model.IsAnonymous)
+                        {
+                            <span class="text-muted fst-italic">Anonymous</span>
+                        }
+                        else
+                        {
+                            @(Model.ReportedBy != null
+                                ? $"{Model.ReportedBy.FirstName} {Model.ReportedBy.LastName}"
+                                : "—")
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted small">Submitted</dt>
+                    <dd class="col-sm-8 small">
+                        @Model.ReportedAt.ToString("MMM dd, yyyy h:mm tt")
+                    </dd>
+
+                    @if (Model.ResolvedAt.HasValue)
+                    {
+                        <dt class="col-sm-4 text-muted small">Resolved / Dismissed</dt>
+                        <dd class="col-sm-8 small">
+                            @Model.ResolvedAt.Value.ToString("MMM dd, yyyy h:mm tt")
+                        </dd>
+                    }
+
+                    @if (Model.HandledBy != null)
+                    {
+                        <dt class="col-sm-4 text-muted small">Handled By</dt>
+                        <dd class="col-sm-8 small">
+                            @Model.HandledBy.FirstName @Model.HandledBy.LastName
+                        </dd>
+                    }
+                </dl>
+
+                <hr class="my-3" />
+
+                <h6 class="text-muted text-uppercase fw-bold mb-2 small">
+                    Description
+                </h6>
+                <p class="mb-0" style="white-space:pre-wrap">@Model.Description</p>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Resolution))
+                {
+                    <hr class="my-3" />
+                    <h6 class="text-muted text-uppercase fw-bold mb-2 small">
+                        Resolution Note
+                    </h6>
+                    <p class="mb-0 text-success" style="white-space:pre-wrap">
+                        @Model.Resolution
+                    </p>
+                }
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Photo + Update Form -->
+    <div class="col-12 col-lg-5">
+
+        @if (!string.IsNullOrEmpty(Model.PhotoURL))
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-3">
+                    <h6 class="text-muted text-uppercase fw-bold mb-2 small">
+                        Photo
+                    </h6>
+                    <img src="@Model.PhotoURL"
+                         alt="Incident photo"
+                         class="img-fluid rounded"
+                         style="max-height:300px;object-fit:cover;width:100%" />
+                </div>
+            </div>
+        }
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="text-muted text-uppercase fw-bold mb-3 small">
+                    Update Status
+                </h6>
+
+                <form asp-action="UpdateStatus"
+                      asp-route-id="@Model.ReportID"
+                      method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="Pending" selected="@(Model.Status == "Pending")">
+                                Pending
+                            </option>
+                            <option value="Investigating" selected="@(Model.Status == "Investigating")">
+                                Investigating
+                            </option>
+                            <option value="Resolved" selected="@(Model.Status == "Resolved")">
+                                Resolved
+                            </option>
+                            <option value="Dismissed" selected="@(Model.Status == "Dismissed")">
+                                Dismissed
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">
+                            Resolution Note
+                        </label>
+                        <textarea name="resolution"
+                                  class="form-control"
+                                  rows="4"
+                                  placeholder="Describe what was done or why it was dismissed...">@Model.Resolution</textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary fw-semibold">
+                            <i class="bi bi-check2 me-2"></i>Save Update
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
