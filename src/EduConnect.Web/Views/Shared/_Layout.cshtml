@@ -2,48 +2,548 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - EduConnect.Web</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — EduConnect</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet"
+          href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/EduConnect.Web.styles.css" asp-append-version="true" />
+
+    <!-- Free, no installation needed -->
+    <!-- Just add this CDN link -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    @await RenderSectionAsync("Styles", required: false)
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">EduConnect.Web</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+<body data-user-id="@Context.Session.GetString("UserID")">
+
+    <!-- TOP NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top shadow">
+        <div class="container-fluid">
+
+            <!-- Brand -->
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="bi bi-broadcast"></i>
+                EduConnect
+            </a>
+
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Navbar Content -->
+            <div class="collapse navbar-collapse" id="navbarContent">
+
+                <!-- Left Nav Links -->
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="bi bi-house"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/Announcement">
+                            <i class="bi bi-megaphone"></i> Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/Event">
+                            <i class="bi bi-calendar-event"></i>
+                            Events
+                        </a>
+                    </li>
+                    @{
+                        var navRole = Context.Session.GetString("RoleName");
+                    }
+                    @if (navRole == "Administrator" || navRole == "Faculty" ||
+                         navRole == "Dean" || navRole == "Chair Person")
+                    {
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link" href="/Event/Scanner">
+                                <i class="bi bi-qr-code-scan"></i> QR Scanner
+                            </a>
                         </li>
+                    }
+                </ul>
+
+                <!-- Right Nav Links -->
+                <!-- Replace the RIGHT Nav Links section with this -->
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+
+                    @if (Context.Session.GetString("UserID") != null)
+                    {
+                        <!-- Notification Bell — only show if logged in -->
+                        <li class="nav-item me-2 position-relative">
+                            <button id="notif-toggle"
+                                    type="button"
+                                    class="btn nav-link position-relative px-2">
+                                <i class="bi bi-bell fs-5 text-white"></i>
+                                <span id="notif-badge"
+                                      class="position-absolute top-0 start-100
+                                             translate-middle badge rounded-pill
+                                             bg-danger d-none">0</span>
+                            </button>
+                            <!-- Notification dropdown -->
+                            <div id="notif-dropdown"
+                                 class="dropdown-menu dropdown-menu-end shadow p-0"
+                                 style="width:360px;top:100%;right:0;position:absolute;">
+                                <div class="d-flex justify-content-between
+                                            align-items-center px-3 py-2 border-bottom">
+                                    <span class="fw-semibold small">Notifications</span>
+                                    <button id="notif-mark-all"
+                                            type="button"
+                                            class="btn btn-link btn-sm p-0 text-decoration-none
+                                                   text-muted small">
+                                        Mark all read
+                                    </button>
+                                </div>
+                                <div id="notif-list"
+                                     style="max-height:400px;overflow-y:auto;">
+                                    <div class="text-center text-muted p-4 small">
+                                        No notifications
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- User Dropdown — only show if logged in -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2"
+                               href="#"
+                               data-bs-toggle="dropdown">
+                                <img src="https://ui-avatars.com/api/?name=@Context.Session.GetString("UserName")&background=0d6efd&color=fff"
+                                     class="rounded-circle"
+                                     width="32" height="32"
+                                     alt="Avatar" />
+                                <span>@Context.Session.GetString("UserName")</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                <li>
+                                    <h6 class="dropdown-header">
+                                        @Context.Session.GetString("RoleName")
+                                    </h6>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/Account/Profile">
+                                        <i class="bi bi-person me-2"></i>Profile
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <a class="dropdown-item text-danger"
+                                       href="/Account/Logout">
+                                        <i class="bi bi-box-arrow-right me-2"></i>
+                                        Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+                    else
+                    {
+                        <!-- Show Login button if NOT logged in -->
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                            <a class="btn btn-outline-light btn-sm"
+                               href="/Account/Login">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>
+                                Login
+                            </a>
                         </li>
-                    </ul>
+                    }
+
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- SIDEBAR + CONTENT WRAPPER -->
+    <div class="d-flex" style="margin-top: 56px;">
+
+        <!-- SIDEBAR -->
+        <div class="sidebar d-none d-lg-flex flex-column flex-shrink-0 p-3 bg-white shadow-sm"
+             style="width: 260px; min-height: calc(100vh - 56px); position: sticky; top: 56px;">
+
+            <!-- User Info -->
+            <!-- User Info in Sidebar -->
+            <div class="d-flex align-items-center gap-3 mb-4 p-2 bg-light rounded">
+                <img src="https://ui-avatars.com/api/?name=@(Context.Session.GetString("UserName") ?? "Guest")&background=0d6efd&color=fff"
+                     class="rounded-circle"
+                     width="45" height="45"
+                     alt="Avatar" />
+                <div>
+                    @if (Context.Session.GetString("UserID") != null)
+                    {
+                        <div class="fw-semibold small">Welcome back,</div>
+                        <div class="fw-bold text-primary">
+                            @Context.Session.GetString("UserName")
+                        </div>
+                        <div class="text-muted" style="font-size:11px">
+                            @Context.Session.GetString("RoleName")
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="fw-semibold small">Welcome,</div>
+                        <div class="fw-bold text-primary">Guest</div>
+                    }
                 </div>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+
+            <!-- Feed Toggle -->
+            <div class="mb-3">
+                <small class="text-muted text-uppercase fw-bold px-2">Feed</small>
+                <div class="d-flex gap-2 mt-2 px-2">
+                    <a href="#" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-mortarboard"></i> Academic
+                    </a>
+                    <a href="#" class="btn btn-outline-secondary btn-sm flex-fill">
+                        <i class="bi bi-building"></i> Non-Academic
+                    </a>
+                </div>
+            </div>
+
+            <hr />
+
+            <!-- Navigation Links -->
+            <!-- Replace the Navigation Links section -->
+            <small class="text-muted text-uppercase
+               fw-bold px-2">Navigation</small>
+            <ul class="nav nav-pills flex-column mt-2 gap-1">
+
+                @{
+                    var currentRole = Context.Session
+                    .GetString("RoleName");
+                }
+
+                @if (currentRole == "Administrator")
+                {
+                    <li class="nav-item">
+                        <a href="/Admin"
+                           class="nav-link text-dark">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Admin/PendingUsers"
+                           class="nav-link text-dark">
+                            <i class="bi bi-person-check me-2"></i>
+                            Verify Students
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Admin/Users"
+                           class="nav-link text-dark">
+                            <i class="bi bi-people me-2"></i>
+                            Manage Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement"
+                           class="nav-link text-dark">
+                            <i class="bi bi-megaphone me-2"></i>
+                            Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event"
+                           class="nav-link text-dark">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event/Scanner"
+                           class="nav-link text-dark">
+                            <i class="bi bi-qr-code-scan me-2"></i>
+                            QR Scanner
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Notification"
+                           class="nav-link text-dark">
+                            <i class="bi bi-bell me-2"></i>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Staff"
+                           class="nav-link text-dark">
+                            <i class="bi bi-shield-exclamation me-2"></i>
+                            Safety Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/SafetyReport/Submit"
+                           class="nav-link text-dark">
+                            <i class="bi bi-flag me-2"></i>
+                            Report Safety Issue
+                        </a>
+                    </li>
+                }
+                else if (currentRole == "Dean")
+                {
+                    <li class="nav-item">
+                        <a href="/Dean"
+                           class="nav-link text-dark">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Dean/PendingApprovals"
+                           class="nav-link text-dark">
+                            <i class="bi bi-hourglass-split me-2"></i>
+                            Pending Approvals
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement/Create"
+                           class="nav-link text-dark">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            New Announcement
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement"
+                           class="nav-link text-dark">
+                            <i class="bi bi-megaphone me-2"></i>
+                            Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event"
+                           class="nav-link text-dark">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event/Scanner"
+                           class="nav-link text-dark">
+                            <i class="bi bi-qr-code-scan me-2"></i>
+                            QR Scanner
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Notification"
+                           class="nav-link text-dark">
+                            <i class="bi bi-bell me-2"></i>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/SafetyReport/Submit"
+                           class="nav-link text-dark">
+                            <i class="bi bi-flag me-2"></i>
+                            Report Safety Issue
+                        </a>
+                    </li>
+                }
+                else if (currentRole == "Faculty")
+                {
+                    <li class="nav-item">
+                        <a href="/Faculty"
+                           class="nav-link text-dark">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement/Create"
+                           class="nav-link text-dark">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            New Announcement
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement"
+                           class="nav-link text-dark">
+                            <i class="bi bi-megaphone me-2"></i>
+                            Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event"
+                           class="nav-link text-dark">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event/Scanner"
+                           class="nav-link text-dark">
+                            <i class="bi bi-qr-code-scan me-2"></i>
+                            QR Scanner
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Notification"
+                           class="nav-link text-dark">
+                            <i class="bi bi-bell me-2"></i>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/SafetyReport/Submit"
+                           class="nav-link text-dark">
+                            <i class="bi bi-flag me-2"></i>
+                            Report Safety Issue
+                        </a>
+                    </li>
+                }
+                else if (currentRole == "Staff")
+                {
+                    <li class="nav-item">
+                        <a href="/Staff"
+                           class="nav-link text-dark">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Staff"
+                           class="nav-link text-dark">
+                            <i class="bi bi-shield-exclamation me-2"></i>
+                            Safety Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/SafetyReport/Submit"
+                           class="nav-link text-dark">
+                            <i class="bi bi-flag me-2"></i>
+                            Report Safety Issue
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement"
+                           class="nav-link text-dark">
+                            <i class="bi bi-megaphone me-2"></i>
+                            Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event"
+                           class="nav-link text-dark">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Notification"
+                           class="nav-link text-dark">
+                            <i class="bi bi-bell me-2"></i>
+                            Notifications
+                        </a>
+                    </li>
+                }
+                else
+                {
+                    <!-- Student -->
+                    <li class="nav-item">
+                        <a href="/"
+                           class="nav-link text-dark">
+                            <i class="bi bi-house me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Announcement"
+                           class="nav-link text-dark">
+                            <i class="bi bi-megaphone me-2"></i>
+                            Announcements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Event"
+                           class="nav-link text-dark">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Notification"
+                           class="nav-link text-dark">
+                            <i class="bi bi-bell me-2"></i>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/SafetyReport/Submit"
+                           class="nav-link text-dark">
+                            <i class="bi bi-flag me-2"></i>
+                            Report Safety Issue
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/StudyGroup"
+                           class="nav-link text-dark">
+                            <i class="bi bi-people me-2"></i>
+                            Study Groups
+                        </a>
+                    </li>
+                }
+
+            </ul>
+
+            <hr />
+
+            <!-- Department Tags -->
+            <small class="text-muted text-uppercase fw-bold px-2">My Department</small>
+            <div class="mt-2 px-2">
+                <span class="badge rounded-pill text-bg-primary">CCIT</span>
+                <span class="badge rounded-pill text-bg-secondary mt-1">School Wide</span>
+            </div>
+
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-grow-1 p-4 bg-light">
             @RenderBody()
         </main>
+
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - EduConnect.Web - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
+    <!-- FOOTER -->
+    <footer class="bg-white border-top py-3 text-center">
+        <small class="text-muted">
+            &copy; 2026 EduConnect — Adamson University
+            Smart Campus Communication System
+        </small>
     </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+    <!-- Bootstrap JS -->
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
     <script src="~/js/site.js" asp-append-version="true"></script>
+
     @await RenderSectionAsync("Scripts", required: false)
+
+    <!-- Toast container -->
+    <div id="toast-container"
+         class="position-fixed bottom-0 end-0 p-3"
+         style="z-index:9999;"></div>
+
+    <!-- SignalR + Notifications -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script src="~/js/notifications.js" asp-append-version="true"></script>
+
+    @if (Context.Session.GetString("UserID") != null)
+    {
+        @await Html.PartialAsync("_ChatbotWidget")
+    }
 </body>
 </html>
