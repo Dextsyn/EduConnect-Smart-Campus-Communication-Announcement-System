@@ -1,0 +1,156 @@
+@model EduConnect.Web.ViewModels.SafetyReportViewModel
+@{
+    ViewData["Title"] = "Report a Safety Issue";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-shield-exclamation me-2 text-warning"></i>
+            Report a Safety Issue
+        </h4>
+        <small class="text-muted">
+            Report a broken or damaged facility on campus
+        </small>
+    </div>
+    <a href="/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger mb-4">
+                        <i class="bi bi-exclamation-circle me-2"></i>
+                        Please fix the errors below.
+                    </div>
+                }
+
+                <form asp-action="Submit"
+                      method="post"
+                      enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Building -->
+                    <div class="mb-4">
+                        <label asp-for="Building"
+                               class="form-label fw-semibold">
+                            Building <span class="text-danger">*</span>
+                        </label>
+                        <select asp-for="Building"
+                                class="form-select form-select-lg">
+                            <option value="">— Select building —</option>
+                            <option value="SV">SV</option>
+                            <option value="ST">ST</option>
+                            <option value="OZ">OZ</option>
+                            <option value="CS">CS</option>
+                            <option value="CT">CT</option>
+                            <option value="Other">Other (outdoor / garden)</option>
+                        </select>
+                        <span asp-validation-for="Building"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <!-- Specific Location -->
+                    <div class="mb-4">
+                        <label asp-for="SpecificLocation"
+                               class="form-label fw-semibold">
+                            Specific Location
+                        </label>
+                        <input asp-for="SpecificLocation"
+                               class="form-control"
+                               placeholder="e.g. Room 201, 2nd floor hallway, near the entrance" />
+                        <div class="form-text">
+                            Optional but helps staff find the issue faster.
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-4">
+                        <label asp-for="Description"
+                               class="form-label fw-semibold">
+                            Description <span class="text-danger">*</span>
+                        </label>
+                        <textarea asp-for="Description"
+                                  class="form-control"
+                                  rows="4"
+                                  placeholder="Describe what is broken or damaged..."></textarea>
+                        <span asp-validation-for="Description"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <!-- Photo -->
+                    <div class="mb-4">
+                        <label asp-for="Photo"
+                               class="form-label fw-semibold">
+                            Photo
+                        </label>
+                        <input asp-for="Photo"
+                               type="file"
+                               accept=".jpg,.jpeg,.png"
+                               class="form-control" />
+                        <div class="form-text">
+                            Optional. JPG or PNG, max 5 MB.
+                        </div>
+                        <span asp-validation-for="Photo"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <!-- Photo preview -->
+                    <div id="photo-preview-wrapper" class="mb-4 d-none">
+                        <img id="photo-preview"
+                             src="#"
+                             alt="Preview"
+                             class="img-thumbnail"
+                             style="max-height:200px" />
+                    </div>
+
+                    <!-- Anonymous -->
+                    <div class="mb-4 p-3 bg-light rounded">
+                        <div class="form-check">
+                            <input asp-for="IsAnonymous"
+                                   class="form-check-input"
+                                   type="checkbox" />
+                            <label asp-for="IsAnonymous"
+                                   class="form-check-label fw-semibold">
+                                Submit anonymously
+                            </label>
+                        </div>
+                        <div class="form-text mt-1">
+                            Your name will not be shown to staff if this is checked.
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit"
+                                class="btn btn-warning btn-lg fw-semibold">
+                            <i class="bi bi-send me-2"></i>Submit Report
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        document.querySelector('input[type="file"]')
+            .addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const wrapper = document.getElementById('photo-preview-wrapper');
+                const img = document.getElementById('photo-preview');
+                img.src = URL.createObjectURL(file);
+                wrapper.classList.remove('d-none');
+            });
+    </script>
+}
