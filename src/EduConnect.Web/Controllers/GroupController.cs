@@ -62,9 +62,11 @@ namespace EduConnect.Web.Controllers
                 return View();
             }
 
+            var userId = GetUserID();
+
             var group = new Group
             {
-                CreatorID = GetUserID(),
+                CreatorID = userId,
                 Name = name.Trim(),
                 Category = category,
                 Description = description?.Trim(),
@@ -77,7 +79,7 @@ namespace EduConnect.Web.Controllers
             _context.GroupMembers.Add(new GroupMember
             {
                 GroupID = group.GroupID,
-                UserID = GetUserID()
+                UserID = userId
             });
             await _context.SaveChangesAsync();
 
@@ -146,16 +148,14 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
+            int countAfterJoin = group.Members.Count + 1;
             _context.GroupMembers.Add(new GroupMember { GroupID = id, UserID = userId });
-            await _context.SaveChangesAsync();
-
-            var memberCount = await _context.GroupMembers.CountAsync(m => m.GroupID == id);
-            if (memberCount >= group.MaxMembers)
+            if (countAfterJoin >= group.MaxMembers)
             {
                 group.Status = "Full";
                 group.ChatExpiresAt = DateTime.UtcNow.AddDays(7);
-                await _context.SaveChangesAsync();
             }
+            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -180,16 +180,19 @@ namespace EduConnect.Web.Controllers
             var membership = await _context.GroupMembers
                 .FirstOrDefaultAsync(m => m.GroupID == id && m.UserID == userId);
 
-            if (membership != null)
+            if (membership == null)
             {
-                _context.GroupMembers.Remove(membership);
-                if (group.Status == "Full")
-                {
-                    group.Status = "Open";
-                    group.ChatExpiresAt = null;
-                }
-                await _context.SaveChangesAsync();
+                TempData["Error"] = "You are not a member of this group.";
+                return RedirectToAction(nameof(Details), new { id });
             }
+
+            _context.GroupMembers.Remove(membership);
+            if (group.Status == "Full")
+            {
+                group.Status = "Open";
+                group.ChatExpiresAt = null;
+            }
+            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }
@@ -207,6 +210,7 @@ namespace EduConnect.Web.Controllers
 
             if (group == null) return NotFound();
             if (group.CreatorID != GetUserID()) return Forbid();
+            if (group.Status == "Dissolved") return RedirectToAction(nameof(Index));
 
             _context.GroupMessages.RemoveRange(group.Messages);
             group.Status = "Dissolved";
