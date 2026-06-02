@@ -53,6 +53,7 @@ namespace EduConnect.Web.Hubs
                 .FirstOrDefaultAsync(g => g.GroupID == groupId);
 
             if (group == null || group.Status == "Dissolved") return;
+            if (group.ChatExpiresAt.HasValue && group.ChatExpiresAt <= DateTime.UtcNow) return;
             if (!group.Members.Any(m => m.UserID == userId)) return;
 
             var message = new GroupMessage

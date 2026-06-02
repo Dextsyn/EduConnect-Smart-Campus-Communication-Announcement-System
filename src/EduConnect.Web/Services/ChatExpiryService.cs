@@ -19,7 +19,8 @@ namespace EduConnect.Web.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 await ExpireChats();
-                await Task.Delay(TimeSpan.FromMinutes(60), stoppingToken);
+                try { await Task.Delay(TimeSpan.FromMinutes(60), stoppingToken); }
+                catch (OperationCanceledException) { break; }
             }
         }
 

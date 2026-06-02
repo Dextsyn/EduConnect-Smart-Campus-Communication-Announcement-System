@@ -23,6 +23,13 @@ namespace EduConnect.Web.Controllers
         private bool IsStudent() =>
             HttpContext.Session.GetString("RoleName") == "Student";
 
+        private static readonly HashSet<string> _allowedCategories = new()
+        {
+            "Study Group", "Project Team", "Research",
+            "Hobby & Arts", "Sports & Fitness", "Tech & Gaming",
+            "Volunteer & Advocacy", "Culture & Faith"
+        };
+
         // GET /Group
         public async Task<IActionResult> Index()
         {
@@ -59,6 +66,12 @@ namespace EduConnect.Web.Controllers
                 || maxMembers < 2 || maxMembers > 50)
             {
                 TempData["Error"] = "Please fill in all required fields correctly.";
+                return View();
+            }
+
+            if (!_allowedCategories.Contains(category))
+            {
+                TempData["Error"] = "Invalid category selected.";
                 return View();
             }
 
@@ -148,14 +161,15 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
-            int countAfterJoin = group.Members.Count + 1;
             _context.GroupMembers.Add(new GroupMember { GroupID = id, UserID = userId });
-            if (countAfterJoin >= group.MaxMembers)
+            await _context.SaveChangesAsync();
+            var actualCount = await _context.GroupMembers.CountAsync(m => m.GroupID == id);
+            if (actualCount >= group.MaxMembers && group.Status == "Open")
             {
                 group.Status = "Full";
                 group.ChatExpiresAt = DateTime.UtcNow.AddDays(7);
+                await _context.SaveChangesAsync();
             }
-            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -166,6 +180,7 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Leave(int id)
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
+            if (!IsStudent()) return Forbid();
 
             var group = await _context.Groups.FindAsync(id);
             if (group == null) return NotFound();
