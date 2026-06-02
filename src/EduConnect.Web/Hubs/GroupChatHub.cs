@@ -65,7 +65,8 @@ namespace EduConnect.Web.Hubs
             await _context.SaveChangesAsync();
 
             var sender = await _context.Users.FindAsync(userId);
-            var senderName = $"{sender!.FirstName} {sender.LastName}";
+            if (sender == null) return;
+            var senderName = $"{sender.FirstName} {sender.LastName}";
 
             await Clients.Group($"group-{groupId}").SendAsync("ReceiveMessage", new
             {
