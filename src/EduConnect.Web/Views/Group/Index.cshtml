@@ -1,0 +1,132 @@
+@model IEnumerable<EduConnect.Web.Models.Group>
+@{
+    ViewData["Title"] = "Group Finder";
+    var role = Context.Session.GetString("RoleName");
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="fw-bold mb-0">
+            <i class="bi bi-people me-2 text-primary"></i>Group Finder
+        </h3>
+        <p class="text-muted mb-0 small">Find your people — academic or otherwise.</p>
+    </div>
+    @if (role == "Student")
+    {
+        <a href="/Group/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Group
+        </a>
+    }
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Category Filter Pills -->
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <button class="btn btn-primary btn-sm category-filter active" data-filter="all">All</button>
+    <span class="text-muted small">Academic:</span>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Study Group">Study Group</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Project Team">Project Team</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Research">Research</button>
+    <span class="text-muted small ms-2">Interest:</span>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Hobby & Arts">Hobby &amp; Arts</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Sports & Fitness">Sports &amp; Fitness</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Tech & Gaming">Tech &amp; Gaming</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Volunteer & Advocacy">Volunteer &amp; Advocacy</button>
+    <button class="btn btn-outline-secondary btn-sm category-filter" data-filter="Culture & Faith">Culture &amp; Faith</button>
+</div>
+
+<!-- Search -->
+<div class="mb-4">
+    <input type="text" id="group-search" class="form-control"
+           placeholder="Search groups by name..." />
+</div>
+
+<!-- Cards -->
+<div class="row g-3" id="group-cards">
+    @if (!Model.Any())
+    {
+        <div class="col-12 text-center text-muted py-5">
+            <i class="bi bi-people fs-1 d-block mb-2"></i>
+            No groups yet. Be the first to create one!
+        </div>
+    }
+    @foreach (var group in Model)
+    {
+        <div class="col-md-4 group-card"
+             data-category="@group.Category"
+             data-name="@group.Name.ToLower()">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-primary">@group.Category</span>
+                        @if (group.Status == "Full")
+                        {
+                            <span class="badge bg-danger">Full</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">Open</span>
+                        }
+                    </div>
+                    <h6 class="fw-bold mb-1">@group.Name</h6>
+                    <p class="text-muted small mb-2" style="min-height:2.5em">
+                        @(group.Description?.Length > 100
+                            ? group.Description.Substring(0, 100) + "…"
+                            : (group.Description ?? "No description."))
+                    </p>
+                    <div class="d-flex justify-content-between align-items-center small text-muted">
+                        <span><i class="bi bi-people me-1"></i>@group.Members.Count / @group.MaxMembers</span>
+                        <span>by @group.Creator.FirstName @group.Creator.LastName</span>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0 pt-0">
+                    <a href="/Group/Details/@group.GroupID"
+                       class="btn btn-outline-primary btn-sm w-100">View Group</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div id="no-results" class="text-center text-muted py-5 d-none">
+    <i class="bi bi-search fs-1 d-block mb-2"></i>
+    No groups match your search.
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('.category-filter').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.category-filter').forEach(b => {
+                b.classList.remove('active', 'btn-primary');
+                b.classList.add('btn-outline-secondary');
+            });
+            this.classList.add('active', 'btn-primary');
+            this.classList.remove('btn-outline-secondary');
+            filterGroups();
+        });
+    });
+
+    document.getElementById('group-search').addEventListener('input', filterGroups);
+
+    function filterGroups() {
+        const filter = document.querySelector('.category-filter.active').dataset.filter;
+        const search = document.getElementById('group-search').value.toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('.group-card').forEach(card => {
+            const matchCat = filter === 'all' || card.dataset.category === filter;
+            const matchSearch = card.dataset.name.includes(search);
+            card.style.display = matchCat && matchSearch ? '' : 'none';
+            if (matchCat && matchSearch) visible++;
+        });
+        document.getElementById('no-results').classList.toggle('d-none', visible > 0);
+    }
+</script>
+}

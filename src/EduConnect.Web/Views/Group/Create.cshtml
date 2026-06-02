@@ -1,0 +1,77 @@
+@{
+    ViewData["Title"] = "Create Group";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-plus-circle me-2"></i>Create a Group
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger">@TempData["Error"]</div>
+                }
+                <form method="post" action="/Group/Create">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Group Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="name" class="form-control"
+                               maxlength="150" required
+                               placeholder="e.g. DS101 Finals Study Group" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Category <span class="text-danger">*</span>
+                        </label>
+                        <select name="category" class="form-select" required>
+                            <option value="" disabled selected>Select a category...</option>
+                            <optgroup label="Academic">
+                                <option value="Study Group">Study Group</option>
+                                <option value="Project Team">Project Team</option>
+                                <option value="Research">Research</option>
+                            </optgroup>
+                            <optgroup label="Interest">
+                                <option value="Hobby & Arts">Hobby &amp; Arts</option>
+                                <option value="Sports & Fitness">Sports &amp; Fitness</option>
+                                <option value="Tech & Gaming">Tech &amp; Gaming</option>
+                                <option value="Volunteer & Advocacy">Volunteer &amp; Advocacy</option>
+                                <option value="Culture & Faith">Culture &amp; Faith</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="description" class="form-control" rows="3"
+                                  maxlength="1000"
+                                  placeholder="What is this group about?"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">
+                            Max Members <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="maxMembers" class="form-control"
+                               min="2" max="50" value="10" required />
+                        <div class="form-text">Between 2 and 50. You count as 1 toward this limit.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Create Group
+                        </button>
+                        <a href="/Group" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
