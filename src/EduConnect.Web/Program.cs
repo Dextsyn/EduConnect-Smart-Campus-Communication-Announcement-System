@@ -16,6 +16,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
     new Client(apiKey: provider.GetRequiredService<IConfiguration>()["GeminiSettings:ApiKey"] ?? ""));
 builder.Services.AddScoped<EduConnect.Web.Services.IChatbotService, EduConnect.Web.Services.ChatbotService>();
+builder.Services.AddHostedService<EduConnect.Web.Services.ChatExpiryService>();
 builder.Services.AddSignalR();
 
 // ↓ ADD THESE TWO
