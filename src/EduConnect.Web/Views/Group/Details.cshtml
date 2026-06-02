@@ -253,7 +253,11 @@
     const feed = document.getElementById('chat-messages');
     if (feed) feed.scrollTop = feed.scrollHeight;
 
-    // Expiry countdown
+
+</script>
+}
+<script>
+    // Expiry countdown — runs for all visitors so non-members don't see a stuck "Calculating…"
     const expiryEl = document.getElementById('expiry-countdown');
     if (expiryEl) {
         const expires = new Date(expiryEl.dataset.expires);
@@ -269,5 +273,4 @@
         setInterval(updateCountdown, 60000);
     }
 </script>
-}
 }
