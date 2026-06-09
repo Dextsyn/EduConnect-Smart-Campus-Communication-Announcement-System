@@ -606,6 +606,8 @@ namespace EduConnect.Web.Controllers
             user.StudentID = model.StudentID;
             user.RoleID = model.RoleID;
             user.IsActive = model.IsActive;
+            if (model.IsActive && user.VerificationStatus != "Verified")
+                user.VerificationStatus = "Verified";
             user.UpdatedAt = DateTime.Now;
 
             if (!string.IsNullOrWhiteSpace(model.Password))
@@ -734,6 +736,9 @@ namespace EduConnect.Web.Controllers
 
             _context.AuditLogs.RemoveRange(
                 _context.AuditLogs.Where(l => l.UserID == id));
+
+            _context.PasswordResetTokens.RemoveRange(
+                _context.PasswordResetTokens.Where(t => t.UserID == id));
 
             _context.UserDepartments.RemoveRange(
                 _context.UserDepartments.Where(d => d.UserID == id));

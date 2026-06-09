@@ -44,8 +44,7 @@ namespace EduConnect.Web.Controllers
         private bool CanPublish()
         {
             var role = GetRoleName();
-            return role == "Administrator" ||
-                   role == "Dean" ||
+            return role == "Dean" ||
                    role == "Chair Person";
         }
 
