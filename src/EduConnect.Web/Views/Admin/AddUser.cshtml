@@ -1,0 +1,103 @@
+@model EduConnect.Web.ViewModels.AdminUserFormViewModel
+@{
+    ViewData["Title"] = "Add User";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-person-plus me-2 text-primary"></i>
+            Add User
+        </h4>
+        <small class="text-muted">Create a new user account manually</small>
+    </div>
+    <a href="/Admin/Users" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:640px;">
+    <div class="card-body p-4">
+
+        <form asp-action="AddUser" method="post">
+            @Html.AntiForgeryToken()
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger mb-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Please fix the errors below.
+                </div>
+            }
+
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <label asp-for="FirstName" class="form-label fw-semibold">First Name</label>
+                    <input asp-for="FirstName" class="form-control" placeholder="First name" />
+                    <span asp-validation-for="FirstName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="LastName" class="form-label fw-semibold">Last Name</label>
+                    <input asp-for="LastName" class="form-control" placeholder="Last name" />
+                    <span asp-validation-for="LastName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Email" class="form-label fw-semibold">Email</label>
+                    <input asp-for="Email" type="email" class="form-control" placeholder="email@adamson.edu.ph" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Password" class="form-label fw-semibold">Password</label>
+                    <input asp-for="Password" type="password" class="form-control" placeholder="Minimum 6 characters" />
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="StudentID" class="form-label fw-semibold">
+                        Student ID <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input asp-for="StudentID" class="form-control" placeholder="e.g. 2021-12345" />
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="RoleID" class="form-label fw-semibold">Role</label>
+                    <select asp-for="RoleID" asp-items="Model.Roles" class="form-select">
+                        <option value="">— Select role —</option>
+                    </select>
+                    <span asp-validation-for="RoleID" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="DepartmentTagID" class="form-label fw-semibold">Department</label>
+                    <select asp-for="DepartmentTagID" asp-items="Model.Departments" class="form-select">
+                        <option value="">— Select department —</option>
+                    </select>
+                    <span asp-validation-for="DepartmentTagID" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                        <label asp-for="IsActive" class="form-check-label">Account is active</label>
+                    </div>
+                </div>
+
+                <div class="col-12 d-flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-1"></i>Create User
+                    </button>
+                    <a href="/Admin/Users" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
