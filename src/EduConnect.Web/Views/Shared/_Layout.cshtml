@@ -67,7 +67,7 @@
                     @{
                         var navRole = Context.Session.GetString("RoleName");
                     }
-                    @if (navRole == "Administrator" || navRole == "Faculty" ||
+                    @if (navRole == "Faculty" ||
                          navRole == "Dean" || navRole == "Chair Person")
                     {
                         <li class="nav-item">
@@ -230,73 +230,27 @@
                 @if (currentRole == "Administrator")
                 {
                     <li class="nav-item">
-                        <a href="/Admin"
-                           class="nav-link text-dark">
+                        <a href="/Admin" class="nav-link text-dark">
                             <i class="bi bi-speedometer2 me-2"></i>
                             Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/Admin/PendingUsers"
-                           class="nav-link text-dark">
+                        <a href="/Admin/PendingUsers" class="nav-link text-dark">
                             <i class="bi bi-person-check me-2"></i>
                             Verify Students
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/Admin/Users"
-                           class="nav-link text-dark">
+                        <a href="/Admin/Users" class="nav-link text-dark">
                             <i class="bi bi-people me-2"></i>
                             Manage Users
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/Announcement"
-                           class="nav-link text-dark">
-                            <i class="bi bi-megaphone me-2"></i>
-                            Announcements
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Event"
-                           class="nav-link text-dark">
-                            <i class="bi bi-calendar-event me-2"></i>
-                            Events
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Group"
-                           class="nav-link text-dark">
-                            <i class="bi bi-people me-2"></i>
-                            Group Finder
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Event/Scanner"
-                           class="nav-link text-dark">
-                            <i class="bi bi-qr-code-scan me-2"></i>
-                            QR Scanner
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Notification"
-                           class="nav-link text-dark">
-                            <i class="bi bi-bell me-2"></i>
-                            Notifications
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Staff"
-                           class="nav-link text-dark">
-                            <i class="bi bi-shield-exclamation me-2"></i>
-                            Safety Reports
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/SafetyReport/Submit"
-                           class="nav-link text-dark">
-                            <i class="bi bi-flag me-2"></i>
-                            Report Safety Issue
+                        <a href="/Admin/AddUser" class="nav-link text-dark">
+                            <i class="bi bi-person-plus me-2"></i>
+                            Add User
                         </a>
                     </li>
                 }
