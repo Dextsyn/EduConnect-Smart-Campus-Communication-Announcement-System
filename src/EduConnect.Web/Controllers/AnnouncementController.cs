@@ -367,6 +367,14 @@ namespace EduConnect.Web.Controllers
             var roleName = GetRoleName();
             var userID = GetUserID();
 
+            // Strip fields Faculty is not allowed to set
+            if (IsFaculty())
+            {
+                model.IsEmergency = false;
+                if (model.FeedType == "Emergency")
+                    model.FeedType = "Academic";
+            }
+
             // ─── SECURITY: Validate tags ───────────
             // Make sure faculty didn't tamper with
             // the form to post to other departments
@@ -765,6 +773,14 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("MyAnnouncements");
             }
 
+            // Strip fields Faculty is not allowed to set
+            if (IsFaculty())
+            {
+                model.IsEmergency = false;
+                if (model.FeedType == "Emergency")
+                    model.FeedType = "Academic";
+            }
+
             // Tag security for non-admins
             if (!isAdmin &&
                 model.SelectedTagIDs != null &&
@@ -1032,6 +1048,13 @@ namespace EduConnect.Web.Controllers
 
             if (announcement == null)
                 return RedirectToAction("MyAnnouncements");
+
+            if (!announcement.AnnouncementTags.Any())
+            {
+                TempData["Error"] =
+                    "Please add at least one department tag before submitting.";
+                return RedirectToAction("MyAnnouncements");
+            }
 
             // Find faculty's primary department tag
             var primaryDept = await _context.UserDepartments
