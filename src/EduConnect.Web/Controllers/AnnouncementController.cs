@@ -671,6 +671,15 @@ namespace EduConnect.Web.Controllers
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
 
+            if (IsFaculty() &&
+                announcement.ApprovalStatus != "Draft" &&
+                announcement.ApprovalStatus != "Rejected")
+            {
+                TempData["Error"] =
+                    "This announcement cannot be edited while under review.";
+                return RedirectToAction("MyAnnouncements");
+            }
+
             var model = new AnnouncementFormViewModel
             {
                 AnnouncementID = announcement.AnnouncementID,
@@ -746,6 +755,15 @@ namespace EduConnect.Web.Controllers
             // Re-check ownership server-side
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
+
+            if (IsFaculty() &&
+                announcement.ApprovalStatus != "Draft" &&
+                announcement.ApprovalStatus != "Rejected")
+            {
+                TempData["Error"] =
+                    "This announcement cannot be edited while under review.";
+                return RedirectToAction("MyAnnouncements");
+            }
 
             // Tag security for non-admins
             if (!isAdmin &&
@@ -862,6 +880,14 @@ namespace EduConnect.Web.Controllers
                     "/uploads/announcements/" + fileName;
             }
 
+            // Reset to Draft if Faculty edits a rejected announcement
+            if (IsFaculty() && announcement.ApprovalStatus == "Rejected")
+            {
+                announcement.ApprovalStatus = "Draft";
+                announcement.ChairRejectionReason = null;
+                announcement.RejectionReason = null;
+            }
+
             // ─── Update fields ─────────────────
             announcement.Title = model.Title;
             announcement.Body = model.Body;
@@ -896,6 +922,10 @@ namespace EduConnect.Web.Controllers
 
             TempData["Success"] =
                 "Announcement updated successfully!";
+
+            if (IsFaculty())
+                return RedirectToAction("MyAnnouncements");
+
             return RedirectToAction("Index");
         }
 
