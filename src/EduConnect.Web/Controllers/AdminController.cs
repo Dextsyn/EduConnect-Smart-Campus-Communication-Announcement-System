@@ -1,6 +1,9 @@
 ﻿using EduConnect.Web.Data;
+using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Web.Controllers
@@ -455,6 +458,128 @@ namespace EduConnect.Web.Controllers
                     $"{newRole?.RoleName}.";
             }
 
+            return RedirectToAction("Users");
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Admin/AddUser
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> AddUser()
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var model = new AdminUserFormViewModel
+            {
+                Roles = (await _context.Roles.ToListAsync())
+                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
+                    .ToList(),
+                Departments = (await _context.DepartmentTags
+                    .Where(d => d.IsActive)
+                    .ToListAsync())
+                    .Select(d => new SelectListItem(
+                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
+                    .ToList()
+            };
+            return View(model);
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Admin/AddUser
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddUser(AdminUserFormViewModel model)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            // Require password for new users
+            if (string.IsNullOrWhiteSpace(model.Password))
+                ModelState.AddModelError("Password", "Password is required when creating a user.");
+
+            // Check email uniqueness
+            if (await _context.Users.AnyAsync(u => u.Email == model.Email))
+                ModelState.AddModelError("Email", "A user with this email already exists.");
+
+            if (!ModelState.IsValid)
+            {
+                model.Roles = (await _context.Roles.ToListAsync())
+                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
+                    .ToList();
+                model.Departments = (await _context.DepartmentTags
+                    .Where(d => d.IsActive)
+                    .ToListAsync())
+                    .Select(d => new SelectListItem(
+                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
+                    .ToList();
+                return View(model);
+            }
+
+            var adminID = int.Parse(HttpContext.Session.GetString("UserID"));
+
+            var user = new User
+            {
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                Email = model.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
+                StudentID = model.StudentID,
+                RoleID = model.RoleID,
+                IsActive = model.IsActive,
+                VerificationStatus = "Verified",
+                VerifiedByID = adminID,
+                VerifiedAt = DateTime.Now,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            _context.UserDepartments.Add(new UserDepartment
+            {
+                UserID = user.UserID,
+                TagID = model.DepartmentTagID,
+                IsPrimary = true,
+                CreatedAt = DateTime.Now
+            });
+            await _context.SaveChangesAsync();
+
+            // Send welcome email (fire-and-forget)
+            try
+            {
+                var emailBody = $@"
+        <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;'>
+            <div style='background:#0d6efd;padding:30px;text-align:center;border-radius:8px 8px 0 0;'>
+                <h1 style='color:white;margin:0;'>EduConnect</h1>
+            </div>
+            <div style='background:#f8f9fa;padding:30px;border-radius:0 0 8px 8px;'>
+                <h2 style='color:#198754;'>✅ Account Created!</h2>
+                <p>Hi {user.FirstName},</p>
+                <p>An EduConnect account has been created for you by the administrator.
+                   You can log in using your email address.</p>
+                <div style='text-align:center;margin:30px 0;'>
+                    <a href='{GetBaseUrl()}/Account/Login'
+                       style='background:#0d6efd;color:white;padding:14px 30px;
+                              text-decoration:none;border-radius:6px;font-weight:bold;'>
+                        Login to EduConnect
+                    </a>
+                </div>
+            </div>
+        </div>";
+
+                await _emailService.SendEmailAsync(
+                    user.Email,
+                    $"{user.FirstName} {user.LastName}",
+                    "EduConnect — Account Created",
+                    emailBody);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Welcome email failed: {Error}", ex.Message);
+            }
+
+            TempData["Success"] = $"{user.FirstName} {user.LastName}'s account has been created.";
             return RedirectToAction("Users");
         }
     }
