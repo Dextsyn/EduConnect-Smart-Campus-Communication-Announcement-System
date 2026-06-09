@@ -1,0 +1,312 @@
+﻿@{
+    ViewData["Title"] = "Manage Users";
+    var users = ViewBag.Users as
+        List<EduConnect.Web.Models.User>
+        ?? new List<EduConnect.Web.Models.User>();
+    var roles = ViewBag.Roles as
+        List<EduConnect.Web.Models.Role>
+        ?? new List<EduConnect.Web.Models.Role>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-people me-2 text-primary"></i>
+            Manage Users
+        </h4>
+        <small class="text-muted">@users.Count total users</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Admin/AddUser" class="btn btn-primary btn-sm">
+            <i class="bi bi-person-plus me-1"></i>Add User
+        </a>
+        <a href="/Admin" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-2"></i>Back
+        </a>
+    </div>
+</div>
+
+<!-- ─── SUCCESS MESSAGE ──────────────── -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success
+                    alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible mb-4">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- ─── FILTERS ──────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2">
+
+            <div class="col-12 col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text"
+                           name="searchQuery"
+                           value="@ViewBag.SearchQuery"
+                           class="form-control"
+                           placeholder="Search name, email, ID..." />
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <select name="filterRole"
+                        class="form-select">
+                    <option value="">All Roles</option>
+                    @foreach (var role in roles)
+                    {
+                        <option value="@role.RoleName"
+                                selected="@(ViewBag.FilterRole == role.RoleName)">
+                            @role.RoleName
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <select name="filterStatus"
+                        class="form-select">
+                    <option value="">All Status</option>
+                    <option value="Verified"
+                            selected="@(ViewBag.FilterStatus == "Verified")">
+                        Verified
+                    </option>
+                    <option value="Pending"
+                            selected="@(ViewBag.FilterStatus == "Pending")">
+                        Pending
+                    </option>
+                    <option value="Rejected"
+                            selected="@(ViewBag.FilterStatus == "Rejected")">
+                        Rejected
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2
+                        d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary
+                               flex-fill">
+                    <i class="bi bi-funnel me-1"></i>
+                    Filter
+                </button>
+                <a href="/Admin/Users"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-x"></i>
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- ─── USERS TABLE ──────────────────── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">User</th>
+                        <th>Student ID</th>
+                        <th>Department</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!users.Any())
+                    {
+                        <tr>
+                            <td colspan="7"
+                                class="text-center
+                                            py-5 text-muted">
+                                <i class="bi bi-people
+                                               fs-1 d-block
+                                               mb-2"></i>
+                                No users found
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var user in users)
+                        {
+                            var dept = user.UserDepartments
+                            .FirstOrDefault(
+                            ud => ud.IsPrimary);
+
+                            <tr>
+                                <!-- User -->
+                                <td class="ps-3">
+                                    <div class="d-flex
+                                                        align-items-center
+                                                        gap-2">
+                                        <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=0d6efd&color=fff&size=32"
+                                             class="rounded-circle"
+                                             width="32"
+                                             height="32" />
+                                        <div>
+                                            <div class="fw-semibold
+                                                                small">
+                                                @user.FirstName
+                                                @user.LastName
+                                            </div>
+                                            <div class="text-muted"
+                                                 style="font-size:11px">
+                                                @user.Email
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Student ID -->
+                                <td class="small text-muted">
+                                    @(user.StudentID ?? "—")
+                                </td>
+
+                                <!-- Department -->
+                                <td class="small">
+                                    @if (dept?.DepartmentTag != null)
+                                    {
+                                        <span class="badge bg-light
+                                                                 text-dark border">
+                                            @dept.DepartmentTag.ShortName
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+
+                                <!-- Role -->
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10
+                                                 text-primary border border-primary
+                                                 border-opacity-25 small">
+                                        @user.Role.RoleName
+                                    </span>
+                                </td>
+
+                                <!-- Status -->
+                                <td>
+                                    @if (user.VerificationStatus
+                                                                == "Verified" &&
+                                                                user.IsActive)
+                                    {
+                                        <span class="badge bg-success">
+                                            Verified
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == "Pending")
+                                    {
+                                        <span class="badge bg-warning
+                                                                 text-dark">
+                                            Pending
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == "Rejected")
+                                    {
+                                        <span class="badge bg-danger">
+                                            Rejected
+                                        </span>
+                                    }
+                                    else if (!user.IsActive)
+                                    {
+                                        <span class="badge bg-secondary">
+                                            Deactivated
+                                        </span>
+                                    }
+                                </td>
+
+                                <!-- Registered -->
+                                <td class="text-muted small">
+                                    @user.CreatedAt.ToString("MMM dd, yyyy")
+                                </td>
+
+                                <!-- Actions -->
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a href="/Admin/EditUser/@user.UserID"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteModal-@user.UserID">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            @foreach (var user in users)
+            {
+                <div class="modal fade" id="deleteModal-@user.UserID"
+                     tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title fw-bold text-danger">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    Delete User
+                                </h5>
+                                <button type="button" class="btn-close"
+                                        data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Permanently delete
+                                    <strong>@user.FirstName @user.LastName</strong>?
+                                </p>
+                                <p class="text-muted small mb-0">
+                                    This action cannot be undone. Users with authored
+                                    announcements or organized events cannot be deleted.
+                                </p>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        data-bs-dismiss="modal">Cancel</button>
+                                <form asp-action="DeleteUser" asp-route-id="@user.UserID"
+                                      method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-trash me-1"></i>Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
