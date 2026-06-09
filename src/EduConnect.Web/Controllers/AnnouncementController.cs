@@ -975,5 +975,122 @@ namespace EduConnect.Web.Controllers
             ViewBag.Announcements = announcements;
             return View();
         }
+
+        // ═══════════════════════════════════════
+        //  POST: /Announcement/Submit/{id}
+        //  Faculty submits draft for review
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Submit(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!IsFaculty())
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var announcement = await _context.Announcements
+                .Include(a => a.AnnouncementTags)
+                .FirstOrDefaultAsync(a =>
+                    a.AnnouncementID == id &&
+                    a.AuthorID == userID &&
+                    (a.ApprovalStatus == "Draft" ||
+                     a.ApprovalStatus == "Rejected"));
+
+            if (announcement == null)
+                return RedirectToAction("MyAnnouncements");
+
+            // Find faculty's primary department tag
+            var primaryDept = await _context.UserDepartments
+                .FirstOrDefaultAsync(ud =>
+                    ud.UserID == userID && ud.IsPrimary);
+
+            if (primaryDept == null)
+            {
+                TempData["Error"] =
+                    "No department assigned. Contact an administrator.";
+                return RedirectToAction("MyAnnouncements");
+            }
+
+            // Find Chair Person in same department
+            var reviewer = await _context.UserDepartments
+                .Include(ud => ud.User)
+                    .ThenInclude(u => u.Role)
+                .Where(ud =>
+                    ud.TagID == primaryDept.TagID &&
+                    ud.User.Role.RoleName == "Chair Person" &&
+                    ud.User.IsActive)
+                .Select(ud => ud.User)
+                .FirstOrDefaultAsync();
+
+            string newApprovalStatus;
+
+            if (reviewer != null)
+            {
+                newApprovalStatus = "PendingChair";
+            }
+            else
+            {
+                // Fall back to Dean
+                reviewer = await _context.UserDepartments
+                    .Include(ud => ud.User)
+                        .ThenInclude(u => u.Role)
+                    .Where(ud =>
+                        ud.TagID == primaryDept.TagID &&
+                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.IsActive)
+                    .Select(ud => ud.User)
+                    .FirstOrDefaultAsync();
+
+                if (reviewer == null)
+                {
+                    TempData["Error"] =
+                        "No Chair Person or Dean found for your " +
+                        "department. Contact an administrator.";
+                    return RedirectToAction("MyAnnouncements");
+                }
+
+                newApprovalStatus = "PendingDean";
+            }
+
+            // Clear stale data from any prior rejected cycle
+            announcement.ChairApprovedByID = null;
+            announcement.ChairApprovedAt = null;
+            announcement.ChairRejectionReason = null;
+            announcement.ApprovedByID = null;
+            announcement.ApprovedAt = null;
+            announcement.RejectionReason = null;
+
+            announcement.ApprovalStatus = newApprovalStatus;
+            announcement.SubmittedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            // In-app notification
+            _ = _notificationService.SendAsync(
+                reviewer.UserID,
+                "AnnouncementReview",
+                $"New announcement pending your review: {announcement.Title}",
+                $"/Announcement/Review/{announcement.AnnouncementID}",
+                announcement.AnnouncementID);
+
+            // Email notification (fire-and-forget)
+            _ = _emailService.SendEmailAsync(
+                reviewer.Email,
+                $"{reviewer.FirstName} {reviewer.LastName}",
+                "EduConnect: Announcement Pending Review",
+                $"<p>Hello {reviewer.FirstName},</p>" +
+                $"<p>A new announcement requires your review: " +
+                $"<strong>{announcement.Title}</strong></p>" +
+                $"<p><a href='https://localhost:7135/Announcement/Review/" +
+                $"{announcement.AnnouncementID}'>Click here to review</a></p>");
+
+            TempData["Success"] =
+                "Announcement submitted for review.";
+            return RedirectToAction("MyAnnouncements");
+        }
     }
 }
