@@ -1,0 +1,351 @@
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var userName = Context.Session.GetString("UserName");
+    var monthLabels = ViewBag.MonthLabels as List<string> ?? new List<string>();
+    var monthlyRegs = ViewBag.MonthlyRegistrations as List<int> ?? new List<int>();
+    var roleLabels = ViewBag.RoleLabels as List<string> ?? new List<string>();
+    var roleCount = ViewBag.RoleCount as List<int> ?? new List<int>();
+    var pendingUsers = ViewBag.RecentPendingUsers as List<EduConnect.Web.Models.User>
+        ?? new List<EduConnect.Web.Models.User>();
+    var recentUsers = ViewBag.RecentlyAddedUsers as List<EduConnect.Web.Models.User>
+        ?? new List<EduConnect.Web.Models.User>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-speedometer2 me-2 text-primary"></i>
+            Admin Dashboard
+        </h4>
+        <small class="text-muted">Welcome back, @userName</small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/Admin/PendingUsers" class="btn btn-warning btn-sm">
+            <i class="bi bi-person-check me-1"></i>
+            Pending
+            @if (ViewBag.PendingVerifications > 0)
+            {
+                <span class="badge bg-dark ms-1">@ViewBag.PendingVerifications</span>
+            }
+        </a>
+        <a href="/Admin/AddUser" class="btn btn-primary btn-sm">
+            <i class="bi bi-person-plus me-1"></i>
+            Add User
+        </a>
+    </div>
+</div>
+
+<!-- ─── STAT CARDS ───────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-primary bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-people text-primary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@ViewBag.TotalUsers</div>
+                <div class="text-muted small">Verified Users</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100
+                    @(ViewBag.PendingVerifications > 0 ? "border-warning border-2" : "")">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-warning bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-person-check text-warning fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@ViewBag.PendingVerifications</div>
+                <div class="text-muted small">Pending</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-success bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-mortarboard text-success fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@ViewBag.CountStudent</div>
+                <div class="text-muted small">Students</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-info bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-person-badge text-info fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@ViewBag.CountFaculty</div>
+                <div class="text-muted small">Faculty</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-purple bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-briefcase text-secondary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@ViewBag.CountStaff</div>
+                <div class="text-muted small">Staff</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-2">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2 bg-secondary bg-opacity-10 d-inline-flex mb-2">
+                    <i class="bi bi-building text-secondary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">@(ViewBag.CountDean + ViewBag.CountChairPerson)</div>
+                <div class="text-muted small">Dean / Chair</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── PENDING USERS ALERT ───────────── -->
+@if (pendingUsers.Any())
+{
+    <div class="card border-0 shadow-sm mb-4 border-start border-warning border-4">
+        <div class="card-header bg-white border-0 pt-3
+                    d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0 text-warning">
+                <i class="bi bi-exclamation-circle me-2"></i>
+                Pending Student Verifications
+                <span class="badge bg-warning text-dark ms-1">
+                    @ViewBag.PendingVerifications
+                </span>
+            </h6>
+            <a href="/Admin/PendingUsers" class="btn btn-warning btn-sm">
+                View All <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+        <div class="card-body pt-0">
+            <div class="row g-2">
+                @foreach (var user in pendingUsers)
+                {
+                    var dept = user.UserDepartments.FirstOrDefault(ud => ud.IsPrimary);
+                    <div class="col-12 col-md-6">
+                        <div class="d-flex align-items-center gap-2 p-2 bg-light rounded">
+                            <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=ffc107&color=000&size=32"
+                                 class="rounded-circle" width="32" height="32" />
+                            <div class="flex-grow-1 small">
+                                <div class="fw-semibold">@user.FirstName @user.LastName</div>
+                                <div class="text-muted">
+                                    @(user.StudentID ?? "No ID") •
+                                    @(dept?.DepartmentTag?.ShortName ?? "—")
+                                </div>
+                            </div>
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ─── CHARTS ROW ────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi bi-graph-up me-2 text-primary"></i>
+                    New Registrations — Last 6 Months
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="registrationsChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi bi-pie-chart me-2 text-primary"></i>
+                    Users by Role
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="roleChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── QUICK ACTIONS ─────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-lightning me-2 text-primary"></i>
+            Quick Actions
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-6 col-md-4">
+                <a href="/Admin/PendingUsers"
+                   class="btn btn-outline-warning w-100 py-3 text-center">
+                    <i class="bi bi-person-check d-block fs-3 mb-1"></i>
+                    <small>Verify Students</small>
+                </a>
+            </div>
+            <div class="col-6 col-md-4">
+                <a href="/Admin/Users"
+                   class="btn btn-outline-primary w-100 py-3 text-center">
+                    <i class="bi bi-people d-block fs-3 mb-1"></i>
+                    <small>Manage Users</small>
+                </a>
+            </div>
+            <div class="col-6 col-md-4">
+                <a href="/Admin/AddUser"
+                   class="btn btn-outline-success w-100 py-3 text-center">
+                    <i class="bi bi-person-plus d-block fs-3 mb-1"></i>
+                    <small>Add User</small>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── RECENTLY ADDED USERS TABLE ───── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-3
+                d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-person-plus me-2 text-primary"></i>
+            Recently Added Users
+        </h6>
+        <a href="/Admin/Users" class="btn btn-outline-primary btn-sm">
+            View All
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">User</th>
+                        <th>Role</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!recentUsers.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                No users yet
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var user in recentUsers)
+                        {
+                            var dept = user.UserDepartments
+                                .FirstOrDefault(ud => ud.IsPrimary);
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=0d6efd&color=fff&size=32"
+                                             class="rounded-circle" width="32" height="32" />
+                                        <div>
+                                            <div class="fw-semibold small">
+                                                @user.FirstName @user.LastName
+                                            </div>
+                                            <div class="text-muted" style="font-size:11px">
+                                                @user.Email
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10
+                                                 text-primary border border-primary
+                                                 border-opacity-25 small">
+                                        @user.Role.RoleName
+                                    </span>
+                                </td>
+                                <td class="small">
+                                    @(dept?.DepartmentTag?.ShortName ?? "—")
+                                </td>
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    }
+                                </td>
+                                <td class="text-muted small">
+                                    @user.CreatedAt.ToString("MMM dd, yyyy")
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    new Chart(document.getElementById('registrationsChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthLabels)),
+            datasets: [{
+                label: 'New Users',
+                data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthlyRegs)),
+                backgroundColor: 'rgba(13,110,253,0.7)',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+
+    new Chart(document.getElementById('roleChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(roleLabels)),
+            datasets: [{
+                data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(roleCount)),
+                backgroundColor: ['#0d6efd','#198754','#dc3545','#ffc107','#0dcaf0','#6f42c1'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+        }
+    });
+</script>
+}
