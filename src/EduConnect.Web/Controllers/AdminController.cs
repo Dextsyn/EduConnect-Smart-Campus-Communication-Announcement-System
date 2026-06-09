@@ -712,5 +712,108 @@ namespace EduConnect.Web.Controllers
             TempData["Success"] = $"{user.FirstName} {user.LastName}'s account has been updated.";
             return RedirectToAction("Users");
         }
+
+        // ═══════════════════════════════════════
+        //  POST: /Admin/DeleteUser/{id}
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var adminID = int.Parse(HttpContext.Session.GetString("UserID"));
+            if (id == adminID)
+            {
+                TempData["Error"] = "You cannot delete your own account.";
+                return RedirectToAction("Users");
+            }
+
+            var user = await _context.Users
+                .Include(u => u.Announcements)
+                .Include(u => u.OrganizedEvents)
+                .FirstOrDefaultAsync(u => u.UserID == id);
+
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Users");
+            }
+
+            // Block deletion if user has content that can't be safely removed
+            var hasVerifiedOthers = await _context.Users
+                .AnyAsync(u => u.VerifiedByID == id);
+            var hasApprovedAnnouncements = await _context.Announcements
+                .AnyAsync(a => a.ApprovedByID == id || a.ChairApprovedByID == id);
+            var hasCreatedStudyGroups = await _context.StudyGroups
+                .AnyAsync(g => g.CreatedByID == id);
+            var hasIncidentReports = await _context.IncidentReports
+                .AnyAsync(r => r.ReportedByID == id || r.HandledByID == id);
+            var hasOrgAnnouncements = await _context.OrgAnnouncements
+                .AnyAsync(a => a.PostedByID == id);
+
+            if (user.Announcements.Any() ||
+                user.OrganizedEvents.Any() ||
+                hasVerifiedOthers ||
+                hasApprovedAnnouncements ||
+                hasCreatedStudyGroups ||
+                hasIncidentReports ||
+                hasOrgAnnouncements)
+            {
+                TempData["Error"] =
+                    $"Cannot delete {user.FirstName} {user.LastName} — " +
+                    "this user has content records (announcements, events, study groups, " +
+                    "incident reports, or approvals) that prevent deletion.";
+                return RedirectToAction("Users");
+            }
+
+            // Remove all cleanable child records in FK-safe order
+            _context.UserAnnouncementInteractions.RemoveRange(
+                _context.UserAnnouncementInteractions.Where(i => i.UserID == id));
+
+            _context.Notifications.RemoveRange(
+                _context.Notifications.Where(n => n.UserID == id));
+
+            _context.EventWaitlist.RemoveRange(
+                _context.EventWaitlist.Where(w => w.UserID == id));
+
+            _context.EventRegistrations.RemoveRange(
+                _context.EventRegistrations.Where(r => r.UserID == id));
+
+            _context.OrgMembers.RemoveRange(
+                _context.OrgMembers.Where(m => m.UserID == id));
+
+            _context.StudyGroupMembers.RemoveRange(
+                _context.StudyGroupMembers.Where(m => m.UserID == id));
+
+            _context.GroupMessages.RemoveRange(
+                _context.GroupMessages.Where(m => m.SenderID == id));
+
+            _context.GroupMembers.RemoveRange(
+                _context.GroupMembers.Where(m => m.UserID == id));
+
+            _context.Feedbacks.RemoveRange(
+                _context.Feedbacks.Where(f => f.UserID == id));
+
+            _context.ChatbotConversations.RemoveRange(
+                _context.ChatbotConversations.Where(c => c.UserID == id));
+
+            _context.RefreshTokens.RemoveRange(
+                _context.RefreshTokens.Where(t => t.UserID == id));
+
+            _context.AuditLogs.RemoveRange(
+                _context.AuditLogs.Where(l => l.UserID == id));
+
+            _context.UserDepartments.RemoveRange(
+                _context.UserDepartments.Where(d => d.UserID == id));
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] =
+                $"{user.FirstName} {user.LastName}'s account has been permanently deleted.";
+            return RedirectToAction("Users");
+        }
     }
 }
