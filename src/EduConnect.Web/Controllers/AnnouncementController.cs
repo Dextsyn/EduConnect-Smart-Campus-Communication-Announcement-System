@@ -1197,5 +1197,286 @@ namespace EduConnect.Web.Controllers
             ViewBag.Role = roleName;
             return View(announcement);
         }
+
+        // ═══════════════════════════════════════
+        //  POST: /Announcement/Approve/{id}
+        //  Chair Person or Dean approves
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Approve(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var roleName = GetRoleName();
+            if (roleName != "Chair Person" && roleName != "Dean")
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var primaryDept = await _context.UserDepartments
+                .FirstOrDefaultAsync(ud =>
+                    ud.UserID == userID && ud.IsPrimary);
+
+            if (primaryDept == null)
+                return RedirectToAction("ReviewQueue");
+
+            var expectedStatus = roleName == "Chair Person"
+                ? "PendingChair"
+                : "PendingDean";
+
+            var announcement = await _context.Announcements
+                .Include(a => a.AnnouncementTags)
+                .FirstOrDefaultAsync(a =>
+                    a.AnnouncementID == id &&
+                    a.ApprovalStatus == expectedStatus &&
+                    a.AnnouncementTags.Any(at =>
+                        at.TagID == primaryDept.TagID));
+
+            if (announcement == null)
+                return RedirectToAction("ReviewQueue");
+
+            if (roleName == "Chair Person")
+            {
+                announcement.ApprovalStatus = "PendingDean";
+                announcement.ChairApprovedByID = userID;
+                announcement.ChairApprovedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+
+                // Find Dean in same department
+                var dean = await _context.UserDepartments
+                    .Include(ud => ud.User)
+                        .ThenInclude(u => u.Role)
+                    .Where(ud =>
+                        ud.TagID == primaryDept.TagID &&
+                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.IsActive)
+                    .Select(ud => ud.User)
+                    .FirstOrDefaultAsync();
+
+                if (dean != null)
+                {
+                    _ = _notificationService.SendAsync(
+                        dean.UserID,
+                        "AnnouncementReview",
+                        $"Announcement forwarded for your review: {announcement.Title}",
+                        $"/Announcement/Review/{announcement.AnnouncementID}",
+                        announcement.AnnouncementID);
+
+                    _ = _emailService.SendEmailAsync(
+                        dean.Email,
+                        $"{dean.FirstName} {dean.LastName}",
+                        "EduConnect: Announcement Pending Your Approval",
+                        $"<p>Hello {dean.FirstName},</p>" +
+                        $"<p>An announcement approved by the Chair Person now requires " +
+                        $"your review: <strong>{announcement.Title}</strong></p>" +
+                        $"<p><a href='https://localhost:7135/Announcement/Review/" +
+                        $"{announcement.AnnouncementID}'>Click here to review</a></p>");
+                }
+
+                TempData["Success"] =
+                    "Announcement approved and forwarded to the Dean.";
+            }
+            else // Dean
+            {
+                announcement.ApprovalStatus = "Approved";
+                announcement.ApprovedByID = userID;
+                announcement.ApprovedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+
+                var author = await _context.Users
+                    .FindAsync(announcement.AuthorID);
+
+                _ = _notificationService.SendAsync(
+                    announcement.AuthorID,
+                    "AnnouncementApproved",
+                    $"Your announcement has been approved — you can now publish it",
+                    "/Announcement/MyAnnouncements",
+                    announcement.AnnouncementID);
+
+                if (author != null)
+                {
+                    _ = _emailService.SendEmailAsync(
+                        author.Email,
+                        $"{author.FirstName} {author.LastName}",
+                        "EduConnect: Announcement Approved",
+                        $"<p>Hello {author.FirstName},</p>" +
+                        $"<p>Your announcement <strong>{announcement.Title}</strong> " +
+                        $"has been approved by the Dean. You can now publish it.</p>" +
+                        $"<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
+                        $"Go to My Announcements</a></p>");
+                }
+
+                TempData["Success"] =
+                    "Announcement approved. Faculty has been notified.";
+            }
+
+            return RedirectToAction("ReviewQueue");
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Announcement/Reject/{id}
+        //  Chair Person or Dean rejects
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reject(int id, string rejectionReason)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var roleName = GetRoleName();
+            if (roleName != "Chair Person" && roleName != "Dean")
+                return RedirectToAction("Index");
+
+            if (string.IsNullOrWhiteSpace(rejectionReason))
+            {
+                TempData["Error"] =
+                    "A rejection reason is required.";
+                return RedirectToAction("Review", new { id });
+            }
+
+            var userID = GetUserID();
+
+            var primaryDept = await _context.UserDepartments
+                .FirstOrDefaultAsync(ud =>
+                    ud.UserID == userID && ud.IsPrimary);
+
+            if (primaryDept == null)
+                return RedirectToAction("ReviewQueue");
+
+            var expectedStatus = roleName == "Chair Person"
+                ? "PendingChair"
+                : "PendingDean";
+
+            var announcement = await _context.Announcements
+                .Include(a => a.AnnouncementTags)
+                .FirstOrDefaultAsync(a =>
+                    a.AnnouncementID == id &&
+                    a.ApprovalStatus == expectedStatus &&
+                    a.AnnouncementTags.Any(at =>
+                        at.TagID == primaryDept.TagID));
+
+            if (announcement == null)
+                return RedirectToAction("ReviewQueue");
+
+            announcement.ApprovalStatus = "Rejected";
+
+            if (roleName == "Chair Person")
+                announcement.ChairRejectionReason = rejectionReason;
+            else
+                announcement.RejectionReason = rejectionReason;
+
+            await _context.SaveChangesAsync();
+
+            var author = await _context.Users
+                .FindAsync(announcement.AuthorID);
+            var rejectedBy = roleName == "Chair Person"
+                ? "the Chair Person"
+                : "the Dean";
+
+            _ = _notificationService.SendAsync(
+                announcement.AuthorID,
+                "AnnouncementRejected",
+                $"Your announcement was rejected by {rejectedBy}",
+                "/Announcement/MyAnnouncements",
+                announcement.AnnouncementID);
+
+            if (author != null)
+            {
+                _ = _emailService.SendEmailAsync(
+                    author.Email,
+                    $"{author.FirstName} {author.LastName}",
+                    "EduConnect: Announcement Rejected",
+                    $"<p>Hello {author.FirstName},</p>" +
+                    $"<p>Your announcement <strong>{announcement.Title}</strong> " +
+                    $"was rejected by {rejectedBy}.</p>" +
+                    $"<p><strong>Reason:</strong> {rejectionReason}</p>" +
+                    $"<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
+                    $"Go to My Announcements to revise and resubmit</a></p>");
+            }
+
+            TempData["Success"] = "Announcement rejected. Faculty has been notified.";
+            return RedirectToAction("ReviewQueue");
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Announcement/Publish/{id}
+        //  Faculty self-publishes after approval
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Publish(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!IsFaculty())
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var announcement = await _context.Announcements
+                .Include(a => a.AnnouncementTags)
+                    .ThenInclude(at => at.DepartmentTag)
+                .FirstOrDefaultAsync(a =>
+                    a.AnnouncementID == id &&
+                    a.AuthorID == userID &&
+                    a.ApprovalStatus == "Approved" &&
+                    a.Status != "Published");
+
+            if (announcement == null)
+                return RedirectToAction("MyAnnouncements");
+
+            announcement.Status = "Published";
+            announcement.PublishedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            // Notify department members
+            var tagIDs = announcement.AnnouncementTags
+                .Select(at => at.TagID)
+                .ToList();
+
+            if (tagIDs.Any())
+            {
+                bool broadcastAll = announcement.AnnouncementTags
+                    .Any(at =>
+                        at.DepartmentTag.ShortName == "ALL" ||
+                        at.DepartmentTag.ShortName == "Emergency");
+
+                List<int> recipientIds;
+                if (broadcastAll)
+                {
+                    recipientIds = await _context.Users
+                        .Where(u => u.IsActive && u.UserID != userID)
+                        .Select(u => u.UserID)
+                        .ToListAsync();
+                }
+                else
+                {
+                    recipientIds = await _context.UserDepartments
+                        .Where(ud => tagIDs.Contains(ud.TagID))
+                        .Select(ud => ud.UserID)
+                        .Distinct()
+                        .Where(uid => uid != userID)
+                        .ToListAsync();
+                }
+
+                if (recipientIds.Count > 0)
+                {
+                    await _notificationService.SendToManyAsync(
+                        recipientIds,
+                        "Announcement",
+                        $"New announcement: {announcement.Title}",
+                        $"/Announcement/Details/{announcement.AnnouncementID}",
+                        announcement.AnnouncementID);
+                }
+            }
+
+            TempData["Success"] =
+                "Announcement published successfully!";
+            return RedirectToAction("MyAnnouncements");
+        }
     }
 }
