@@ -938,5 +938,42 @@ namespace EduConnect.Web.Controllers
                 "Announcement archived successfully!";
             return RedirectToAction("Index");
         }
+
+        // ═══════════════════════════════════════
+        //  GET: /Announcement/MyAnnouncements
+        //  Faculty's own announcement list
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> MyAnnouncements()
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!IsFaculty())
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var announcements = await _context.Announcements
+                .Include(a => a.Category)
+                .Where(a => a.AuthorID == userID)
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => new
+                {
+                    a.AnnouncementID,
+                    a.Title,
+                    a.FeedType,
+                    a.Status,
+                    a.ApprovalStatus,
+                    a.SubmittedAt,
+                    a.CreatedAt,
+                    a.ChairRejectionReason,
+                    a.RejectionReason,
+                    CategoryName = a.Category.CategoryName
+                })
+                .ToListAsync();
+
+            ViewBag.Announcements = announcements;
+            return View();
+        }
     }
 }
