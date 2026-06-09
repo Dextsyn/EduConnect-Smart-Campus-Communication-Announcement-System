@@ -1,0 +1,97 @@
+@model EduConnect.Web.Models.Announcement
+@{
+    ViewData["Title"] = "Review Announcement";
+    string role = ViewBag.Role;
+}
+
+<div class="mb-4">
+    <a href="/Announcement/ReviewQueue" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Queue
+    </a>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <!-- Announcement preview -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="badge bg-primary">@Model.FeedType</span>
+                <span class="badge bg-secondary">@Model.Category.CategoryName</span>
+            </div>
+            <div class="card-body">
+                <h3 class="fw-bold">@Model.Title</h3>
+                <div class="text-muted small mb-3">
+                    By @Model.Author.FirstName @Model.Author.LastName
+                    (@Model.Author.Role.RoleName) ·
+                    Submitted @Model.SubmittedAt?.ToString("MMM dd, yyyy HH:mm")
+                </div>
+                <hr />
+                <div>@Html.Raw(Model.Body)</div>
+                @if (!string.IsNullOrEmpty(Model.AttachmentURL))
+                {
+                    <div class="mt-3">
+                        <img src="@Model.AttachmentURL" class="img-fluid rounded" style="max-height:300px;" />
+                    </div>
+                }
+                <div class="mt-3">
+                    @foreach (var tag in Model.AnnouncementTags)
+                    {
+                        <span class="badge bg-light text-dark border me-1">
+                            @tag.DepartmentTag.ShortName
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision panel -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-success mb-3">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-3">
+                    <i class="bi bi-check-circle me-2"></i>Approve
+                </h6>
+                <form method="post" action="/Announcement/Approve/@Model.AnnouncementID">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-check2 me-2"></i>
+                        @(role == "Chair Person" ? "Approve & Forward to Dean" : "Approve & Notify Faculty")
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-danger">
+            <div class="card-body">
+                <h6 class="fw-bold text-danger mb-3">
+                    <i class="bi bi-x-circle me-2"></i>Reject
+                </h6>
+                <form method="post" action="/Announcement/Reject/@Model.AnnouncementID">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">
+                            Reason for rejection <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="rejectionReason"
+                                  class="form-control"
+                                  rows="4"
+                                  placeholder="Provide a reason for rejection"
+                                  required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="bi bi-x me-2"></i>Reject
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

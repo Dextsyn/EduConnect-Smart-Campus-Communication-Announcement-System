@@ -1092,5 +1092,110 @@ namespace EduConnect.Web.Controllers
                 "Announcement submitted for review.";
             return RedirectToAction("MyAnnouncements");
         }
+
+        // ═══════════════════════════════════════
+        //  GET: /Announcement/ReviewQueue
+        //  Chair Person / Dean pending review list
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> ReviewQueue()
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var roleName = GetRoleName();
+            if (roleName != "Chair Person" && roleName != "Dean")
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var primaryDept = await _context.UserDepartments
+                .FirstOrDefaultAsync(ud =>
+                    ud.UserID == userID && ud.IsPrimary);
+
+            if (primaryDept == null)
+            {
+                ViewBag.Announcements = new List<object>();
+                ViewBag.Role = roleName;
+                return View();
+            }
+
+            var pendingStatus = roleName == "Chair Person"
+                ? "PendingChair"
+                : "PendingDean";
+
+            var announcements = await _context.Announcements
+                .Include(a => a.Author)
+                .Include(a => a.Category)
+                .Include(a => a.AnnouncementTags)
+                    .ThenInclude(at => at.DepartmentTag)
+                .Where(a =>
+                    a.ApprovalStatus == pendingStatus &&
+                    a.AnnouncementTags.Any(at =>
+                        at.TagID == primaryDept.TagID))
+                .OrderBy(a => a.SubmittedAt)
+                .Select(a => new
+                {
+                    a.AnnouncementID,
+                    a.Title,
+                    a.FeedType,
+                    a.SubmittedAt,
+                    AuthorName = a.Author.FirstName
+                                 + " " + a.Author.LastName,
+                    CategoryName = a.Category.CategoryName,
+                    Tags = a.AnnouncementTags
+                        .Select(at => at.DepartmentTag.ShortName)
+                        .ToList()
+                })
+                .ToListAsync();
+
+            ViewBag.Announcements = announcements;
+            ViewBag.Role = roleName;
+            return View();
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Announcement/Review/{id}
+        //  Full preview for reviewer
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> Review(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var roleName = GetRoleName();
+            if (roleName != "Chair Person" && roleName != "Dean")
+                return RedirectToAction("Index");
+
+            var userID = GetUserID();
+
+            var primaryDept = await _context.UserDepartments
+                .FirstOrDefaultAsync(ud =>
+                    ud.UserID == userID && ud.IsPrimary);
+
+            if (primaryDept == null)
+                return RedirectToAction("ReviewQueue");
+
+            var expectedStatus = roleName == "Chair Person"
+                ? "PendingChair"
+                : "PendingDean";
+
+            var announcement = await _context.Announcements
+                .Include(a => a.Author)
+                    .ThenInclude(u => u.Role)
+                .Include(a => a.Category)
+                .Include(a => a.AnnouncementTags)
+                    .ThenInclude(at => at.DepartmentTag)
+                .FirstOrDefaultAsync(a =>
+                    a.AnnouncementID == id &&
+                    a.ApprovalStatus == expectedStatus &&
+                    a.AnnouncementTags.Any(at =>
+                        at.TagID == primaryDept.TagID));
+
+            if (announcement == null)
+                return RedirectToAction("ReviewQueue");
+
+            ViewBag.Role = roleName;
+            return View(announcement);
+        }
     }
 }
