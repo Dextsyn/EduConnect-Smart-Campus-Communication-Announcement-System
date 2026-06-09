@@ -50,7 +50,6 @@ namespace EduConnect.Web.Controllers
         }
 
         private bool CanEditAnnouncement(Announcement a) =>
-            GetRoleName() == "Administrator" ||
             a.AuthorID == GetUserID();
 
         private bool IsFaculty() =>
@@ -59,8 +58,7 @@ namespace EduConnect.Web.Controllers
         private bool CanCreate()
         {
             var role = GetRoleName();
-            return role == "Administrator" ||
-                   role == "Dean" ||
+            return role == "Dean" ||
                    role == "Chair Person" ||
                    role == "Faculty";
         }
