@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduConnect.Web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260331091403_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260427054312_AddEventRegistrationAndWaitlist")]
+    partial class AddEventRegistrationAndWaitlist
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -79,6 +79,16 @@ namespace EduConnect.Web.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedByID")
+                        .HasColumnType("int");
+
                     b.Property<string>("AttachmentURL")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -113,10 +123,16 @@ namespace EduConnect.Web.Migrations
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -130,6 +146,8 @@ namespace EduConnect.Web.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AnnouncementID");
+
+                    b.HasIndex("ApprovedByID");
 
                     b.HasIndex("AuthorID");
 
@@ -344,6 +362,74 @@ namespace EduConnect.Web.Migrations
                     b.ToTable("DepartmentTags");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.EmergencyAcknowledgement", b =>
+                {
+                    b.Property<int>("AckID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AckID"));
+
+                    b.Property<DateTime>("AcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("BroadcastID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("AckID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("BroadcastID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("EmergencyAcknowledgements");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EmergencyBroadcast", b =>
+                {
+                    b.Property<int>("BroadcastID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BroadcastID"));
+
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SentByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("BroadcastID");
+
+                    b.HasIndex("SentByID");
+
+                    b.ToTable("EmergencyBroadcasts");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Event", b =>
                 {
                     b.Property<int>("EventID")
@@ -355,18 +441,32 @@ namespace EduConnect.Web.Migrations
                     b.Property<int?>("AnnouncementID")
                         .HasColumnType("int");
 
+                    b.Property<string>("CoverPhotoURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("CurrentAttendees")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime>("EndDateTime")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EventTitle")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<bool>("IsOnline")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRegistrationOpen")
                         .HasColumnType("bit");
 
                     b.Property<string>("Location")
@@ -383,8 +483,16 @@ namespace EduConnect.Web.Migrations
                     b.Property<int>("OrganizerID")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("RegistrationDeadline")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("StartDateTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -396,6 +504,80 @@ namespace EduConnect.Web.Migrations
                     b.HasIndex("OrganizerID");
 
                     b.ToTable("Events");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EventRegistration", b =>
+                {
+                    b.Property<int>("RegistrationID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RegistrationID"));
+
+                    b.Property<int>("EventID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("QRCode")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("RegistrationID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("EventID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("EventRegistrations");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EventWaitlist", b =>
+                {
+                    b.Property<int>("WaitlistID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("WaitlistID"));
+
+                    b.Property<int>("EventID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("WaitlistID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("EventID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("EventWaitlist");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.Feedback", b =>
@@ -444,6 +626,63 @@ namespace EduConnect.Web.Migrations
                     b.ToTable("Feedback");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.IncidentReport", b =>
+                {
+                    b.Property<int>("ReportID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReportID"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("HandledByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IncidentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PhotoURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ReportedByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Resolution")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("ReportID");
+
+                    b.HasIndex("HandledByID");
+
+                    b.HasIndex("ReportedByID");
+
+                    b.ToTable("IncidentReports");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Notification", b =>
                 {
                     b.Property<int>("NotificationID")
@@ -484,6 +723,177 @@ namespace EduConnect.Web.Migrations
                     b.HasIndex("UserID");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.OrgAnnouncement", b =>
+                {
+                    b.Property<int>("OrgAnnouncementID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrgAnnouncementID"));
+
+                    b.Property<string>("AttachmentURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OrgID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("PostedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PostedByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("OrgAnnouncementID");
+
+                    b.HasIndex("OrgID");
+
+                    b.HasIndex("PostedByID");
+
+                    b.ToTable("OrgAnnouncements");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.OrgMember", b =>
+                {
+                    b.Property<int>("MemberID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MemberID"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OrgID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OrgRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Position")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("MemberID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("OrgID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("OrgMembers");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.Organization", b =>
+                {
+                    b.Property<int>("OrgID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrgID"));
+
+                    b.Property<string>("CoverPhotoURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByID")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DepartmentTagID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LogoURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("OrgName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("OrgID");
+
+                    b.HasIndex("CreatedByID");
+
+                    b.HasIndex("DepartmentTagID");
+
+                    b.ToTable("Organizations");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.PasswordResetToken", b =>
+                {
+                    b.Property<int>("TokenID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TokenID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("TokenID");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.RefreshToken", b =>
@@ -560,6 +970,93 @@ namespace EduConnect.Web.Migrations
                         .IsUnique();
 
                     b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.StudyGroup", b =>
+                {
+                    b.Property<int>("GroupID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GroupID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByID")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DepartmentTagID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<byte>("MaxMembers")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("MeetingURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("GroupID");
+
+                    b.HasIndex("CreatedByID");
+
+                    b.HasIndex("DepartmentTagID");
+
+                    b.ToTable("StudyGroups");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.StudyGroupMember", b =>
+                {
+                    b.Property<int>("MembershipID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MembershipID"));
+
+                    b.Property<DateTime?>("AttendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("GroupID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("MembershipID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("GroupID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("StudyGroupMembers");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.TagType", b =>
@@ -642,12 +1139,27 @@ namespace EduConnect.Web.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("VerificationRejectionReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VerificationStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("VerifiedByID")
+                        .HasColumnType("int");
+
                     b.HasKey("UserID");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.HasIndex("RoleID");
+
+                    b.HasIndex("VerifiedByID");
 
                     b.ToTable("Users");
                 });
@@ -694,6 +1206,11 @@ namespace EduConnect.Web.Migrations
 
             modelBuilder.Entity("EduConnect.Web.Models.Announcement", b =>
                 {
+                    b.HasOne("EduConnect.Web.Models.User", "ApprovedBy")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EduConnect.Web.Models.User", "Author")
                         .WithMany("Announcements")
                         .HasForeignKey("AuthorID")
@@ -705,6 +1222,8 @@ namespace EduConnect.Web.Migrations
                         .HasForeignKey("CategoryID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ApprovedBy");
 
                     b.Navigation("Author");
 
@@ -762,11 +1281,42 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("TagType");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.EmergencyAcknowledgement", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.EmergencyBroadcast", "Broadcast")
+                        .WithMany("Acknowledgements")
+                        .HasForeignKey("BroadcastID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Broadcast");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EmergencyBroadcast", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "SentBy")
+                        .WithMany()
+                        .HasForeignKey("SentByID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SentBy");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Event", b =>
                 {
                     b.HasOne("EduConnect.Web.Models.Announcement", "Announcement")
                         .WithMany("Events")
-                        .HasForeignKey("AnnouncementID");
+                        .HasForeignKey("AnnouncementID")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("EduConnect.Web.Models.User", "Organizer")
                         .WithMany("OrganizedEvents")
@@ -777,6 +1327,44 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("Announcement");
 
                     b.Navigation("Organizer");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EventRegistration", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.Event", "Event")
+                        .WithMany("Registrations")
+                        .HasForeignKey("EventID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EventWaitlist", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.Event", "Event")
+                        .WithMany("Waitlist")
+                        .HasForeignKey("EventID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.Feedback", b =>
@@ -798,6 +1386,23 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.IncidentReport", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "HandledBy")
+                        .WithMany()
+                        .HasForeignKey("HandledByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduConnect.Web.Models.User", "ReportedBy")
+                        .WithMany()
+                        .HasForeignKey("ReportedByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("HandledBy");
+
+                    b.Navigation("ReportedBy");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Notification", b =>
                 {
                     b.HasOne("EduConnect.Web.Models.Announcement", "Announcement")
@@ -817,6 +1422,73 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.OrgAnnouncement", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.Organization", "Organization")
+                        .WithMany("Announcements")
+                        .HasForeignKey("OrgID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "PostedBy")
+                        .WithMany()
+                        .HasForeignKey("PostedByID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("PostedBy");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.OrgMember", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.Organization", "Organization")
+                        .WithMany("Members")
+                        .HasForeignKey("OrgID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.Organization", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.DepartmentTag", "DepartmentTag")
+                        .WithMany()
+                        .HasForeignKey("DepartmentTagID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("DepartmentTag");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.RefreshToken", b =>
                 {
                     b.HasOne("EduConnect.Web.Models.User", "User")
@@ -824,6 +1496,43 @@ namespace EduConnect.Web.Migrations
                         .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.StudyGroup", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.DepartmentTag", "DepartmentTag")
+                        .WithMany()
+                        .HasForeignKey("DepartmentTagID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("DepartmentTag");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.StudyGroupMember", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.StudyGroup", "StudyGroup")
+                        .WithMany("Members")
+                        .HasForeignKey("GroupID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("StudyGroup");
 
                     b.Navigation("User");
                 });
@@ -836,7 +1545,14 @@ namespace EduConnect.Web.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("EduConnect.Web.Models.User", "VerifiedBy")
+                        .WithMany()
+                        .HasForeignKey("VerifiedByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Role");
+
+                    b.Navigation("VerifiedBy");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.UserDepartment", b =>
@@ -883,9 +1599,33 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("UserDepartments");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.EmergencyBroadcast", b =>
+                {
+                    b.Navigation("Acknowledgements");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.Event", b =>
+                {
+                    b.Navigation("Registrations");
+
+                    b.Navigation("Waitlist");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.Organization", b =>
+                {
+                    b.Navigation("Announcements");
+
+                    b.Navigation("Members");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Role", b =>
                 {
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.StudyGroup", b =>
+                {
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.TagType", b =>

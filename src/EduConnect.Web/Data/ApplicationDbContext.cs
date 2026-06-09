@@ -256,6 +256,15 @@ namespace EduConnect.Web.Data
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // Announcement chairapprovedby relationship
+            modelBuilder.Entity<Announcement>(entity =>
+            {
+                entity.HasOne(e => e.ChairApprovedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.ChairApprovedByID)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             // ─── PasswordResetTokens ───────────────
             modelBuilder.Entity<PasswordResetToken>(entity =>
             {

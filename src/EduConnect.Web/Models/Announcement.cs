@@ -32,6 +32,14 @@ namespace EduConnect.Web.Models
         [Required]
         [MaxLength(20)]
         public string Status { get; set; } = "Draft";
+        public string ApprovalStatus { get; set; } = "Draft"; // Renamed from 'ApporvalStatus'
+        public int? ApprovedByID { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public string? RejectionReason { get; set; }
+        public string? ChairRejectionReason { get; set; }
+        public int? ChairApprovedByID { get; set; }
+        public DateTime? ChairApprovedAt { get; set; }
 
         [Required]
         public byte Priority { get; set; } = 1;
@@ -50,11 +58,14 @@ namespace EduConnect.Web.Models
 
         // Navigation Properties
         public User Author { get; set; }
+        public User? ApprovedBy { get; set; }
+        public User? ChairApprovedBy { get; set; }
         public AnnouncementCategory Category { get; set; }
         public ICollection<AnnouncementTag> AnnouncementTags { get; set; }
         public ICollection<Notification> Notifications { get; set; }
         public ICollection<Feedback> Feedbacks { get; set; }
         public ICollection<Event> Events { get; set; }
         public ICollection<AIProcessingLog> AIProcessingLogs { get; set; }
+        public ICollection<UserAnnouncementInteraction> UserInteractions { get; set; }
     }
 }
