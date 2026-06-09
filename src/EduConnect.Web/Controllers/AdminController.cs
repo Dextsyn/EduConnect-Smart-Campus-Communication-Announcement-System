@@ -582,5 +582,135 @@ namespace EduConnect.Web.Controllers
             TempData["Success"] = $"{user.FirstName} {user.LastName}'s account has been created.";
             return RedirectToAction("Users");
         }
+
+        // ═══════════════════════════════════════
+        //  GET: /Admin/EditUser/{id}
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> EditUser(int id)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var user = await _context.Users
+                .Include(u => u.UserDepartments)
+                .FirstOrDefaultAsync(u => u.UserID == id);
+
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Users");
+            }
+
+            var primaryDept = user.UserDepartments
+                .FirstOrDefault(ud => ud.IsPrimary);
+
+            var model = new AdminUserFormViewModel
+            {
+                UserID = user.UserID,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                StudentID = user.StudentID,
+                RoleID = user.RoleID,
+                DepartmentTagID = primaryDept?.TagID ?? 0,
+                IsActive = user.IsActive,
+                Roles = (await _context.Roles.ToListAsync())
+                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
+                    .ToList(),
+                Departments = (await _context.DepartmentTags
+                    .Where(d => d.IsActive)
+                    .ToListAsync())
+                    .Select(d => new SelectListItem(
+                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
+                    .ToList()
+            };
+
+            return View(model);
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Admin/EditUser/{id}
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditUser(int id, AdminUserFormViewModel model)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            // Check email uniqueness (excluding this user)
+            if (await _context.Users.AnyAsync(u => u.Email == model.Email && u.UserID != id))
+                ModelState.AddModelError("Email", "A user with this email already exists.");
+
+            // Password validation only when provided
+            if (!string.IsNullOrWhiteSpace(model.Password) && model.Password.Length < 6)
+                ModelState.AddModelError("Password", "Password must be at least 6 characters.");
+
+            if (!ModelState.IsValid)
+            {
+                model.Roles = (await _context.Roles.ToListAsync())
+                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
+                    .ToList();
+                model.Departments = (await _context.DepartmentTags
+                    .Where(d => d.IsActive)
+                    .ToListAsync())
+                    .Select(d => new SelectListItem(
+                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
+                    .ToList();
+                return View(model);
+            }
+
+            var user = await _context.Users
+                .Include(u => u.UserDepartments)
+                .FirstOrDefaultAsync(u => u.UserID == id);
+
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Users");
+            }
+
+            user.FirstName = model.FirstName;
+            user.LastName = model.LastName;
+            user.Email = model.Email;
+            user.StudentID = model.StudentID;
+            user.RoleID = model.RoleID;
+            user.IsActive = model.IsActive;
+            user.UpdatedAt = DateTime.Now;
+
+            if (!string.IsNullOrWhiteSpace(model.Password))
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
+
+            // Replace primary department
+            var existingPrimary = user.UserDepartments
+                .FirstOrDefault(ud => ud.IsPrimary);
+
+            if (existingPrimary != null && existingPrimary.TagID != model.DepartmentTagID)
+            {
+                _context.UserDepartments.Remove(existingPrimary);
+                _context.UserDepartments.Add(new UserDepartment
+                {
+                    UserID = user.UserID,
+                    TagID = model.DepartmentTagID,
+                    IsPrimary = true,
+                    CreatedAt = DateTime.Now
+                });
+            }
+            else if (existingPrimary == null)
+            {
+                _context.UserDepartments.Add(new UserDepartment
+                {
+                    UserID = user.UserID,
+                    TagID = model.DepartmentTagID,
+                    IsPrimary = true,
+                    CreatedAt = DateTime.Now
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"{user.FirstName} {user.LastName}'s account has been updated.";
+            return RedirectToAction("Users");
+        }
     }
 }
