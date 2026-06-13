@@ -172,10 +172,20 @@ namespace EduConnect.Web.Controllers
             string? attachmentUrl = null;
             if (vm.Attachment != null && vm.Attachment.Length > 0)
             {
+                var allowedExtensions = new[] { ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+                    ".ppt", ".pptx", ".txt", ".jpg", ".jpeg", ".png", ".gif", ".zip" };
+                var ext = Path.GetExtension(vm.Attachment.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(ext))
+                {
+                    ModelState.AddModelError("Attachment",
+                        "File type not allowed. Accepted: PDF, Word, Excel, PowerPoint, images, ZIP.");
+                    return View(vm);
+                }
+
                 var uploadsDir = Path.Combine(
                     _environment.WebRootPath, "uploads", "org-attachments");
                 Directory.CreateDirectory(uploadsDir);
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(vm.Attachment.FileName)}";
+                var fileName = $"{Guid.NewGuid()}{ext}";
                 using var stream = new FileStream(
                     Path.Combine(uploadsDir, fileName), FileMode.Create);
                 await vm.Attachment.CopyToAsync(stream);
@@ -326,10 +336,13 @@ namespace EduConnect.Web.Controllers
                     currentAdviser.IsActive = false;
 
                 var existing = org.Members.FirstOrDefault(m =>
-                    m.UserID == vm.AdviserUserID && m.OrgRole == "Adviser");
+                    m.UserID == vm.AdviserUserID);
 
                 if (existing != null)
+                {
+                    existing.OrgRole = "Adviser";
                     existing.IsActive = true;
+                }
                 else
                     _context.OrgMembers.Add(new OrgMember
                     {
