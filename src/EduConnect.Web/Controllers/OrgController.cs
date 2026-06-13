@@ -61,24 +61,32 @@ namespace EduConnect.Web.Controllers
 
             var orgs = await orgsQuery.OrderBy(o => o.OrgName).ToListAsync();
 
-            var groups = new List<OrgFeedGroup>();
-            foreach (var org in orgs)
-            {
-                var posts = await _context.OrgAnnouncements
-                    .Include(a => a.PostedBy)
-                    .Where(a => a.OrgID == org.OrgID &&
-                                (a.ExpiresAt == null || a.ExpiresAt > now))
+            var orgIds = orgs.Select(o => o.OrgID).ToList();
+            var allPosts = await _context.OrgAnnouncements
+                .Include(a => a.PostedBy)
+                .Where(a => orgIds.Contains(a.OrgID) &&
+                            (a.ExpiresAt == null || a.ExpiresAt > now))
+                .ToListAsync();
+
+            var postsByOrg = allPosts
+                .GroupBy(a => a.OrgID)
+                .ToDictionary(g => g.Key, g => g
                     .OrderByDescending(a => a.IsPinned)
                     .ThenByDescending(a => a.PostedAt)
-                    .ToListAsync();
+                    .ToList());
 
-                groups.Add(new OrgFeedGroup { Org = org, Announcements = posts });
-            }
+            var groups = orgs.Select(org => new OrgFeedGroup
+            {
+                Org = org,
+                Announcements = postsByOrg.TryGetValue(org.OrgID, out var p) ? p : new()
+            }).ToList();
 
-            var allOrgs = await _context.Organizations
-                .Where(o => o.IsActive)
-                .OrderBy(o => o.OrgName)
-                .ToListAsync();
+            var allOrgs = orgId.HasValue
+                ? await _context.Organizations
+                    .Where(o => o.IsActive)
+                    .OrderBy(o => o.OrgName)
+                    .ToListAsync()
+                : orgs;
 
             var vm = new OrgFeedViewModel
             {
