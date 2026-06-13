@@ -1,0 +1,135 @@
+@using EduConnect.Web.Models
+@model List<Organization>
+@{
+    ViewData["Title"] = "Manage Organizations";
+}
+
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-building me-2 text-primary"></i>
+            Organizations
+        </h4>
+        <small class="text-muted">@Model.Count organization(s)</small>
+    </div>
+    <a href="/Org/Create" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>
+        Add Organization
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Organization</th>
+                        <th>Adviser</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var org in Model)
+                    {
+                        var adviser = org.Members?
+                            .FirstOrDefault(m => m.OrgRole == "Adviser" && m.IsActive);
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (!string.IsNullOrEmpty(org.LogoURL))
+                                    {
+                                        <img src="@org.LogoURL"
+                                             class="rounded-circle"
+                                             width="32" height="32"
+                                             style="object-fit:cover;"
+                                             alt="Logo" />
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded-circle bg-primary bg-opacity-10
+                                                    d-flex align-items-center justify-content-center"
+                                             style="width:32px;height:32px;">
+                                            <i class="bi bi-building text-primary small"></i>
+                                        </div>
+                                    }
+                                    <span class="fw-semibold">@org.OrgName</span>
+                                </div>
+                            </td>
+                            <td>
+                                @if (adviser != null)
+                                {
+                                    @($"{adviser.User.FirstName} {adviser.User.LastName}")
+                                }
+                                else
+                                {
+                                    <span class="text-muted fst-italic">None</span>
+                                }
+                            </td>
+                            <td>
+                                @if (org.DepartmentTag != null)
+                                {
+                                    <span class="badge bg-secondary">
+                                        @org.DepartmentTag.ShortName
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">University-wide</span>
+                                }
+                            </td>
+                            <td>
+                                @if (org.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="/Org/Edit/@org.OrgID"
+                                   class="btn btn-outline-primary btn-sm me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post"
+                                      action="/Org/Deactivate/@org.OrgID"
+                                      class="d-inline"
+                                      onsubmit="return confirm('@(org.IsActive ? "Deactivate" : "Reactivate") this organization?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit"
+                                            class="btn btn-sm @(org.IsActive ? "btn-outline-danger" : "btn-outline-success")">
+                                        <i class="bi bi-@(org.IsActive ? "x-circle" : "check-circle")"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                <i class="bi bi-building fs-2 d-block mb-2"></i>
+                                No organizations yet.
+                                <a href="/Org/Create">Add the first one.</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

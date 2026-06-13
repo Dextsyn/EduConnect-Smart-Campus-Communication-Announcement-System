@@ -1,0 +1,138 @@
+@using EduConnect.Web.Models
+@model Organization
+@{
+    ViewData["Title"] = Model.OrgName;
+    bool isAdviser = (bool)ViewBag.IsAdviser;
+    var posts = ViewBag.Announcements as List<OrgAnnouncement>
+        ?? new List<OrgAnnouncement>();
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <div class="d-flex align-items-start gap-4 flex-wrap">
+            @if (!string.IsNullOrEmpty(Model.LogoURL))
+            {
+                <img src="@Model.LogoURL"
+                     class="rounded-circle"
+                     width="80" height="80"
+                     style="object-fit:cover;" />
+            }
+            else
+            {
+                <div class="rounded-circle bg-primary bg-opacity-10
+                            d-flex align-items-center justify-content-center"
+                     style="width:80px;height:80px;">
+                    <i class="bi bi-building text-primary fs-2"></i>
+                </div>
+            }
+            <div class="flex-grow-1">
+                <h4 class="fw-bold mb-1">@Model.OrgName</h4>
+                @if (Model.DepartmentTag != null)
+                {
+                    <span class="badge bg-secondary mb-2">
+                        @Model.DepartmentTag.TagName
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-info mb-2">University-wide</span>
+                }
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <p class="text-muted mb-0">@Model.Description</p>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                @if (isAdviser)
+                {
+                    <a href="/Org/Post/@Model.OrgID"
+                       class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        New Post
+                    </a>
+                }
+                <a href="/Org" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<h6 class="fw-semibold mb-3 text-muted">
+    ANNOUNCEMENTS (@posts.Count)
+</h6>
+
+@if (!posts.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-megaphone fs-1 d-block mb-3"></i>
+            No announcements yet.
+            @if (isAdviser)
+            {
+                <div class="mt-2">
+                    <a href="/Org/Post/@Model.OrgID" class="btn btn-primary btn-sm">
+                        Post the first announcement
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    @foreach (var post in posts)
+    {
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            @if (post.IsPinned)
+                            {
+                                <i class="bi bi-pin-angle-fill text-danger"
+                                   title="Pinned"></i>
+                            }
+                            <h6 class="fw-bold mb-0">@post.Title</h6>
+                        </div>
+                        <p class="text-muted mb-2" style="white-space:pre-line;">
+                            @post.Body
+                        </p>
+                        @if (!string.IsNullOrEmpty(post.AttachmentURL))
+                        {
+                            <a href="@post.AttachmentURL"
+                               target="_blank"
+                               class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-paperclip me-1"></i> Attachment
+                            </a>
+                        }
+                    </div>
+                    <div class="text-muted small text-nowrap">
+                        @post.PostedAt.ToString("MMM d, yyyy")
+                    </div>
+                </div>
+                <div class="text-muted small mt-2">
+                    <i class="bi bi-person-circle me-1"></i>
+                    @post.PostedBy.FirstName @post.PostedBy.LastName
+                    @if (post.ExpiresAt.HasValue)
+                    {
+                        <span class="ms-2">
+                            <i class="bi bi-clock me-1"></i>
+                            Expires @post.ExpiresAt.Value.ToString("MMM d, yyyy")
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}

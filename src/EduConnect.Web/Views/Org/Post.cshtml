@@ -1,0 +1,104 @@
+@model EduConnect.Web.ViewModels.OrgPostViewModel
+@{
+    ViewData["Title"] = $"New Post — {Model.OrgName}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-megaphone me-2 text-primary"></i>
+            New Post
+        </h4>
+        <small class="text-muted">@Model.OrgName</small>
+    </div>
+    <a href="/Org/Details/@Model.OrgID"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Cancel
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <form asp-action="Post"
+              asp-route-orgId="@Model.OrgID"
+              method="post"
+              enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger mb-4">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    Please fix the errors below.
+                </div>
+            }
+
+            <div class="mb-4">
+                <label asp-for="Title" class="form-label fw-semibold">
+                    Title <span class="text-danger">*</span>
+                </label>
+                <input asp-for="Title"
+                       class="form-control form-control-lg"
+                       placeholder="Announcement title" />
+                <span asp-validation-for="Title" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="Body" class="form-label fw-semibold">
+                    Body <span class="text-danger">*</span>
+                </label>
+                <textarea asp-for="Body"
+                          class="form-control"
+                          rows="8"
+                          placeholder="Write your announcement here…"></textarea>
+                <span asp-validation-for="Body" class="text-danger small"></span>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <label asp-for="Attachment" class="form-label fw-semibold">
+                        Attachment <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input asp-for="Attachment"
+                           type="file"
+                           class="form-control" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label asp-for="ExpiresAt" class="form-label fw-semibold">
+                        Expires At <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input asp-for="ExpiresAt"
+                           type="date"
+                           class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="form-check">
+                    <input asp-for="IsPinned"
+                           type="checkbox"
+                           class="form-check-input" />
+                    <label asp-for="IsPinned" class="form-check-label fw-semibold">
+                        <i class="bi bi-pin-angle-fill text-danger me-1"></i>
+                        Pin this announcement
+                    </label>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send me-1"></i> Publish
+                </button>
+                <a href="/Org/Details/@Model.OrgID"
+                   class="btn btn-outline-secondary">
+                    Cancel
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

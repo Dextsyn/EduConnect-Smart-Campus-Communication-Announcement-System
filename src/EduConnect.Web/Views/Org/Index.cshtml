@@ -1,0 +1,145 @@
+@model EduConnect.Web.ViewModels.OrgFeedViewModel
+@{
+    ViewData["Title"] = "Organizations";
+}
+
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-people me-2 text-primary"></i>
+            Organizations
+        </h4>
+        <small class="text-muted">Student organization announcements</small>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2">
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+            <select name="orgId"
+                    class="form-select form-select-sm"
+                    style="width:220px;"
+                    onchange="this.form.submit()">
+                <option value="">All Organizations</option>
+                @foreach (var opt in Model.OrgOptions)
+                {
+                    if (Model.FilterOrgID?.ToString() == opt.Value)
+                    {
+                        <option value="@opt.Value" selected>@opt.Text</option>
+                    }
+                    else
+                    {
+                        <option value="@opt.Value">@opt.Text</option>
+                    }
+                }
+            </select>
+            @if (Model.FilterOrgID.HasValue)
+            {
+                <a href="/Org" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x"></i> Clear
+                </a>
+            }
+        </form>
+    </div>
+</div>
+
+@if (!Model.Groups.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-building fs-1 d-block mb-3"></i>
+            No organizations found.
+        </div>
+    </div>
+}
+
+@foreach (var group in Model.Groups)
+{
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2">
+            <div class="d-flex align-items-center gap-3">
+                @if (!string.IsNullOrEmpty(group.Org.LogoURL))
+                {
+                    <img src="@group.Org.LogoURL"
+                         class="rounded-circle"
+                         width="40" height="40"
+                         style="object-fit:cover;" />
+                }
+                else
+                {
+                    <div class="rounded-circle bg-primary bg-opacity-10
+                                d-flex align-items-center justify-content-center"
+                         style="width:40px;height:40px;">
+                        <i class="bi bi-building text-primary"></i>
+                    </div>
+                }
+                <div>
+                    <a href="/Org/Details/@group.Org.OrgID"
+                       class="fw-bold text-decoration-none text-dark">
+                        @group.Org.OrgName
+                    </a>
+                    @if (group.Org.DepartmentTag != null)
+                    {
+                        <span class="badge bg-secondary ms-2 small">
+                            @group.Org.DepartmentTag.ShortName
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-info ms-2 small">University-wide</span>
+                    }
+                </div>
+                <a href="/Org/Details/@group.Org.OrgID"
+                   class="ms-auto btn btn-outline-primary btn-sm">
+                    View All
+                </a>
+            </div>
+        </div>
+
+        @if (!group.Announcements.Any())
+        {
+            <div class="card-body text-muted small fst-italic">
+                No announcements yet.
+            </div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var post in group.Announcements.Take(3))
+                {
+                    <li class="list-group-item px-4 py-3">
+                        <div class="d-flex justify-content-between
+                                    align-items-start gap-2">
+                            <div>
+                                @if (post.IsPinned)
+                                {
+                                    <i class="bi bi-pin-angle-fill text-danger me-1 small"></i>
+                                }
+                                <span class="fw-semibold">@post.Title</span>
+                                <div class="text-muted small mt-1">
+                                    @(post.Body.Length > 120 ? post.Body.Substring(0, 120) + "…" : post.Body)
+                                </div>
+                            </div>
+                            <div class="text-muted small text-nowrap">
+                                @post.PostedAt.ToString("MMM d")
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            Posted by @post.PostedBy.FirstName @post.PostedBy.LastName
+                        </div>
+                    </li>
+                }
+                @if (group.Announcements.Count > 3)
+                {
+                    <li class="list-group-item px-4 py-2 text-center">
+                        <a href="/Org/Details/@group.Org.OrgID"
+                           class="small text-primary text-decoration-none">
+                            +@(group.Announcements.Count - 3) more
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+}
