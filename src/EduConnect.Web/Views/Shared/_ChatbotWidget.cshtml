@@ -228,7 +228,7 @@
             .replace(/"/g, '&quot;');
         return escaped.replace(
             /\[([^\]]+)\]\((\/(?:Announcement|Event)\/Details\/\d+)\)/g,
-            '<a href="$2" class="chatbot-link" target="_blank">$1</a>'
+            '<a href="$2" class="chatbot-link" target="_blank" rel="noopener noreferrer">$1</a>'
         );
     }
 
