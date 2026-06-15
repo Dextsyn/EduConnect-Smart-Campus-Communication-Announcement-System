@@ -45,7 +45,7 @@ namespace EduConnect.Web.Services
 
         public async Task<string> SendMessageAsync(int userId, string roleName, string sessionToken, string userMessage)
         {
-            var cacheKey = $"chatbot_prompt_{userId}";
+            var cacheKey = $"chatbot_prompt_{userId}_{roleName}";
             var systemPrompt = await _cache.GetOrCreateAsync(cacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
