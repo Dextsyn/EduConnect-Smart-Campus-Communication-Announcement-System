@@ -71,5 +71,6 @@ app.MapControllerRoute(
 
 app.MapHub<NotificationHub>("/notificationHub");
 app.MapHub<GroupChatHub>("/groupChatHub");
+app.MapHub<EventHub>("/eventHub");
 
 app.Run();
