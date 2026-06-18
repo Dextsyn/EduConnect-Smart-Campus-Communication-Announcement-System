@@ -489,8 +489,7 @@
     @section Scripts {
         <script>
             (function () {
-                var eventID      = @Model.EventID;
-                var maxAttendees = @Model.MaxAttendees.Value;
+                var eventID = @Model.EventID;
 
                 var conn = new signalR.HubConnectionBuilder()
                     .withUrl("/eventHub")
