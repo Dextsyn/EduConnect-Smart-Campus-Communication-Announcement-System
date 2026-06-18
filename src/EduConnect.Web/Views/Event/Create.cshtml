@@ -352,8 +352,6 @@
             if (endField)   endField.min   = (startField && startField.value) ? startField.value : todayStr;
             if (regDeadline) {
                 regDeadline.min = todayStr;
-                if (startField && startField.value)
-                    regDeadline.max = startField.value;
             }
 
             // Set start to tomorrow at 9AM
@@ -373,9 +371,8 @@
             if (endField && !endField.value)
                 endField.value = formatDateTimeLocal(tomorrowEnd);
 
-            // Re-apply min/max with the default values now set
-            if (endField)    endField.min    = startField ? startField.value : todayStr;
-            if (regDeadline && startField) regDeadline.max = startField.value;
+            // Re-apply endField.min with the default start value now set
+            if (endField) endField.min = startField ? startField.value : todayStr;
 
             // Auto-update end + regDeadline max when start changes
             if (startField) {
