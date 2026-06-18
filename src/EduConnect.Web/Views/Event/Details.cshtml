@@ -1,0 +1,533 @@
+﻿@model EduConnect.Web.ViewModels.EventDetailViewModel
+@{
+    ViewData["Title"] = Model.EventTitle;
+    var roleName = Context.Session
+        .GetString("RoleName");
+    bool isOrganizer = (bool)ViewBag.IsOrganizer;
+}
+
+<!-- ─── BACK BUTTON ───────────────────── -->
+<div class="mb-4">
+    <a href="/Event"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>
+        Back to Events
+    </a>
+</div>
+
+<!-- ─── SUCCESS/ERROR/INFO MESSAGES ──── -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success
+                    alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger
+                    alert-dismissible mb-4">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        @TempData["Error"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Info"] != null)
+{
+    <div class="alert alert-info
+                    alert-dismissible mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        @TempData["Info"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row g-4">
+
+    <!-- ─── MAIN CONTENT ──────────────── -->
+    <div class="col-12 col-lg-8">
+
+        <!-- Cover Photo -->
+        @if (!string.IsNullOrEmpty(
+                Model.CoverPhotoURL))
+        {
+            <div class="mb-4">
+                <img src="@Model.CoverPhotoURL"
+                     class="img-fluid rounded
+                                shadow-sm w-100"
+                     style="max-height: 350px;
+                                object-fit: cover;"
+                     alt="Event cover" />
+            </div>
+        }
+
+        <!-- Event Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+
+                <!-- Status Badges -->
+                <div class="d-flex flex-wrap
+                            gap-2 mb-3">
+                    @if (Model.IsRegistered)
+                    {
+                        <span class="badge bg-success
+                                         fs-6">
+                            ✅ You are registered
+                        </span>
+                    }
+                    @if (Model.IsOnWaitlist)
+                    {
+                        <span class="badge bg-warning
+                                         text-dark fs-6">
+                            ⏳ Waitlist #@Model
+                            .WaitlistPosition
+                        </span>
+                    }
+                    @if (Model.IsOnline)
+                    {
+                        <span class="badge bg-info">
+                            <i class="bi bi-camera-video
+                                           me-1"></i>
+                            Online Event
+                        </span>
+                    }
+                    <span class="badge @(Model.Status == "Upcoming" ? "bg-primary" : Model.Status == "Ongoing" ? "bg-success" : Model.Status == "Completed" ? "bg-secondary" : "bg-danger")">
+                        @Model.Status
+                    </span>
+                </div>
+
+                <!-- Title -->
+                <h3 class="fw-bold mb-3">
+                    @Model.EventTitle
+                </h3>
+
+                <!-- Event Details -->
+                <div class="row g-3 mb-4
+                            pb-4 border-bottom">
+                    <div class="col-md-6">
+                        <div class="d-flex
+                                    align-items-start
+                                    gap-3">
+                            <i class="bi bi-calendar-event
+                                       text-primary
+                                       fs-4 mt-1"></i>
+                            <div>
+                                <div class="fw-semibold">
+                                    Date
+                                </div>
+                                <div class="text-muted">
+                                    @Model.StartDateTime.ToString("MMMM dd, yyyy")
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex
+                                    align-items-start
+                                    gap-3">
+                            <i class="bi bi-clock
+                                       text-primary
+                                       fs-4 mt-1"></i>
+                            <div>
+                                <div class="fw-semibold">
+                                    Time
+                                </div>
+                                <div class="text-muted">
+                                    @Model.StartDateTime.ToString("hh:mm tt")
+                                    —
+                                    @Model.EndDateTime.ToString("hh:mm tt")
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex
+                                    align-items-start
+                                    gap-3">
+                            <i class="bi bi-geo-alt
+                                       text-primary
+                                       fs-4 mt-1"></i>
+                            <div>
+                                <div class="fw-semibold">
+                                    Location
+                                </div>
+                                <div class="text-muted">
+                                    @(Model.Location
+                                                                        ?? "Online")
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex
+                                    align-items-start
+                                    gap-3">
+                            <i class="bi bi-person
+                                       text-primary
+                                       fs-4 mt-1"></i>
+                            <div>
+                                <div class="fw-semibold">
+                                    Organized by
+                                </div>
+                                <div class="text-muted">
+                                    @Model.OrganizerName
+                                    <span class="badge
+                                                 bg-light
+                                                 text-dark
+                                                 border
+                                                 ms-1">
+                                        @Model.OrganizerRole
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @if (Model.IsOnline &&
+                                        !string.IsNullOrEmpty(
+                                        Model.MeetingURL) &&
+                                        Model.IsRegistered)
+                    {
+                        <div class="col-12">
+                            <div class="d-flex
+                                            align-items-start
+                                            gap-3">
+                                <i class="bi bi-camera-video
+                                               text-primary
+                                               fs-4 mt-1"></i>
+                                <div>
+                                    <div class="fw-semibold">
+                                        Meeting Link
+                                    </div>
+                                    <a href="@Model.MeetingURL"
+                                       target="_blank"
+                                       class="text-primary">
+                                        @Model.MeetingURL
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Description -->
+                @if (!string.IsNullOrEmpty(
+                                Model.Description))
+                {
+                    <div>
+                        <h6 class="fw-bold mb-2">
+                            About this Event
+                        </h6>
+                        <p class="text-muted lh-lg">
+                            @Model.Description
+                        </p>
+                    </div>
+                }
+
+                <!-- Linked Announcement -->
+                @if (!string.IsNullOrEmpty(
+                                Model.AnnouncementTitle))
+                {
+                    <div class="mt-3 p-3 bg-light
+                                    rounded border-start
+                                    border-primary border-3">
+                        <small class="text-muted">
+                            Related Announcement:
+                        </small>
+                        <div>
+                            <a href="/Announcement/Details/@Model.AnnouncementID"
+                               class="text-primary
+                                          fw-semibold">
+                                @Model.AnnouncementTitle
+                            </a>
+                        </div>
+                    </div>
+                }
+
+            </div>
+        </div>
+
+        <!-- QR Code (if registered) -->
+        @if (Model.IsRegistered &&
+                !string.IsNullOrEmpty(Model.UserQRCode))
+        {
+            <div class="card border-0 shadow-sm mb-4
+                            border-success border-2">
+                <div class="card-header bg-success
+                                 text-white border-0">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-qr-code me-2"></i>
+                        Your Event QR Code
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <p class="text-muted small mb-3">
+                        Present this QR code at the
+                        event entrance for attendance
+                        tracking
+                    </p>
+                    <img src="@Model.UserQRCode"
+                         class="img-fluid"
+                         style="max-width: 200px;"
+                         alt="QR Code" />
+                    <div class="mt-3">
+                        <button class="btn
+                                           btn-outline-success
+                                           btn-sm"
+                                onclick="window.print()">
+                            <i class="bi bi-printer me-1">
+                            </i>
+                            Print QR Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Registrants Link (Organizer Only) -->
+        @if (isOrganizer)
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-people display-6
+                               text-primary mb-2 d-block"></i>
+                    <p class="text-muted small mb-3">
+                        View the full list of students
+                        who registered for this event.
+                    </p>
+                    <a href="/Event/Registrants/@Model.EventID"
+                       class="btn btn-primary">
+                        <i class="bi bi-people-fill me-2"></i>
+                        View Registrants
+                    </a>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- ─── SIDEBAR ────────────────────── -->
+    <div class="col-12 col-lg-4">
+
+        <!-- Registration Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white
+                         border-0 pt-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi bi-calendar-check
+                               me-2 text-primary"></i>
+                    Registration
+                </h6>
+            </div>
+            <div class="card-body">
+
+                <!-- Slots Progress -->
+                @if (Model.MaxAttendees.HasValue)
+                {
+                    var pct = Model.MaxAttendees.Value > 0
+                    ? (double)Model.CurrentAttendees /
+                    Model.MaxAttendees.Value * 100
+                    : 0;
+                    <div class="mb-3">
+                        <div class="d-flex
+                                        justify-content-between
+                                        small mb-1">
+                            <span>Slots</span>
+                            <span id="slotCounter" class="@(Model.IsFull ? "text-danger fw-bold" : "text-success fw-bold")">
+                                @Model.CurrentAttendees / @Model.MaxAttendees
+                            </span>
+                        </div>
+                        <div class="progress mb-1"
+                             style="height: 8px;">
+                            <div id="slotProgressBar"
+                                 class="progress-bar @(Model.IsFull ? "bg-danger" : "bg-success")"
+                                 style="width: @pct%">
+                            </div>
+                        </div>
+                        <small id="slotHelperText" class="@(Model.IsFull ? "text-danger" : "text-success")">
+                            @(Model.IsFull ? "Event is full" : $"{Model.SlotsRemaining} slots remaining")
+                        </small>
+                    </div>
+                }
+
+                <!-- Deadline -->
+                @if (Model.RegistrationDeadline
+                                .HasValue)
+                {
+                    <div class="alert alert-warning
+                                    small py-2 mb-3">
+                        <i class="bi bi-clock me-1"></i>
+                        Registration closes:
+                        <strong>
+                            @Model.RegistrationDeadline.Value.ToString("MMM dd, yyyy hh:mm tt")
+                        </strong>
+                    </div>
+                }
+
+                <!-- Registration Button -->
+                @if (Model.IsRegistered)
+                {
+                    <div class="alert alert-success
+                                    mb-3">
+                        <i class="bi bi-check-circle
+                                       me-2"></i>
+                        You are registered!
+                    </div>
+                    <form asp-action="CancelRegistration"
+                          method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden"
+                               name="eventID"
+                               value="@Model.EventID" />
+                        <button type="submit"
+                                class="btn btn-outline-danger
+                                           w-100"
+                                onclick="return confirm(
+                                        'Cancel your registration?')">
+                            <i class="bi bi-x-circle me-2">
+                            </i>
+                            Cancel Registration
+                        </button>
+                    </form>
+                }
+                else if (Model.IsOnWaitlist)
+                {
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-hourglass-split
+                                       me-2"></i>
+                        You are #@Model.WaitlistPosition
+                        on the waitlist
+                    </div>
+                }
+                else if (Model.RegistrationStatus
+                == "Open")
+                {
+                    <form asp-action="Register"
+                          method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden"
+                               name="eventID"
+                               value="@Model.EventID" />
+                        <button type="submit"
+                                class="btn btn-primary
+                                           w-100 py-2
+                                           fw-semibold">
+                            <i class="bi bi-calendar-check
+                                           me-2"></i>
+                            Register Now
+                        </button>
+                    </form>
+                }
+                else if (Model.RegistrationStatus
+                == "Full")
+                {
+                    <form asp-action="Register"
+                          method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden"
+                               name="eventID"
+                               value="@Model.EventID" />
+                        <button type="submit"
+                                class="btn btn-warning
+                                           w-100 py-2
+                                           fw-semibold">
+                            <i class="bi bi-list-ol me-2">
+                            </i>
+                            Join Waitlist
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <button class="btn btn-secondary
+                                       w-100" disabled>
+                        Registration Closed
+                    </button>
+                }
+
+            </div>
+        </div>
+
+        <!-- Organizer Actions -->
+        @if (isOrganizer)
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white
+                                 border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-gear
+                                       me-2 text-primary"></i>
+                        Organizer Actions
+                    </h6>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="/Event/Edit/@Model.EventID"
+                       class="btn btn-outline-primary
+                                  btn-sm">
+                        <i class="bi bi-pencil me-2"></i>
+                        Edit Event
+                    </a>
+                    <a href="/Event/Registrants/@Model.EventID"
+                       class="btn btn-primary btn-sm">
+                        <i class="bi bi-people-fill
+                                       me-2"></i>
+                        View Registrants
+                    </a>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@if (Model.MaxAttendees.HasValue)
+{
+    @section Scripts {
+        <script>
+            (function () {
+                var eventID      = @Model.EventID;
+                var maxAttendees = @Model.MaxAttendees.Value;
+
+                var conn = new signalR.HubConnectionBuilder()
+                    .withUrl("/eventHub")
+                    .withAutomaticReconnect()
+                    .build();
+
+                conn.on("UpdateAttendeeCount", function (current, max) {
+                    var isFull    = current >= max;
+                    var remaining = max - current;
+                    var pct       = max > 0 ? (current / max * 100) : 0;
+
+                    var counter = document.getElementById("slotCounter");
+                    var bar     = document.getElementById("slotProgressBar");
+                    var helper  = document.getElementById("slotHelperText");
+
+                    if (!counter || !bar || !helper) return;
+
+                    counter.textContent = current + " / " + max;
+                    bar.style.width     = pct + "%";
+
+                    if (isFull) {
+                        counter.className = "text-danger fw-bold";
+                        bar.className     = "progress-bar bg-danger";
+                        helper.textContent = "Event is full";
+                        helper.className   = "text-danger";
+                    } else {
+                        counter.className = "text-success fw-bold";
+                        bar.className     = "progress-bar bg-success";
+                        helper.textContent = remaining + " slots remaining";
+                        helper.className   = "text-success";
+                    }
+                });
+
+                conn.start()
+                    .then(function () { return conn.invoke("JoinEvent", eventID); })
+                    .catch(function (err) { console.error("EventHub:", err); });
+            })();
+        </script>
+    }
+}
