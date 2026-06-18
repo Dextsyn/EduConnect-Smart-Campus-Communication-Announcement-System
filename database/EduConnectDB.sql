@@ -134,12 +134,16 @@ CREATE TABLE AnnouncementCategories (
     ColorHex        CHAR(7)             NOT NULL    DEFAULT '#000000',
     IconName        NVARCHAR(50)        NULL,
     IsEmergency     BIT                 NOT NULL    DEFAULT 0,
+    FeedType        NVARCHAR(20)        NOT NULL    DEFAULT 'NonAcademic',
     IsActive        BIT                 NOT NULL    DEFAULT 1,
     CreatedAt       DATETIME            NOT NULL    DEFAULT GETDATE(),
     UpdatedAt       DATETIME            NULL,
 
     CONSTRAINT PK_AnnouncementCategories PRIMARY KEY (CategoryID),
-    CONSTRAINT UQ_Categories_Name UNIQUE (CategoryName)
+    CONSTRAINT UQ_Categories_Name UNIQUE (CategoryName),
+    CONSTRAINT CHK_AnnouncementCategories_FeedType CHECK (
+        FeedType IN ('Academic', 'NonAcademic', 'Emergency')
+    )
 );
 GO
 
@@ -466,15 +470,15 @@ GO
 -- ============================================================
 --  SEED DATA: AnnouncementCategories
 -- ============================================================
-INSERT INTO AnnouncementCategories (CategoryName, Description, ColorHex, IconName, IsEmergency)
+INSERT INTO AnnouncementCategories (CategoryName, Description, ColorHex, IconName, IsEmergency, FeedType)
 VALUES
-    ('Academic',        'Class schedules, exams, grades',        '#3B82F6', 'fa-book',        0),
-    ('Extracurricular', 'Clubs, sports, campus events',          '#10B981', 'fa-star',        0),
-    ('Administrative',  'School policies, office memos',         '#8B5CF6', 'fa-building',    0),
-    ('Financial',       'Payments, tuition, billing',            '#F59E0B', 'fa-money-bill',  0),
-    ('Health',          'Health advisories, clinic updates',     '#EF4444', 'fa-heart-pulse', 0),
-    ('General',         'General campus information',            '#64748B', 'fa-info-circle', 0),
-    ('Emergency',       'Urgent campus wide alerts',             '#DC2626', 'fa-exclamation', 1);
+    ('Academic',        'Class schedules, exams, grades',        '#3B82F6', 'fa-book',        0, 'Academic'),
+    ('Extracurricular', 'Clubs, sports, campus events',          '#10B981', 'fa-star',        0, 'NonAcademic'),
+    ('Administrative',  'School policies, office memos',         '#8B5CF6', 'fa-building',    0, 'NonAcademic'),
+    ('Financial',       'Payments, tuition, billing',            '#F59E0B', 'fa-money-bill',  0, 'NonAcademic'),
+    ('Health',          'Health advisories, clinic updates',     '#EF4444', 'fa-heart-pulse', 0, 'NonAcademic'),
+    ('General',         'General campus information',            '#64748B', 'fa-info-circle', 0, 'NonAcademic'),
+    ('Emergency',       'Urgent campus wide alerts',             '#DC2626', 'fa-exclamation', 1, 'Emergency');
 GO
 
 -- ============================================================
@@ -509,7 +513,9 @@ UNION ALL
 SELECT 'AnnouncementCategories',                COUNT(*) FROM AnnouncementCategories
 UNION ALL
 SELECT 'Users',                                 COUNT(*) FROM Users;
+GO
 
+SELECT * FROM Users
 PRINT '============================================================';
 PRINT ' EduConnectDB v4.0 — Fully Normalized';
 PRINT ' Tables   : 15';

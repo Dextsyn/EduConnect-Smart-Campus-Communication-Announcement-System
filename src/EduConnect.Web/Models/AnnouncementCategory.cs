@@ -24,6 +24,11 @@ namespace EduConnect.Web.Models
         public string? IconName { get; set; }
 
         public bool IsEmergency { get; set; } = false;
+
+        [Required]
+        [MaxLength(20)]
+        public string FeedType { get; set; } = "NonAcademic";
+
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;

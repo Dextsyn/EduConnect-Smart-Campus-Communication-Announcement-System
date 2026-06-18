@@ -333,12 +333,6 @@ namespace EduConnect.Web.Controllers
                     .OrderBy(d => d.TagName)
                     .ToListAsync();
 
-                // Set default FeedType based on role
-                if (roleName == "Dean" ||
-                    roleName == "Chair Person")
-                    model.FeedType = "Academic";
-                else
-                    model.FeedType = "NonAcademic";
             }
 
             ViewBag.IsFaculty = IsFaculty();
@@ -366,11 +360,7 @@ namespace EduConnect.Web.Controllers
 
             // Strip fields Faculty is not allowed to set
             if (IsFaculty())
-            {
                 model.IsEmergency = false;
-                if (model.FeedType == "Emergency")
-                    model.FeedType = "Academic";
-            }
 
             // ─── SECURITY: Validate tags ───────────
             // Make sure faculty didn't tamper with
@@ -515,12 +505,16 @@ namespace EduConnect.Web.Controllers
                 }
             }
 
+            // Derive FeedType from the selected category
+            var category = await _context.AnnouncementCategories
+                .FindAsync(model.CategoryID);
+
             // Create announcement
             var announcement = new Announcement
             {
                 AuthorID = userID,
                 CategoryID = model.CategoryID,
-                FeedType = model.FeedType,
+                FeedType = category?.FeedType ?? "NonAcademic",
                 Title = model.Title,
                 Body = model.Body,
                 Priority = model.Priority,
@@ -691,7 +685,6 @@ namespace EduConnect.Web.Controllers
                 Title = announcement.Title,
                 Body = announcement.Body,
                 CategoryID = announcement.CategoryID,
-                FeedType = announcement.FeedType,
                 Priority = announcement.Priority,
                 IsEmergency = announcement.IsEmergency,
                 ExpiresAt = announcement.ExpiresAt,
@@ -772,11 +765,7 @@ namespace EduConnect.Web.Controllers
 
             // Strip fields Faculty is not allowed to set
             if (IsFaculty())
-            {
                 model.IsEmergency = false;
-                if (model.FeedType == "Emergency")
-                    model.FeedType = "Academic";
-            }
 
             // Tag security for non-admins
             if (!isAdmin &&
@@ -901,11 +890,15 @@ namespace EduConnect.Web.Controllers
                 announcement.RejectionReason = null;
             }
 
+            // Derive FeedType from the selected category
+            var category = await _context.AnnouncementCategories
+                .FindAsync(model.CategoryID);
+
             // ─── Update fields ─────────────────
             announcement.Title = model.Title;
             announcement.Body = model.Body;
             announcement.CategoryID = model.CategoryID;
-            announcement.FeedType = model.FeedType;
+            announcement.FeedType = category?.FeedType ?? "NonAcademic";
             announcement.Priority = model.Priority;
             announcement.IsEmergency = model.IsEmergency;
             announcement.ExpiresAt = model.ExpiresAt;
