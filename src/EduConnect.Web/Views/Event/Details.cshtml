@@ -523,6 +523,11 @@
                     }
                 });
 
+                conn.onreconnected(function () {
+                    conn.invoke("JoinEvent", eventID)
+                        .catch(function (err) { console.error("EventHub rejoin:", err); });
+                });
+
                 conn.start()
                     .then(function () { return conn.invoke("JoinEvent", eventID); })
                     .catch(function (err) { console.error("EventHub:", err); });

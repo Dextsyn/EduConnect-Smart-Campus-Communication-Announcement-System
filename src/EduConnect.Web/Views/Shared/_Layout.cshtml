@@ -583,16 +583,16 @@
     <!-- Custom JS -->
     <script src="~/js/site.js" asp-append-version="true"></script>
 
+    <!-- SignalR + Notifications -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script src="~/js/notifications.js" asp-append-version="true"></script>
+
     @await RenderSectionAsync("Scripts", required: false)
 
     <!-- Toast container -->
     <div id="toast-container"
          class="position-fixed bottom-0 end-0 p-3"
          style="z-index:9999;"></div>
-
-    <!-- SignalR + Notifications -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-    <script src="~/js/notifications.js" asp-append-version="true"></script>
 
     @if (Context.Session.GetString("UserID") != null)
     {
