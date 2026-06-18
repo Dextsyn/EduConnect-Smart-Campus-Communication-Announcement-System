@@ -896,11 +896,11 @@ namespace EduConnect.Web.Controllers
                     .FirstOrDefaultAsync();
                 if (evMaxAtt.HasValue)
                 {
-                    var cancelledCount = await _context.EventRegistrations
+                    var registeredCount = await _context.EventRegistrations
                         .CountAsync(r => r.EventID == eventID && r.Status == "Registered");
                     await _eventHub.Clients
                         .Group($"event-{eventID}")
-                        .SendAsync("UpdateAttendeeCount", cancelledCount, evMaxAtt.Value);
+                        .SendAsync("UpdateAttendeeCount", registeredCount, evMaxAtt.Value);
                 }
 
                 TempData["Success"] =
