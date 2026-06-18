@@ -386,8 +386,10 @@
                         var end   = new Date(start);
                         end.setHours(end.getHours() + 2);
                         endField.value = formatDateTimeLocal(end);
-                        endField.min   = this.value;
                     }
+                    // Always update endField.min; fall back to nowStr if start cleared
+                    if (endField) endField.min = this.value || nowStr;
+                    // Setting to "" removes the cap — intentional; start is required so no data risk
                     if (regDeadline) regDeadline.max = this.value;
                 });
             }
