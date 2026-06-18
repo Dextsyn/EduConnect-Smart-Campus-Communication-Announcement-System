@@ -343,16 +343,15 @@
             var endField    = document.getElementById('endDateTime');
             var regDeadline = document.getElementById('regDeadline');
 
-            // Compute min = now rounded up to next minute
-            var nowMin = new Date();
-            nowMin.setSeconds(0, 0);
-            nowMin.setMinutes(nowMin.getMinutes() + 1);
-            var nowStr = formatDateTimeLocal(nowMin);
+            // min = today at midnight so only past days are grayed out
+            var todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
+            var todayStr = formatDateTimeLocal(todayMidnight);
 
-            if (startField) startField.min = nowStr;
-            if (endField)   endField.min   = (startField && startField.value) ? startField.value : nowStr;
+            if (startField) startField.min = todayStr;
+            if (endField)   endField.min   = (startField && startField.value) ? startField.value : todayStr;
             if (regDeadline) {
-                regDeadline.min = nowStr;
+                regDeadline.min = todayStr;
                 if (startField && startField.value)
                     regDeadline.max = startField.value;
             }
@@ -375,7 +374,7 @@
                 endField.value = formatDateTimeLocal(tomorrowEnd);
 
             // Re-apply min/max with the default values now set
-            if (endField)    endField.min    = startField ? startField.value : nowStr;
+            if (endField)    endField.min    = startField ? startField.value : todayStr;
             if (regDeadline && startField) regDeadline.max = startField.value;
 
             // Auto-update end + regDeadline max when start changes
@@ -387,8 +386,8 @@
                         end.setHours(end.getHours() + 2);
                         endField.value = formatDateTimeLocal(end);
                     }
-                    // Always update endField.min; fall back to nowStr if start cleared
-                    if (endField) endField.min = this.value || nowStr;
+                    // Always update endField.min; fall back to todayStr if start cleared
+                    if (endField) endField.min = this.value || todayStr;
                     // Setting to "" removes the cap — intentional; start is required so no data risk
                     if (regDeadline) regDeadline.max = this.value;
                 });
