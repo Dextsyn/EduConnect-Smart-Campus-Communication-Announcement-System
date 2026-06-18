@@ -1,8 +1,10 @@
 ﻿using EduConnect.Web.Data;
+using EduConnect.Web.Hubs;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using QRCoder;
 using System.IO;
@@ -16,19 +18,22 @@ namespace EduConnect.Web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<EventHub> _eventHub;
 
         public EventController(
             ApplicationDbContext context,
             ILogger<EventController> logger,
             IWebHostEnvironment environment,
             IEmailService emailService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IHubContext<EventHub> eventHub)
         {
             _context = context;
             _logger = logger;
             _environment = environment;
             _emailService = emailService;
             _notificationService = notificationService;
+            _eventHub = eventHub;
         }
 
         // ─── Helpers ───────────────────────────
@@ -664,6 +669,16 @@ namespace EduConnect.Web.Controllers
                     $"You're registered for \"{ev.EventTitle}\"",
                     $"/Event/Details/{eventID}");
 
+                // Broadcast updated attendee count to Details page viewers
+                if (ev.MaxAttendees.HasValue)
+                {
+                    var newCount = await _context.EventRegistrations
+                        .CountAsync(r => r.EventID == eventID && r.Status == "Registered");
+                    await _eventHub.Clients
+                        .Group($"event-{eventID}")
+                        .SendAsync("UpdateAttendeeCount", newCount, ev.MaxAttendees.Value);
+                }
+
                 // Send confirmation email
                 try
                 {
@@ -872,6 +887,20 @@ namespace EduConnect.Web.Controllers
                             "Waitlist email failed: " +
                             "{Error}", ex.Message);
                     }
+                }
+
+                // Broadcast updated attendee count to Details page viewers
+                var evMaxAtt = await _context.Events
+                    .Where(e => e.EventID == eventID)
+                    .Select(e => e.MaxAttendees)
+                    .FirstOrDefaultAsync();
+                if (evMaxAtt.HasValue)
+                {
+                    var cancelledCount = await _context.EventRegistrations
+                        .CountAsync(r => r.EventID == eventID && r.Status == "Registered");
+                    await _eventHub.Clients
+                        .Group($"event-{eventID}")
+                        .SendAsync("UpdateAttendeeCount", cancelledCount, evMaxAtt.Value);
                 }
 
                 TempData["Success"] =
