@@ -65,6 +65,9 @@ namespace EduConnect.Web.Controllers
                    role == "Chair Person";
         }
 
+        private bool IsCreator(Event ev) =>
+            ev.OrganizerID == GetUserID();
+
         private string GetBaseUrl() =>
             $"{Request.Scheme}://{Request.Host}";
 
@@ -202,7 +205,8 @@ namespace EduConnect.Web.Controllers
                         : 999,
                     OrganizerName =
                         e.Organizer.FirstName + " " +
-                        e.Organizer.LastName
+                        e.Organizer.LastName,
+                    OrganizerID = e.OrganizerID
                 }).ToList();
 
             ViewBag.Events = eventList;
@@ -210,6 +214,7 @@ namespace EduConnect.Web.Controllers
             ViewBag.Filter = filter ?? "all";
             ViewBag.ViewMode = view ?? "list";
             ViewBag.CanManage = CanManageEvents();
+            ViewBag.CurrentUserID = GetUserID();
 
             // Calendar data — all events as JSON
             var calendarEvents = eventList.Select(e =>
@@ -366,6 +371,9 @@ namespace EduConnect.Web.Controllers
                 ev.OrganizerID == userID ||
                 roleName == "Administrator";
 
+            ViewBag.IsCreator =
+                ev.OrganizerID == userID;
+
             return View(model);
         }
 
@@ -479,32 +487,41 @@ namespace EduConnect.Web.Controllers
                     model.CoverPhoto.FileName)
                     .ToLowerInvariant();
 
-                if (allowedTypes.Contains(extension) &&
-                    model.CoverPhoto.Length
-                        <= 5 * 1024 * 1024)
+                if (!allowedTypes.Contains(extension))
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath,
-                        "uploads", "events");
-
-                    Directory.CreateDirectory(
-                        uploadsFolder);
-
-                    var fileName =
-                        Guid.NewGuid().ToString()
-                        + extension;
-
-                    var filePath = Path.Combine(
-                        uploadsFolder, fileName);
-
-                    using var stream = new FileStream(
-                        filePath, FileMode.Create);
-                    await model.CoverPhoto
-                        .CopyToAsync(stream);
-
-                    coverPhotoURL =
-                        "/uploads/events/" + fileName;
+                    ModelState.AddModelError("CoverPhoto",
+                        "Only image files are allowed (JPG, PNG, GIF, WebP).");
+                    return View(model);
                 }
+
+                if (model.CoverPhoto.Length > 5 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("CoverPhoto",
+                        "File size cannot exceed 5MB.");
+                    return View(model);
+                }
+
+                var uploadsFolder = Path.Combine(
+                    _environment.WebRootPath,
+                    "uploads", "events");
+
+                Directory.CreateDirectory(
+                    uploadsFolder);
+
+                var fileName =
+                    Guid.NewGuid().ToString()
+                    + extension;
+
+                var filePath = Path.Combine(
+                    uploadsFolder, fileName);
+
+                using var stream = new FileStream(
+                    filePath, FileMode.Create);
+                await model.CoverPhoto
+                    .CopyToAsync(stream);
+
+                coverPhotoURL =
+                    "/uploads/events/" + fileName;
             }
 
             var ev = new Event
@@ -549,6 +566,15 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction(
                     "Login", "Account");
+
+            if (GetRoleName() == "Staff")
+            {
+                TempData["Error"] =
+                    "Staff members cannot register " +
+                    "for events.";
+                return RedirectToAction(
+                    "Details", new { id = eventID });
+            }
 
             var userID = GetUserID();
 
