@@ -100,6 +100,16 @@ namespace EduConnect.Web.Controllers
             return $"/uploads/qrcodes/{fileName}";
         }
 
+        private void DeleteEventPhoto(string? url)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+            var path = Path.Combine(
+                _environment.WebRootPath,
+                url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
+        }
+
         // ═══════════════════════════════════════
         //  GET: /Event
         //  List all upcoming events
@@ -552,6 +562,190 @@ namespace EduConnect.Web.Controllers
                 "Event created successfully!";
             return RedirectToAction(
                 "Details", new { id = ev.EventID });
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Event/Edit/5
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> Edit(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!CanManageEvents())
+                return RedirectToAction("Index");
+
+            var ev = await _context.Events
+                .FirstOrDefaultAsync(e => e.EventID == id);
+
+            if (ev == null)
+                return NotFound();
+
+            if (!IsCreator(ev))
+            {
+                TempData["Error"] =
+                    "You can only edit events you created.";
+                return RedirectToAction(
+                    "Details", new { id });
+            }
+
+            var model = new EventFormViewModel
+            {
+                EventID              = ev.EventID,
+                EventTitle           = ev.EventTitle,
+                Description          = ev.Description,
+                Location             = ev.Location,
+                StartDateTime        = ev.StartDateTime,
+                EndDateTime          = ev.EndDateTime,
+                MaxAttendees         = ev.MaxAttendees,
+                IsOnline             = ev.IsOnline,
+                MeetingURL           = ev.MeetingURL,
+                RegistrationDeadline = ev.RegistrationDeadline,
+                LinkedAnnouncementID = ev.AnnouncementID,
+                ExistingCoverPhotoURL = ev.CoverPhotoURL,
+                Announcements        = await _context.Announcements
+                    .Where(a => a.Status == "Published" &&
+                                a.AuthorID == GetUserID())
+                    .OrderByDescending(a => a.PublishedAt)
+                    .ToListAsync()
+            };
+
+            return View(model);
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Event/Edit/5
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(
+            int id, EventFormViewModel model)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!CanManageEvents())
+                return RedirectToAction("Index");
+
+            var ev = await _context.Events
+                .FirstOrDefaultAsync(e => e.EventID == id);
+
+            if (ev == null)
+                return NotFound();
+
+            if (!IsCreator(ev))
+            {
+                TempData["Error"] =
+                    "You can only edit events you created.";
+                return RedirectToAction(
+                    "Details", new { id });
+            }
+
+            // ─── Date validation ───────────────────────
+            if (!model.StartDateTime.HasValue)
+                ModelState.AddModelError(
+                    "StartDateTime", "Start date is required.");
+
+            if (!model.EndDateTime.HasValue)
+                ModelState.AddModelError(
+                    "EndDateTime", "End date is required.");
+
+            if (model.StartDateTime.HasValue &&
+                model.EndDateTime.HasValue &&
+                model.EndDateTime.Value <= model.StartDateTime.Value)
+            {
+                ModelState.AddModelError(
+                    "EndDateTime",
+                    "End date must be after start date.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
+                model.Announcements = await _context.Announcements
+                    .Where(a => a.Status == "Published" &&
+                                a.AuthorID == GetUserID())
+                    .OrderByDescending(a => a.PublishedAt)
+                    .ToListAsync();
+                return View(model);
+            }
+
+            // ─── Photo handling ────────────────────────
+            if (model.RemoveCoverPhoto)
+            {
+                DeleteEventPhoto(ev.CoverPhotoURL);
+                ev.CoverPhotoURL = null;
+            }
+            else if (model.CoverPhoto != null &&
+                     model.CoverPhoto.Length > 0)
+            {
+                var allowedTypes = new[]
+                {
+                    ".jpg", ".jpeg", ".png", ".gif", ".webp"
+                };
+                var extension = Path.GetExtension(
+                    model.CoverPhoto.FileName).ToLowerInvariant();
+
+                if (!allowedTypes.Contains(extension))
+                {
+                    ModelState.AddModelError("CoverPhoto",
+                        "Only image files are allowed (JPG, PNG, GIF, WebP).");
+                    model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
+                    model.Announcements = await _context.Announcements
+                        .Where(a => a.Status == "Published" &&
+                                    a.AuthorID == GetUserID())
+                        .OrderByDescending(a => a.PublishedAt)
+                        .ToListAsync();
+                    return View(model);
+                }
+
+                if (model.CoverPhoto.Length > 5 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("CoverPhoto",
+                        "File size cannot exceed 5MB.");
+                    model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
+                    model.Announcements = await _context.Announcements
+                        .Where(a => a.Status == "Published" &&
+                                    a.AuthorID == GetUserID())
+                        .OrderByDescending(a => a.PublishedAt)
+                        .ToListAsync();
+                    return View(model);
+                }
+
+                DeleteEventPhoto(ev.CoverPhotoURL);
+
+                var uploadsFolder = Path.Combine(
+                    _environment.WebRootPath, "uploads", "events");
+                Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = Guid.NewGuid().ToString() + extension;
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using var stream = new FileStream(
+                    filePath, FileMode.Create);
+                await model.CoverPhoto.CopyToAsync(stream);
+
+                ev.CoverPhotoURL = "/uploads/events/" + fileName;
+            }
+            // else: keep existing photo unchanged
+
+            // ─── Update fields ─────────────────────────
+            ev.EventTitle            = model.EventTitle;
+            ev.Description           = model.Description;
+            ev.Location              = model.Location;
+            ev.StartDateTime         = model.StartDateTime!.Value;
+            ev.EndDateTime           = model.EndDateTime!.Value;
+            ev.MaxAttendees          = model.MaxAttendees;
+            ev.IsOnline              = model.IsOnline;
+            ev.MeetingURL            = model.MeetingURL;
+            ev.RegistrationDeadline  = model.RegistrationDeadline;
+            ev.AnnouncementID        = model.LinkedAnnouncementID;
+            ev.UpdatedAt             = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Event updated successfully!";
+            return RedirectToAction("Details", new { id });
         }
 
         // ═══════════════════════════════════════
