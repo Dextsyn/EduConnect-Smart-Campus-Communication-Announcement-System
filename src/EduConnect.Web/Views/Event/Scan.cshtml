@@ -1,0 +1,185 @@
+@model EduConnect.Web.ViewModels.ScanResultViewModel
+@{
+    ViewData["Title"] = "Check-In — " + Model.EventTitle;
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+
+            <!-- Back link -->
+            <a href="/Event/Registrants/@Model.EventID"
+               class="btn btn-outline-secondary btn-sm mb-3">
+                <i class="bi bi-arrow-left me-1"></i>
+                Back to Registrants
+            </a>
+
+            <!-- TempData alerts -->
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success
+                            alert-dismissible fade show mb-3">
+                    <i class="bi bi-check-circle me-2"></i>
+                    @TempData["Success"]
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert"></button>
+                </div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger
+                            alert-dismissible fade show mb-3">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    @TempData["Error"]
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <!-- Status Card -->
+            @{
+                string headerClass = Model.RegistrationStatus switch
+                {
+                    "Attended"  => "bg-success text-white",
+                    "Cancelled" => "bg-danger text-white",
+                    _           => "bg-warning text-dark"
+                };
+                string statusIcon = Model.RegistrationStatus switch
+                {
+                    "Attended"  => "bi-check-circle-fill",
+                    "Cancelled" => "bi-x-circle-fill",
+                    _           => "bi-clock-history"
+                };
+                string statusText = Model.RegistrationStatus switch
+                {
+                    "Attended"  => "Already checked in",
+                    "Cancelled" => "Registration cancelled",
+                    _           => "Not yet checked in"
+                };
+            }
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header @headerClass
+                            text-center py-4">
+                    <i class="bi @statusIcon display-4 d-block mb-1"></i>
+                    <div class="fw-bold fs-5">@statusText</div>
+                </div>
+            </div>
+
+            <!-- Student Info -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-person me-2 text-primary"></i>
+                        Student Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Full Name
+                        </dt>
+                        <dd class="col-sm-8 fw-semibold">
+                            @Model.StudentFullName
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Student ID
+                        </dt>
+                        <dd class="col-sm-8">@Model.StudentID</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Email
+                        </dt>
+                        <dd class="col-sm-8">@Model.Email</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Department
+                        </dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-light
+                                         text-dark border">
+                                @Model.Department
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Registered
+                        </dt>
+                        <dd class="col-sm-8 text-muted small">
+                            @Model.RegisteredAt.ToString(
+                                "MMMM dd, yyyy · h:mm tt")
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Event Info -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-calendar-event
+                                   me-2 text-primary"></i>
+                        Event
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Title
+                        </dt>
+                        <dd class="col-sm-8 fw-semibold">
+                            @Model.EventTitle
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Date
+                        </dt>
+                        <dd class="col-sm-8">
+                            @Model.StartDateTime.ToString("MMMM dd, yyyy")
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">
+                            Time
+                        </dt>
+                        <dd class="col-sm-8">
+                            @Model.StartDateTime.ToString("h:mm tt") —
+                            @Model.EndDateTime.ToString("h:mm tt")
+                        </dd>
+
+                        @if (!string.IsNullOrEmpty(Model.Location))
+                        {
+                            <dt class="col-sm-4 text-muted fw-normal">
+                                Location
+                            </dt>
+                            <dd class="col-sm-8">@Model.Location</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Mark as Attended Button -->
+            @if (Model.RegistrationStatus == "Registered")
+            {
+                <form asp-action="MarkAttendance" method="post"
+                      class="mt-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="registrationID"
+                           value="@Model.RegistrationID" />
+                    <input type="hidden" name="eventID"
+                           value="@Model.EventID" />
+                    <input type="hidden" name="source"
+                           value="scan" />
+                    <button type="submit"
+                            class="btn btn-success
+                                   w-100 py-3 fs-5 fw-bold"
+                            onclick="return confirm(
+                                'Mark @Model.StudentFullName as attended?')">
+                        <i class="bi bi-check-lg me-2"></i>
+                        Mark as Attended
+                    </button>
+                </form>
+            }
+
+        </div>
+    </div>
+</div>

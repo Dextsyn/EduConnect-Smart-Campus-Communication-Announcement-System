@@ -115,7 +115,7 @@ private bool IsStudent() => HttpContext.Session.GetString("RoleName") == "Studen
 |--------|-------|------|-------------|
 | `Index` | `GET /Group` | logged-in | Browse all non-dissolved groups. Passes full list to view; JS filters by category client-side. |
 | `Create` GET | `GET /Group/Create` | student | Show create form |
-| `Create` POST | `POST /Group/Create` | student | Validate and save new group; creator auto-joins as first member |
+| `Create` POST | `POST /Group/Create` | student | Validate and save new group; creator auto-joins as first member (counts toward `MaxMembers`) |
 | `Details` | `GET /Group/Details/{id}` | logged-in | Group info + member list. If viewer is a member, also loads last 50 messages for initial render |
 | `Join` | `POST /Group/Join/{id}` | student | Add member; if `MemberCount == MaxMembers` after join → `Status = Full`, `ChatExpiresAt = UtcNow + 7 days` |
 | `Leave` | `POST /Group/Leave/{id}` | student | Remove member; if group was `Full` → `Status = Open`, `ChatExpiresAt = null`. Creator cannot leave (must dissolve). |

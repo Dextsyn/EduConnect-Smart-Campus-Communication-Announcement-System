@@ -1,0 +1,278 @@
+@model List<EduConnect.Web.Models.Notification>
+@{
+    ViewData["Title"] = "Notifications";
+    int unreadCount = ViewBag.UnreadCount ?? 0;
+}
+
+<!-- ─── PAGE HEADER ──────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-bell me-2 text-primary"></i>
+            Notifications
+        </h4>
+        <small class="text-muted">
+            @if (unreadCount > 0)
+            {
+                <span>You have <strong>@unreadCount unread</strong> notification@(unreadCount == 1 ? "" : "s")</span>
+            }
+            else
+            {
+                <span>All caught up</span>
+            }
+        </small>
+    </div>
+    @if (Model.Count > 0)
+    {
+        <button id="page-mark-all"
+                class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-check2-all me-1"></i>
+            Mark all as read
+        </button>
+    }
+</div>
+
+<!-- ─── FILTER TABS ──────────────────────────── -->
+@if (Model.Count > 0)
+{
+    <div class="mb-3 d-flex flex-wrap gap-2" id="filter-btns">
+        <button class="btn btn-primary btn-sm active" data-filter="all">
+            All <span class="badge bg-white text-primary ms-1">@Model.Count</span>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" data-filter="unread">
+            Unread <span class="badge bg-danger ms-1">@unreadCount</span>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" data-filter="Announcement">
+            <i class="bi bi-megaphone me-1"></i>Announcements
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" data-filter="EventRegistration,WaitlistPromotion">
+            <i class="bi bi-calendar-check me-1"></i>Events
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" data-filter="PasswordReset,NewPendingStudent">
+            <i class="bi bi-shield-lock me-1"></i>System
+        </button>
+    </div>
+}
+
+<!-- ─── NOTIFICATION LIST ─────────────────────── -->
+@if (Model.Count == 0)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-bell-slash fs-1 text-muted mb-3 d-block"></i>
+            <h6 class="text-muted fw-normal">No notifications yet</h6>
+            <small class="text-muted">You'll see announcements, event updates, and alerts here.</small>
+        </div>
+    </div>
+}
+else
+{
+    <div id="notif-page-list" class="d-flex flex-column gap-2">
+        @foreach (var n in Model)
+        {
+            var icon = n.Type switch
+            {
+                "Announcement" => "bi-megaphone",
+                "EventRegistration" => "bi-calendar-check",
+                "WaitlistPromotion" => "bi-arrow-up-circle",
+                "PasswordReset" => "bi-shield-lock",
+                "NewPendingStudent" => "bi-person-plus",
+                _ => "bi-bell"
+            };
+            var iconColor = n.Type switch
+            {
+                "Announcement" => "text-primary",
+                "EventRegistration" => "text-success",
+                "WaitlistPromotion" => "text-warning",
+                "PasswordReset" => "text-danger",
+                "NewPendingStudent" => "text-info",
+                _ => "text-secondary"
+            };
+            var bgClass = n.IsRead ? "" : "border-start border-primary border-3";
+
+            <div class="card border-0 shadow-sm notif-card @bgClass"
+                 data-id="@n.NotificationID"
+                 data-type="@n.Type"
+                 data-read="@n.IsRead.ToString().ToLower()">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-start gap-3">
+
+                        <!-- Icon bubble -->
+                        <div class="rounded-circle p-2 bg-light flex-shrink-0 d-flex align-items-center justify-content-center"
+                             style="width:42px;height:42px;">
+                            <i class="bi @icon @iconColor fs-5"></i>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                <p class="mb-1 small fw-semibold @(n.IsRead ? "text-muted" : "")">
+                                    @if (!string.IsNullOrEmpty(n.Link))
+                                    {
+                                        <a href="@n.Link" class="text-decoration-none text-dark stretched-link-notif">
+                                            @n.Message
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        @n.Message
+                                    }
+                                </p>
+                                @if (!n.IsRead)
+                                {
+                                    <span class="badge rounded-pill bg-primary flex-shrink-0"
+                                          style="font-size:9px;">New</span>
+                                }
+                            </div>
+                            <div class="d-flex align-items-center gap-3 mt-1">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <span class="notif-time" data-sent="@n.SentAt.ToString("o")">
+                                        @n.SentAt.ToString("MMM d, yyyy h:mm tt")
+                                    </span>
+                                </small>
+                                @if (!n.IsRead)
+                                {
+                                    <button class="btn btn-link btn-sm p-0 text-muted mark-one-read"
+                                            style="font-size:11px;"
+                                            data-id="@n.NotificationID">
+                                        Mark read
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div id="notif-empty-filter" class="card border-0 shadow-sm d-none">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-funnel fs-1 text-muted mb-3 d-block"></i>
+            <small class="text-muted">No notifications match this filter.</small>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+(function () {
+    // ── Filter tabs ─────────────────────────────
+    document.querySelectorAll('#filter-btns [data-filter]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('#filter-btns [data-filter]').forEach(function (b) {
+                b.classList.remove('btn-primary', 'active');
+                b.classList.add('btn-outline-secondary');
+            });
+            btn.classList.add('btn-primary', 'active');
+            btn.classList.remove('btn-outline-secondary');
+
+            var filter = btn.dataset.filter;
+            var types = filter === 'all' || filter === 'unread' ? null : filter.split(',');
+            var cards = document.querySelectorAll('.notif-card');
+            var visible = 0;
+            cards.forEach(function (card) {
+                var matchType = !types || types.includes(card.dataset.type);
+                var matchRead = filter !== 'unread' || card.dataset.read === 'false';
+                if (matchType && matchRead) {
+                    card.style.display = '';
+                    visible++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            var emptyEl = document.getElementById('notif-empty-filter');
+            if (emptyEl) emptyEl.classList.toggle('d-none', visible > 0);
+        });
+    });
+
+    // ── Mark one read ───────────────────────────
+    document.querySelectorAll('.mark-one-read').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var id = btn.dataset.id;
+            fetch('/Notification/MarkRead/' + id, { method: 'POST' })
+                .then(function () {
+                    var card = document.querySelector('.notif-card[data-id="' + id + '"]');
+                    if (card) {
+                        card.classList.remove('border-start', 'border-primary', 'border-3');
+                        card.dataset.read = 'true';
+                        var badge = card.querySelector('.badge.bg-primary');
+                        if (badge) badge.remove();
+                        btn.remove();
+                        var msg = card.querySelector('.fw-semibold');
+                        if (msg) msg.classList.add('text-muted');
+                    }
+                    // Update the bell badge in the navbar
+                    var bellBadge = document.getElementById('notif-badge');
+                    if (bellBadge) {
+                        var current = parseInt(bellBadge.textContent) || 1;
+                        var next = current - 1;
+                        if (next <= 0) { bellBadge.classList.add('d-none'); }
+                        else { bellBadge.textContent = next; }
+                    }
+                    // Update page unread label
+                    updateUnreadLabel(-1);
+                });
+        });
+    });
+
+    // ── Mark all read ───────────────────────────
+    var markAllBtn = document.getElementById('page-mark-all');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function () {
+            fetch('/Notification/MarkAllRead', { method: 'POST' })
+                .then(function () {
+                    document.querySelectorAll('.notif-card').forEach(function (card) {
+                        card.classList.remove('border-start', 'border-primary', 'border-3');
+                        card.dataset.read = 'true';
+                        var badge = card.querySelector('.badge.bg-primary');
+                        if (badge) badge.remove();
+                        var markBtn = card.querySelector('.mark-one-read');
+                        if (markBtn) markBtn.remove();
+                        var msg = card.querySelector('.fw-semibold');
+                        if (msg) msg.classList.add('text-muted');
+                    });
+                    var bellBadge = document.getElementById('notif-badge');
+                    if (bellBadge) bellBadge.classList.add('d-none');
+                    updateUnreadLabel(0, true);
+                    markAllBtn.style.display = 'none';
+                });
+        });
+    }
+
+    // ── Relative timestamps ─────────────────────
+    document.querySelectorAll('.notif-time[data-sent]').forEach(function (el) {
+        var sent = new Date(el.dataset.sent);
+        var seconds = Math.floor((Date.now() - sent.getTime()) / 1000);
+        var text;
+        if (seconds < 60) text = 'just now';
+        else if (seconds < 3600) text = Math.floor(seconds / 60) + 'm ago';
+        else if (seconds < 86400) text = Math.floor(seconds / 3600) + 'h ago';
+        else text = el.textContent.trim(); // keep the formatted date
+        el.textContent = text;
+    });
+
+    // ── Helper ──────────────────────────────────
+    function updateUnreadLabel(delta, setZero) {
+        var label = document.querySelector('.text-muted span strong');
+        if (!label) return;
+        var parent = label.parentElement;
+        if (!parent) return;
+        if (setZero) {
+            parent.outerHTML = '<span>All caught up</span>';
+            return;
+        }
+        var current = parseInt(label.textContent) || 0;
+        var next = Math.max(0, current + delta);
+        if (next === 0) {
+            parent.outerHTML = '<span>All caught up</span>';
+        } else {
+            label.textContent = next;
+        }
+    }
+})();
+</script>
+}

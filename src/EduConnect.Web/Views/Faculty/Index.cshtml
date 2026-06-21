@@ -1,0 +1,280 @@
+@{
+    ViewData["Title"] = "Faculty Dashboard";
+    var userName = Context.Session.GetString("UserName");
+    var monthLabels = ViewBag.MonthLabels as List<string>
+        ?? new List<string>();
+    var monthlyCount = ViewBag.MonthlyCount as List<int>
+        ?? new List<int>();
+    var myEventList =
+        ViewBag.MyEventList as
+        List<EduConnect.Web.Models.Event>
+        ?? new List<EduConnect.Web.Models.Event>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-person-workspace
+                       me-2 text-primary"></i>
+            Faculty Dashboard
+        </h4>
+        <small class="text-muted">
+            @ViewBag.DepartmentName
+            <span class="badge bg-primary ms-1">
+                @ViewBag.DepartmentShort
+            </span>
+        </small>
+    </div>
+    <a href="/Event/Create"
+       class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>
+        New Event
+    </a>
+</div>
+
+<!-- ─── STAT CARDS ───────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-primary bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-calendar-event
+                               text-primary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.TotalEvents
+                </div>
+                <div class="text-muted small">
+                    Total Events
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-success bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-calendar-check
+                               text-success fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.UpcomingEvents
+                </div>
+                <div class="text-muted small">
+                    Upcoming
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-secondary bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-check2-all
+                               text-secondary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.CompletedEvents
+                </div>
+                <div class="text-muted small">
+                    Completed
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-info bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-people
+                               text-info fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.TotalRegistrations
+                </div>
+                <div class="text-muted small">
+                    Registrations
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── CHART ─────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-graph-up
+                       me-2 text-primary"></i>
+            My Events Created — Last 6 Months
+        </h6>
+    </div>
+    <div class="card-body">
+        <canvas id="monthlyChart" height="80"></canvas>
+    </div>
+</div>
+
+<!-- ─── MY EVENTS TABLE ───────────────── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-3
+                d-flex justify-content-between
+                align-items-center">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-list-ul
+                       me-2 text-primary"></i>
+            My Events
+        </h6>
+        <a href="/Event/Create"
+           class="btn btn-primary btn-sm">
+            <i class="bi bi-plus me-1"></i>
+            New
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Event</th>
+                        <th>Date</th>
+                        <th>Location</th>
+                        <th>Registrants</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!myEventList.Any())
+                    {
+                        <tr>
+                            <td colspan="6"
+                                class="text-center
+                                       py-4 text-muted">
+                                <i class="bi bi-calendar-event
+                                           fs-1 d-block mb-2"></i>
+                                No events yet.
+                                <a href="/Event/Create"
+                                   class="text-primary">
+                                    Create your first event.
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var ev in myEventList)
+                        {
+                            var registeredCount = ev.Registrations
+                                ?.Count(r => r.Status != "Cancelled")
+                                ?? 0;
+                            <tr>
+                                <td class="ps-3">
+                                    <a href="/Event/Details/@ev.EventID"
+                                       class="text-decoration-none
+                                              fw-semibold text-dark small">
+                                        @ev.EventTitle
+                                    </a>
+                                </td>
+                                <td class="small text-muted">
+                                    @ev.StartDateTime.ToString("MMM dd, yyyy")
+                                </td>
+                                <td class="small text-muted">
+                                    @(string.IsNullOrEmpty(ev.Location)
+                                        ? (ev.IsOnline ? "Online" : "—")
+                                        : ev.Location)
+                                </td>
+                                <td class="small text-muted">
+                                    <i class="bi bi-people me-1"></i>
+                                    @registeredCount
+                                    @if (ev.MaxAttendees.HasValue)
+                                    {
+                                        <span>/ @ev.MaxAttendees</span>
+                                    }
+                                </td>
+                                <td>
+                                    @switch (ev.Status)
+                                    {
+                                        case "Upcoming":
+                                            <span class="badge bg-primary">
+                                                Upcoming
+                                            </span>
+                                            break;
+                                        case "Ongoing":
+                                            <span class="badge bg-success">
+                                                Ongoing
+                                            </span>
+                                            break;
+                                        case "Completed":
+                                            <span class="badge bg-secondary">
+                                                Completed
+                                            </span>
+                                            break;
+                                        case "Cancelled":
+                                            <span class="badge bg-danger">
+                                                Cancelled
+                                            </span>
+                                            break;
+                                        default:
+                                            <span class="badge bg-secondary">
+                                                @ev.Status
+                                            </span>
+                                            break;
+                                    }
+                                </td>
+                                <td>
+                                    <a href="/Event/Registrants/@ev.EventID"
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-people-fill"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        new Chart(
+            document.getElementById('monthlyChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(
+                    System.Text.Json.JsonSerializer.Serialize(monthLabels)),
+                datasets: [{
+                    label: 'Events Created',
+                    data: @Html.Raw(
+                        System.Text.Json.JsonSerializer.Serialize(monthlyCount)),
+                    backgroundColor: 'rgba(13,110,253,0.7)',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                }
+            }
+        });
+    </script>
+}

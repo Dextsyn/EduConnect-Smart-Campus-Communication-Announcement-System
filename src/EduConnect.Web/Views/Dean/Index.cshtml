@@ -1,0 +1,296 @@
+﻿@{
+    ViewData["Title"] = "Dean Dashboard";
+    var userName = Context.Session
+        .GetString("UserName");
+    var monthLabels = ViewBag.MonthLabels
+        as List<string>
+        ?? new List<string>();
+    var monthlyCount = ViewBag.MonthlyCount
+        as List<int>
+        ?? new List<int>();
+    var recentList =
+        ViewBag.RecentAnnouncements as
+        List<EduConnect.Web.Models.Announcement>
+        ?? new List<EduConnect.Web.Models
+            .Announcement>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-mortarboard
+                       me-2 text-primary"></i>
+            Dean Dashboard
+        </h4>
+        <small class="text-muted">
+            @ViewBag.DepartmentName
+            <span class="badge bg-primary ms-1">
+                @ViewBag.DepartmentShort
+            </span>
+        </small>
+    </div>
+    <a href="/Announcement/Create"
+       class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>
+        New Announcement
+    </a>
+</div>
+
+<!-- ─── STAT CARDS ───────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-success bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-megaphone
+                               text-success fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.TotalPublished
+                </div>
+                <div class="text-muted small">
+                    Published
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-primary bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-people
+                               text-primary fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.TotalFaculty
+                </div>
+                <div class="text-muted small">
+                    Faculty Members
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-3">
+                <div class="rounded-circle p-2
+                            bg-info bg-opacity-10
+                            d-inline-flex mb-2">
+                    <i class="bi bi-calendar-check
+                               text-info fs-5"></i>
+                </div>
+                <div class="fw-bold fs-4">
+                    @ViewBag.TodayAnnouncements
+                </div>
+                <div class="text-muted small">
+                    Posted Today
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── CHART ─────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-graph-up
+                       me-2 text-primary"></i>
+            @ViewBag.DepartmentShort Announcements
+            — Last 6 Months
+        </h6>
+    </div>
+    <div class="card-body">
+        <canvas id="monthlyChart" height="80">
+        </canvas>
+    </div>
+</div>
+
+<!-- ─── QUICK ACTIONS ─────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-lightning
+                       me-2 text-primary"></i>
+            Quick Actions
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-6 col-md-4">
+                <a href="/Announcement/Create"
+                   class="btn btn-outline-primary
+                          w-100 py-3 text-center">
+                    <i class="bi bi-plus-circle
+                               d-block fs-3 mb-1"></i>
+                    <small>New Announcement</small>
+                </a>
+            </div>
+            <div class="col-6 col-md-4">
+                <a href="/Announcement"
+                   class="btn btn-outline-success
+                          w-100 py-3 text-center">
+                    <i class="bi bi-megaphone
+                               d-block fs-3 mb-1"></i>
+                    <small>All Announcements</small>
+                </a>
+            </div>
+            <div class="col-6 col-md-4">
+                <a href="/Event"
+                   class="btn btn-outline-secondary
+                          w-100 py-3 text-center">
+                    <i class="bi bi-calendar-event
+                               d-block fs-3 mb-1"></i>
+                    <small>Events</small>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── RECENT ANNOUNCEMENTS ─────────── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">
+            <i class="bi bi-table me-2 text-primary"></i>
+            Recent Department Announcements
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Title</th>
+                        <th>Author</th>
+                        <th>Category</th>
+                        <th>Views</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!recentList.Any())
+                    {
+                        <tr>
+                            <td colspan="6"
+                                class="text-center
+                                            py-4 text-muted">
+                                No announcements yet
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in recentList)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <a href="/Announcement/Details/@item.AnnouncementID"
+                                       class="text-decoration-none
+                                                      fw-semibold text-dark
+                                                      small">
+                                        @item.Title
+                                    </a>
+                                </td>
+                                <td class="small
+                                                    text-muted">
+                                    @item.Author?.FirstName
+                                    @item.Author?.LastName
+                                </td>
+                                <td>
+                                    <span class="badge
+                                                         rounded-pill"
+                                          style="background-color:
+                                                         @item.Category
+                                                              ?.ColorHex">
+                                        @item.Category
+                                        ?.CategoryName
+                                    </span>
+                                </td>
+                                <td class="small
+                                                    text-muted">
+                                    <i class="bi bi-eye
+                                                       me-1"></i>
+                                    @item.ViewCount
+                                </td>
+                                <td>
+                                    @if (item.Status
+                                                                == "Published")
+                                    {
+                                        <span class="badge
+                                                                 bg-success">
+                                            Published
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge
+                                                                 bg-secondary">
+                                            @item.Status
+                                        </span>
+                                    }
+                                </td>
+                                <td class="small
+                                                    text-muted">
+                                    @(item.PublishedAt?
+                                                                .ToString(
+                                                                                                "MMM dd, yyyy")
+                                                                ?? "—")
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    </script>
+    <script>
+        new Chart(
+            document.getElementById('monthlyChart')
+                .getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(
+                                    System.Text.Json.JsonSerializer
+                                            .Serialize(monthLabels)),
+            datasets: [{
+                label: 'Announcements',
+                data: @Html.Raw(
+                                        System.Text.Json.JsonSerializer
+                                                .Serialize(monthlyCount)),
+                backgroundColor:
+                    'rgba(13,110,253,0.7)',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+</script>
+}

@@ -32,15 +32,19 @@ namespace EduConnect.Web.Models
         [Required]
         public int RoleID { get; set; }
         public bool IsActive { get; set; } = true;
+        public string VerificationStatus { get; set; } = "Pending";
 
         [MaxLength(500)]
         public string? ProfilePicture { get; set; }
-
+        public int? VerifiedByID { get; set; }
+        public DateTime? VerifiedAt { get; set; }
+        public string? VerificationRejectionReason { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLogin { get; set; }
 
-        public Role Role { get; set; }  
+        public Role Role { get; set; }
+        public User? VerifiedBy { get; set; }
         public ICollection<UserDepartment> UserDepartments { get; set; }    
         public ICollection<Announcement> Announcements { get; set; }
         public ICollection<Notification> Notifications { get; set; }
@@ -49,6 +53,7 @@ namespace EduConnect.Web.Models
         public ICollection<RefreshToken> RefreshTokens { get; set; }
         public ICollection<AuditLog> AuditLogs { get; set; }
         public ICollection<Event> OrganizedEvents { get; set; }
+        public ICollection<UserAnnouncementInteraction> AnnouncementInteractions { get; set; }
 
     }
 }

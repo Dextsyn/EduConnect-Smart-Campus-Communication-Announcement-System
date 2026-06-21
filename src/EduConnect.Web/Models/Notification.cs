@@ -12,12 +12,18 @@ namespace EduConnect.Web.Models
         [Required]
         public int UserID { get; set; }
 
+        public int? AnnouncementID { get; set; }
+
         [Required]
-        public int AnnouncementID { get; set; }
+        [MaxLength(50)]
+        public string Type { get; set; } = "Announcement";
 
         [Required]
         [MaxLength(500)]
         public string Message { get; set; }
+
+        [MaxLength(200)]
+        public string? Link { get; set; }
 
         public bool IsRead { get; set; } = false;
         public DateTime? ReadAt { get; set; }
@@ -30,6 +36,6 @@ namespace EduConnect.Web.Models
 
         // Navigation Properties
         public User User { get; set; }
-        public Announcement Announcement { get; set; }
+        public Announcement? Announcement { get; set; }
     }
 }

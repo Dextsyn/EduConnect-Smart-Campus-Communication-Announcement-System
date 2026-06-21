@@ -1,0 +1,420 @@
+﻿@model EduConnect.Web.ViewModels.AnnouncementDetailViewModel
+@{
+    ViewData["Title"] = Model.Title;
+    var roleName = Context.Session.GetString("RoleName");
+}
+
+<!-- ─── BACK BUTTON ───────────────────── -->
+<div class="mb-4">
+    <a href="/Announcement"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>
+        Back to Announcements
+    </a>
+</div>
+
+<div class="row g-4">
+
+    <!-- ─── MAIN CONTENT ──────────────── -->
+    <div class="col-12 col-lg-8">
+
+        <!-- Announcement Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+
+                <!-- Emergency Banner -->
+                @if (Model.IsEmergency)
+                {
+                    <div class="alert alert-danger d-flex
+                                    align-items-center mb-4">
+                        <i class="bi bi-exclamation-triangle-fill
+                                      fs-4 me-3"></i>
+                        <div>
+                            <strong>Emergency Announcement</strong>
+                            <div class="small">
+                                Please read carefully and act accordingly
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Badges -->
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="badge rounded-pill fs-6"
+                          style="background-color: @Model.CategoryColor">
+                        @Model.CategoryName
+                    </span>
+
+                    @if (Model.FeedType == "Academic")
+                    {
+                        <span class="badge bg-primary">
+                            <i class="bi bi-mortarboard me-1"></i>
+                            Academic
+                        </span>
+                    }
+                    else if (Model.FeedType == "Emergency")
+                    {
+                        <span class="badge bg-danger">
+                            Emergency
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-building me-1"></i>
+                            Non-Academic
+                        </span>
+                    }
+
+                    @foreach (var tag in Model.Tags)
+                    {
+                        <span class="badge bg-light
+                                         text-dark border">
+                            @tag
+                        </span>
+                    }
+                </div>
+
+                <!-- Title -->
+                <h3 class="fw-bold mb-3">@Model.Title</h3>
+
+                <!-- Meta -->
+                <div class="d-flex flex-wrap gap-3
+                            text-muted small mb-4
+                            pb-4 border-bottom">
+                    <span>
+                        <i class="bi bi-person me-1"></i>
+                        @Model.AuthorName
+                        <span class="badge bg-light
+                                     text-dark border ms-1">
+                            @Model.AuthorRole
+                        </span>
+                    </span>
+                    <span>
+                        <i class="bi bi-calendar me-1"></i>
+                        @(Model.PublishedAt.HasValue
+                                                ? Model.PublishedAt.Value
+                                                .ToString("MMMM dd, yyyy hh:mm tt")
+                                                : "—")
+                    </span>
+                    <span>
+                        <i class="bi bi-eye me-1"></i>
+                        @Model.ViewCount views
+                    </span>
+                    @if (Model.ExpiresAt.HasValue)
+                    {
+                        var daysLeft = (Model.ExpiresAt.Value - DateTime.Now).Days;
+
+                        @if (daysLeft <= 3 && daysLeft >= 0)
+                        {
+                            <div class="alert alert-warning d-flex
+                            align-items-center mb-4">
+                                <i class="bi bi-clock-history fs-4 me-3"></i>
+                                <div>
+                                    <strong>Expiring Soon!</strong>
+                                    <div class="small">
+                                        This announcement expires in
+                                        @daysLeft day(s) on
+                                        @Model.ExpiresAt.Value
+                                        .ToString("MMMM dd, yyyy")
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (daysLeft > 3)
+                        {
+                            <div class="alert alert-info d-flex
+                            align-items-center mb-4">
+                                <i class="bi bi-clock me-3"></i>
+                                <div>
+                                    This announcement expires on
+                                    <strong>
+                                        @Model.ExpiresAt.Value
+                                        .ToString("MMMM dd, yyyy")
+                                    </strong>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <!-- Photo -->
+                @if (!string.IsNullOrEmpty(Model.AttachmentURL))
+                {
+                    <div class="mb-4">
+                        <img src="@Model.AttachmentURL"
+                             class="img-fluid rounded"
+                             alt="Announcement photo" />
+                    </div>
+                }
+
+                <!-- Body -->
+                <div class="announcement-body lh-lg">
+                    @Html.Raw(Model.Body)
+                </div>
+
+            </div>
+        </div>
+
+        <!-- AI Summary Card -->
+        @if (!string.IsNullOrEmpty(Model.AISummary))
+        {
+            <div class="card border-0 shadow-sm mb-4
+                            border-start border-primary border-4">
+                <div class="card-body">
+                    <h6 class="fw-bold text-primary mb-2">
+                        <i class="bi bi-robot me-2"></i>
+                        AI Summary
+                    </h6>
+                    <p class="mb-0 text-muted">
+                        @Model.AISummary
+                    </p>
+                </div>
+            </div>
+        }
+
+        <!-- Feedback Section -->
+        @if (roleName == "Student")
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-star me-2 text-warning"></i>
+                        Rate This Announcement
+                    </h6>
+                </div>
+                <div class="card-body">
+
+                    @if (TempData["Success"] != null)
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle me-2"></i>
+                            @TempData["Success"]
+                        </div>
+                    }
+
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-circle me-2"></i>
+                            @TempData["Error"]
+                        </div>
+                    }
+
+                    @if (!Model.UserHasRated)
+                    {
+                        <form asp-action="SubmitFeedback"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden"
+                                   name="AnnouncementID"
+                                   value="@Model.AnnouncementID" />
+
+                            <!-- Star Rating -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    Your Rating
+                                </label>
+                                <div class="d-flex gap-2">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <div class="form-check
+                                                                form-check-inline">
+                                            <input class="form-check-input"
+                                                   type="radio"
+                                                   name="Rating"
+                                                   id="star@i"
+                                                   value="@i"
+                                                   required />
+                                            <label class="form-check-label"
+                                                   for="star@i">
+                                                @i ⭐
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Feedback Text -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    Your Feedback
+                                    <span class="text-muted fw-normal">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <textarea name="FeedbackText"
+                                  class="form-control"
+                                  rows="3"
+                                  maxlength="1000"
+                                  placeholder="Share your thoughts about this announcement...">
+                                </textarea>
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                <i class="bi bi-send me-2"></i>
+                                Submit Feedback
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-check-circle me-2"></i>
+                            You have already submitted feedback
+                            for this announcement.
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Feedback List -->
+        @if (Model.Feedbacks.Any())
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-chat-dots me-2 text-primary"></i>
+                        Student Feedback
+                        <span class="badge bg-primary ms-2">
+                            @Model.TotalFeedback
+                        </span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    @foreach (var feedback in Model.Feedbacks)
+                    {
+                        <div class="d-flex gap-3 mb-3
+                                            pb-3 border-bottom">
+                            <img src="https://ui-avatars.com/api/?name=@feedback.UserName&background=0d6efd&color=fff"
+                                 class="rounded-circle flex-shrink-0"
+                                 width="40" height="40"
+                                 alt="Avatar" />
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold small">
+                                        @feedback.UserName
+                                    </span>
+                                    <span class="text-muted small">
+                                        @feedback.CreatedAt.ToString("MMM dd, yyyy")
+                                    </span>
+                                </div>
+
+                                @if (feedback.Rating.HasValue)
+                                {
+                                    <div class="text-warning small mb-1">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            if (i <= feedback.Rating.Value)
+                                            {
+                                                <i class="bi bi-star-fill"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-star"></i>
+                                            }
+                                        }
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(
+                                                        feedback.FeedbackText))
+                                {
+                                    <p class="small text-muted mb-1">
+                                        @feedback.FeedbackText
+                                    </p>
+                                }
+
+                                @if (!string.IsNullOrEmpty(
+                                                        feedback.SentimentLabel))
+                                {
+                                    <span class="badge @(feedback.SentimentLabel == "Positive" ? "bg-success" : feedback.SentimentLabel == "Negative" ? "bg-danger" : "bg-secondary") small">
+                                        @feedback.SentimentLabel
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- ─── SIDEBAR ────────────────────── -->
+    <div class="col-12 col-lg-4">
+
+        <!-- Stats Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 pt-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi bi-bar-chart me-2 text-primary"></i>
+                    Engagement
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 text-center">
+                    <div class="col-6">
+                        <div class="fw-bold fs-4 text-primary">
+                            @Model.ViewCount
+                        </div>
+                        <div class="text-muted small">Views</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="fw-bold fs-4 text-warning">
+                            @Model.AverageRating.ToString("F1")
+                        </div>
+                        <div class="text-muted small">
+                            Avg Rating
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="fw-bold fs-4 text-success">
+                            @Model.TotalFeedback
+                        </div>
+                        <div class="text-muted small">
+                            Total Feedback
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Actions -->
+        @if (roleName == "Administrator")
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-gear me-2 text-primary"></i>
+                        Actions
+                    </h6>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="/Announcement/Edit/@Model.AnnouncementID"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil me-2"></i>
+                        Edit Announcement
+                    </a>
+                    <form asp-action="Delete"
+                          method="post"
+                          onsubmit="return confirm(
+                                  'Archive this announcement?')">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden"
+                               name="id"
+                               value="@Model.AnnouncementID" />
+                        <button type="submit"
+                                class="btn btn-outline-danger btn-sm w-100">
+                            <i class="bi bi-archive me-2"></i>
+                            Archive
+                        </button>
+                    </form>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>

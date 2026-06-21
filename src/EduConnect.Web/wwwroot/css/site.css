@@ -1,22 +1,58 @@
-html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
+/* ─── Global ─────────────────────────── */
 body {
-  margin-bottom: 60px;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f8f9fa;
+}
+
+/* ─── Sidebar ────────────────────────── */
+/* Active sidebar link */
+.nav-pills .nav-link.active,
+.nav-pills .nav-link:hover {
+    background-color: #e9ecef;
+    border-radius: 8px;
+    color: #0d6efd !important;
+}
+.sidebar .nav-link:hover {
+    background-color: #e9ecef;
+    border-radius: 8px;
+    color: #0d6efd !important;
+}
+
+.sidebar .nav-link.active {
+    background-color: #0d6efd;
+    color: white !important;
+    border-radius: 8px;
+}
+
+/* ─── Cards ──────────────────────────── */
+.announcement-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+    .announcement-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+/* ─── Navbar ─────────────────────────── */
+.navbar-brand {
+    font-size: 1.3rem;
+    letter-spacing: 0.5px;
+}
+
+/* ─── Badges ─────────────────────────── */
+.feed-badge {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+/* ─── Mobile ─────────────────────────── */
+@media (max-width: 991px) {
+    main {
+        padding: 1rem !important;
+    }
 }

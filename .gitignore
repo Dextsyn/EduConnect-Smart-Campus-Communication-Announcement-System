@@ -6,6 +6,18 @@
 # dotenv files
 .env
 
+# Superpowers plugin internal state
+.superpowers/
+
+# ASP.NET Core secrets — keep real credentials out of source control
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.Local.json
+
+# User-uploaded runtime files
+**/wwwroot/uploads/**
+!**/wwwroot/uploads/**/.gitkeep
+
 # User-specific files
 *.rsuser
 *.suo

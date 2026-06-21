@@ -15,11 +15,17 @@ namespace EduConnect.Web.Models
         public int OrganizerID { get; set; }
 
         [Required]
-        [MaxLength(255)]
+        [MaxLength(300)]
         public string EventTitle { get; set; }
+
+        [MaxLength(500)]
+        public string? Description { get; set; }
 
         [MaxLength(255)]
         public string? Location { get; set; }
+
+        [MaxLength(500)]
+        public string? CoverPhotoURL { get; set; }
 
         [Required]
         public DateTime StartDateTime { get; set; }
@@ -28,16 +34,41 @@ namespace EduConnect.Web.Models
         public DateTime EndDateTime { get; set; }
 
         public int? MaxAttendees { get; set; }
+
+        public int CurrentAttendees { get; set; }
+            = 0;
+
         public bool IsOnline { get; set; } = false;
 
         [MaxLength(500)]
         public string? MeetingURL { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [MaxLength(20)]
+        public string Status { get; set; }
+            = "Upcoming";
+        // Values: Upcoming, Ongoing,
+        //         Completed, Cancelled
+
+        public bool IsRegistrationOpen { get; set; }
+            = true;
+
+        public DateTime? RegistrationDeadline
+        { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+            = DateTime.Now;
+
         public DateTime? UpdatedAt { get; set; }
 
-        // Navigation Properties
-        public Announcement? Announcement { get; set; }
+        // Navigation
+        public Announcement? Announcement
+        { get; set; }
         public User Organizer { get; set; }
+        public ICollection<EventRegistration>
+            Registrations
+        { get; set; }
+        public ICollection<EventWaitlist>
+            Waitlist
+        { get; set; }
     }
 }

@@ -147,6 +147,14 @@
             .addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
+                const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowed.includes(file.type)) {
+                    alert('Only image files are allowed (JPG, PNG, GIF, WebP).');
+                    e.target.value = '';
+                    const wrapper = document.getElementById('photo-preview-wrapper');
+                    wrapper.classList.add('d-none');
+                    return;
+                }
                 const wrapper = document.getElementById('photo-preview-wrapper');
                 const img = document.getElementById('photo-preview');
                 img.src = URL.createObjectURL(file);

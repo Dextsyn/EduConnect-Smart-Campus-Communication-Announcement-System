@@ -1,0 +1,378 @@
+﻿@model EduConnect.Web.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "Register";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+    <title>Register — EduConnect</title>
+    <link rel="stylesheet"
+          href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 0;
+        }
+
+        .register-card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .brand-logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dee2e6;
+        }
+
+            .step-dot.active {
+                background: #0d6efd;
+                width: 24px;
+                border-radius: 5px;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-6">
+
+                <!-- Register Card -->
+                <div class="card register-card p-4">
+
+                    <!-- Brand -->
+                    <div class="text-center mb-4">
+                        <div class="brand-logo">
+                            <i class="bi bi-broadcast text-white fs-3"></i>
+                        </div>
+                        <h4 class="fw-bold">Create Account</h4>
+                        <p class="text-muted small">
+                            Join EduConnect — Adamson University
+                        </p>
+                    </div>
+
+                    <!-- Validation Summary -->
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-circle me-2"></i>
+                            Please fix the errors below.
+                        </div>
+                    }
+
+                    <!-- Register Form -->
+                    <form asp-action="Register" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <!-- Name Row -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label asp-for="FirstName"
+                                       class="form-label fw-semibold">
+                                    First Name
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-person"></i>
+                                    </span>
+                                    <input asp-for="FirstName"
+                                           class="form-control"
+                                           placeholder="Juan" />
+                                </div>
+                                <span asp-validation-for="FirstName"
+                                      class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="LastName"
+                                       class="form-label fw-semibold">
+                                    Last Name
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-person"></i>
+                                    </span>
+                                    <input asp-for="LastName"
+                                           class="form-control"
+                                           placeholder="Dela Cruz" />
+                                </div>
+                                <span asp-validation-for="LastName"
+                                      class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <!-- Student ID -->
+                        <div class="mb-3">
+                            <label asp-for="StudentID"
+                                   class="form-label fw-semibold">
+                                Student ID
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-card-text"></i>
+                                </span>
+                                <input asp-for="StudentID"
+                                       class="form-control"
+                                       placeholder="e.g. 202100123" />
+                            </div>
+                            <span asp-validation-for="StudentID"
+                                  class="text-danger small"></span>
+                        </div>
+
+                        <!-- Add after Student ID field -->
+                        <!--
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                School ID Photo
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="file"
+                                   name="SchoolIDPhoto"
+                                   class="form-control"
+                                   accept="image/*"
+                                   required />
+                            <div class="form-text text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Upload a clear photo of your Adamson
+                                University School ID for verification.
+                                ITC will verify your account within
+                                1-2 business days.
+                            </div>
+                        </div>
+                        -->
+                        
+                        <!-- Email -->
+                        <div class="mb-3">
+                            <label asp-for="Email"
+                                   class="form-label fw-semibold">
+                                Email Address
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                <input asp-for="Email"
+                                       class="form-control"
+                                       placeholder="your@email.com" />
+                            </div>
+                            <span asp-validation-for="Email"
+                                  class="text-danger small"></span>
+                        </div>
+
+                        <!-- Department -->
+                        <div class="mb-3">
+                            <label asp-for="DepartmentTagID"
+                                   class="form-label fw-semibold">
+                                College / Department
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-building"></i>
+                                </span>
+                                <select asp-for="DepartmentTagID"
+                                        class="form-select">
+                                    <option value="">
+                                        — Select your college —
+                                    </option>
+                                    @foreach (var dept in Model.Departments)
+                                    {
+                                        <option value="@dept.TagID">
+                                            @dept.TagName
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <span asp-validation-for="DepartmentTagID"
+                                  class="text-danger small"></span>
+                        </div>
+
+                        <!-- Password -->
+                        <div class="mb-3">
+                            <label asp-for="Password"
+                                   class="form-label fw-semibold">
+                                Password
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-lock"></i>
+                                </span>
+                                <input asp-for="Password"
+                                       class="form-control"
+                                       id="passwordField"
+                                       placeholder="Minimum 8 characters" />
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        onclick="togglePassword('passwordField', 'eyeIcon1')">
+                                    <i class="bi bi-eye" id="eyeIcon1"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Password"
+                                  class="text-danger small"></span>
+                        </div>
+
+                        <!-- Confirm Password -->
+                        <div class="mb-4">
+                            <label asp-for="ConfirmPassword"
+                                   class="form-label fw-semibold">
+                                Confirm Password
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-lock-fill"></i>
+                                </span>
+                                <input asp-for="ConfirmPassword"
+                                       class="form-control"
+                                       id="confirmField"
+                                       placeholder="Re-enter your password" />
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        onclick="togglePassword('confirmField', 'eyeIcon2')">
+                                    <i class="bi bi-eye" id="eyeIcon2"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="ConfirmPassword"
+                                  class="text-danger small"></span>
+                        </div>
+
+                        <!-- Password Strength -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">
+                                    Password strength
+                                </small>
+                                <small id="strengthText"
+                                       class="text-muted">
+                                    —
+                                </small>
+                            </div>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar"
+                                     id="strengthBar"
+                                     style="width: 0%">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit -->
+                        <button type="submit"
+                                class="btn btn-primary w-100 py-2 fw-semibold">
+                            <i class="bi bi-person-plus me-2"></i>
+                            Create Account
+                        </button>
+
+                    </form>
+
+                    @if (TempData["Pending"] != null)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <strong>Registration Submitted!</strong>
+                            <p class="mb-0 small mt-1">
+                                Your account is pending verification
+                                by ITC. You will receive an email
+                                once your account is approved.
+                                This usually takes 1-2 business days.
+                            </p>
+                        </div>
+                    }
+
+                    <!-- Login Link -->
+                    <div class="text-center mt-4">
+                        <small class="text-muted">
+                            Already have an account?
+                            <a href="/Account/Login"
+                               class="text-primary fw-semibold">
+                                Login here
+                            </a>
+                        </small>
+                    </div>
+
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center mt-3">
+                    <small class="text-white opacity-75">
+                        &copy; 2026 Adamson University — EduConnect
+                    </small>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js">
+    </script>
+    <script>
+        // Toggle password visibility
+        function togglePassword(fieldId, iconId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                field.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+
+        // Password strength checker
+        document.getElementById('passwordField')
+            .addEventListener('input', function () {
+            const val = this.value;
+            const bar = document.getElementById('strengthBar');
+            const text = document.getElementById('strengthText');
+
+            let strength = 0;
+            if (val.length >= 8) strength++;
+            if (/[A-Z]/.test(val)) strength++;
+            if (/[0-9]/.test(val)) strength++;
+            if (/[^A-Za-z0-9]/.test(val)) strength++;
+
+            const levels = [
+                { width: '0%',   color: '',          label: '—' },
+                { width: '25%',  color: 'bg-danger',  label: 'Weak' },
+                { width: '50%',  color: 'bg-warning', label: 'Fair' },
+                { width: '75%',  color: 'bg-info',    label: 'Good' },
+                { width: '100%', color: 'bg-success',  label: 'Strong' }
+            ];
+
+            bar.style.width = levels[strength].width;
+            bar.className = 'progress-bar ' + levels[strength].color;
+            text.textContent = levels[strength].label;
+            text.className = levels[strength].color
+                .replace('bg-', 'text-');
+        });
+    </script>
+</body>
+</html>

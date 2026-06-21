@@ -1,0 +1,374 @@
+﻿@{
+    ViewData["Title"] = "Announcements";
+    var announcements = ViewBag.Announcements as
+        List<EduConnect.Web.ViewModels.AnnouncementTableViewModel>;
+    var categories = ViewBag.Categories as
+        List<EduConnect.Web.Models.AnnouncementCategory>;
+    var currentPage = (int)ViewBag.CurrentPage;
+    var totalPages = (int)ViewBag.TotalPages;
+    var totalItems = (int)ViewBag.TotalItems;
+    bool canPublish = (bool)ViewBag.CanPublish;
+    int currentUserID = ViewBag.CurrentUserID != null
+        ? (int)ViewBag.CurrentUserID : 0;
+    var roleName = Context.Session.GetString("RoleName");
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-megaphone me-2 text-primary"></i>
+            Announcements
+        </h4>
+        <small class="text-muted">
+            @totalItems announcement(s) found
+        </small>
+    </div>
+
+    @if (canPublish)
+    {
+        <a href="/Announcement/Create"
+           class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>
+            New Announcement
+        </a>
+    }
+</div>
+
+<!-- ─── SUCCESS/ERROR MESSAGES ──────── -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- ─── FILTERS ──────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2">
+
+            <!-- Search -->
+            <div class="col-12 col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text"
+                           name="searchQuery"
+                           value="@ViewBag.SearchQuery"
+                           class="form-control"
+                           placeholder="Search announcements..." />
+                </div>
+            </div>
+
+            <!-- Feed Type -->
+            <div class="col-6 col-md-2">
+                <select name="feedType" class="form-select">
+                    <option value="">All Feeds</option>
+                    <option value="Academic"
+                            selected="@(ViewBag.FeedType == "Academic")">
+                        Academic
+                    </option>
+                    <option value="NonAcademic"
+                            selected="@(ViewBag.FeedType == "NonAcademic")">
+                        Non-Academic
+                    </option>
+                    <option value="Emergency"
+                            selected="@(ViewBag.FeedType == "Emergency")">
+                        Emergency
+                    </option>
+                </select>
+            </div>
+
+            <!-- Category -->
+            <div class="col-6 col-md-3">
+                <select name="categoryID" class="form-select">
+                    <option value="">All Categories</option>
+                    @if (categories != null)
+                    {
+                        @foreach (var cat in categories)
+                        {
+                            <option value="@cat.CategoryID"
+                                    selected="@(ViewBag.CategoryID?.ToString() == cat.CategoryID.ToString())">
+                                @cat.CategoryName
+                            </option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <!-- Buttons -->
+            <div class="col-12 col-md-3 d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary flex-fill">
+                    <i class="bi bi-funnel me-1"></i>
+                    Filter
+                </button>
+                <a href="/Announcement"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-x"></i>
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- ─── ANNOUNCEMENT CARDS ───────────── -->
+@if (announcements == null || !announcements.Any())
+{
+    <div class="text-center py-5">
+        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+        <h5 class="text-muted">No announcements found</h5>
+        <p class="text-muted small">
+            Try adjusting your filters or check back later
+        </p>
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        @foreach (var item in announcements)
+        {
+            <div class="col-12">
+                <div class="card border-0 shadow-sm
+                                    announcement-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between
+                                            align-items-start flex-wrap gap-2">
+
+                            <!-- Left Side -->
+                            <div class="flex-grow-1">
+
+                                <!-- Badges -->
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    <span class="badge rounded-pill"
+                                          style="background-color: @item.CategoryColor">
+                                        @item.CategoryName
+                                    </span>
+
+                                    @if (item.FeedType == "Emergency")
+                                    {
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            Emergency
+                                        </span>
+                                    }
+                                    else if (item.FeedType == "Academic")
+                                    {
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-mortarboard me-1"></i>
+                                            Academic
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-building me-1"></i>
+                                            Non-Academic
+                                        </span>
+                                    }
+
+                                    @if (item.Status == "Draft")
+                                    {
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-pencil-square me-1"></i>
+                                            Draft
+                                        </span>
+                                    }
+                                    else if (item.Status == "Archived")
+                                    {
+                                        <span class="badge bg-dark">
+                                            <i class="bi bi-archive me-1"></i>
+                                            Archived
+                                        </span>
+                                    }
+
+                                    @foreach (var tag in item.Tags.Take(3))
+                                    {
+                                        <span class="badge bg-light
+                                                                 text-dark border">
+                                            @tag
+                                        </span>
+                                    }
+                                </div>
+
+                                <!-- Title -->
+                                <h5 class="fw-bold mb-1">
+                                    <a href="/Announcement/Details/@item.AnnouncementID"
+                                       class="text-decoration-none text-dark">
+                                        @item.Title
+                                    </a>
+                                </h5>
+
+                                <!-- Meta -->
+                                <div class="d-flex flex-wrap gap-3
+                                                    text-muted small">
+                                    <span>
+                                        <i class="bi bi-person me-1"></i>
+                                        @item.AuthorName
+                                    </span>
+                                    <span>
+                                        <i class="bi bi-eye me-1"></i>
+                                        @item.ViewCount views
+                                    </span>
+                                    <span>
+                                        <i class="bi bi-clock me-1"></i>
+                                        @(item.PublishedAt.HasValue
+                                                                        ? item.PublishedAt.Value
+                                                                        .ToString("MMM dd, yyyy")
+                                                                        : "—")
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Right Side — Actions -->
+                            <div class="d-flex gap-2 align-items-start">
+                                @if (item.Status == "Published")
+                                {
+                                    <a href="/Announcement/Details/@item.AnnouncementID"
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-eye me-1"></i>
+                                        View
+                                    </a>
+                                }
+                                @if (roleName == "Administrator" ||
+                                     item.AuthorID == currentUserID)
+                                {
+                                    <a href="/Announcement/Edit/@item.AnnouncementID"
+                                       class="btn btn-outline-secondary btn-sm"
+                                       title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-sm"
+                                            title="Archive"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteModal"
+                                            data-id="@item.AnnouncementID"
+                                            data-title="@item.Title"
+                                            data-published="@item.Status">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- ─── PAGINATION ────────────────── -->
+    @if (totalPages > 1)
+    {
+        <nav>
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <a class="page-link"
+                       href="?page=@(currentPage - 1)&searchQuery=@ViewBag.SearchQuery&feedType=@ViewBag.FeedType">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    <li class="page-item @(i == currentPage ? "active" : "")">
+                        <a class="page-link"
+                           href="?page=@i&searchQuery=@ViewBag.SearchQuery&feedType=@ViewBag.FeedType">
+                            @i
+                        </a>
+                    </li>
+                }
+
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <a class="page-link"
+                       href="?page=@(currentPage + 1)&searchQuery=@ViewBag.SearchQuery&feedType=@ViewBag.FeedType">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+<!-- ─── DELETE CONFIRMATION MODAL ──────── -->
+<div class="modal fade" id="deleteModal" tabindex="-1"
+     aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"
+                    id="deleteModalLabel">
+                    <i class="bi bi-archive me-2 text-danger"></i>
+                    Archive Announcement
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteWarningPublished"
+                   class="alert alert-warning d-none">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    This announcement is <strong>currently published</strong>
+                    and visible to users. Archiving it will remove it from
+                    all feeds immediately.
+                </p>
+                <p>
+                    Are you sure you want to archive
+                    <strong id="deleteAnnouncementTitle"></strong>?
+                    It will no longer be visible to anyone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <form id="deleteForm" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit"
+                            class="btn btn-danger">
+                        <i class="bi bi-archive me-2"></i>
+                        Yes, Archive It
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const deleteModal = document
+            .getElementById('deleteModal');
+        deleteModal.addEventListener(
+            'show.bs.modal', function (event) {
+                const btn = event.relatedTarget;
+                const id = btn.getAttribute('data-id');
+                const title = btn.getAttribute('data-title');
+                const status = btn.getAttribute('data-published');
+
+                document.getElementById(
+                    'deleteAnnouncementTitle').textContent = title;
+
+                document.getElementById(
+                    'deleteForm').action =
+                    '/Announcement/Delete/' + id;
+
+                const warning = document.getElementById(
+                    'deleteWarningPublished');
+                if (status === 'Published') {
+                    warning.classList.remove('d-none');
+                } else {
+                    warning.classList.add('d-none');
+                }
+            });
+    </script>
+}

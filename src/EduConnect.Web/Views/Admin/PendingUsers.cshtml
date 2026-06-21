@@ -1,0 +1,263 @@
+﻿@using EduConnect.Web.Models
+@{
+    ViewData["Title"] = "Pending Verifications";
+    var users = Model as List<User>
+        ?? new List<User>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-person-check
+                       me-2 text-warning"></i>
+            Pending Verifications
+        </h4>
+        <small class="text-muted">
+            @users.Count student(s) awaiting
+            ITC verification
+        </small>
+    </div>
+    <a href="/Admin"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>
+        Back to Dashboard
+    </a>
+</div>
+
+<!-- ─── SUCCESS/ERROR MESSAGES ──────── -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success
+                    alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger
+                    alert-dismissible mb-4">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        @TempData["Error"]
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
+    </div>
+}
+
+<!-- ─── PENDING USERS TABLE ──────────── -->
+@if (!users.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-check-circle
+                           fs-1 text-success
+                           d-block mb-3"></i>
+            <h5 class="text-muted">
+                No Pending Verifications
+            </h5>
+            <p class="text-muted small">
+                All student accounts have
+                been verified.
+            </p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var user in users)
+        {
+            var dept = user.UserDepartments
+            .FirstOrDefault(
+            ud => ud.IsPrimary);
+
+            <div class="col-12">
+                <div class="card border-0
+                                    shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+
+                            <!-- User Info -->
+                            <div class="col-12 col-md-5">
+                                <div class="d-flex
+                                                    align-items-center
+                                                    gap-3">
+                                    <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=0d6efd&color=fff"
+                                         class="rounded-circle
+                                                        flex-shrink-0"
+                                         width="50"
+                                         height="50"
+                                         alt="Avatar" />
+                                    <div>
+                                        <div class="fw-bold">
+                                            @user.FirstName
+                                            @user.LastName
+                                        </div>
+                                        <div class="text-muted
+                                                            small">
+                                            @user.Email
+                                        </div>
+                                        <div class="text-muted
+                                                            small">
+                                            <i class="bi bi-card-text
+                                                               me-1"></i>
+                                            Student ID:
+                                            <strong>
+                                                @(user.StudentID
+                                                                                        ?? "Not provided")
+                                            </strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Department & Date -->
+                            <div class="col-12 col-md-4
+                                                mt-3 mt-md-0">
+                                <div class="text-muted small">
+                                    <i class="bi bi-building
+                                                       me-1"></i>
+                                    <strong>Department:</strong>
+                                    @(dept?.DepartmentTag
+                                                                ?.ShortName
+                                                                ?? "Not assigned")
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <strong>Registered:</strong>
+                                    @user.CreatedAt.ToString("MMM dd, yyyy")
+                                </div>
+                            </div>
+                            
+
+
+                            <!-- Actions -->
+                            <div class="col-12 col-md-3
+                                                mt-3 mt-md-0">
+                                <div class="d-flex
+                                                    flex-column
+                                                    gap-2">
+
+                                    <!-- Approve Button -->
+                                    <form asp-action="ApproveUser"
+                                          method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden"
+                                               name="userID"
+                                               value="@user.UserID" />
+                                        <button type="submit"
+                                                class="btn btn-success
+                                                               btn-sm w-100"
+                                                onclick="return confirm(
+                                                            'Approve account for @user.FirstName @user.LastName?')">
+                                            <i class="bi bi-check-circle
+                                                               me-1"></i>
+                                            Approve
+                                        </button>
+                                    </form>
+
+                                    <!-- Reject Button -->
+                                    <button type="button"
+                                            class="btn btn-danger
+                                                           btn-sm w-100"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#rejectModal_@user.UserID">
+                                        <i class="bi bi-x-circle
+                                                           me-1"></i>
+                                        Reject
+                                    </button>
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reject Modal -->
+            <div class="modal fade"
+                 id="rejectModal_@user.UserID"
+                 tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title
+                                                fw-bold">
+                                <i class="bi bi-x-circle
+                                                   text-danger me-2">
+                                </i>
+                                Reject Account
+                            </h5>
+                            <button type="button"
+                                    class="btn-close"
+                                    data-bs-dismiss="modal">
+                            </button>
+                        </div>
+                        <form asp-action="RejectUser"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden"
+                                   name="userID"
+                                   value="@user.UserID" />
+                            <div class="modal-body">
+                                <p class="text-muted">
+                                    You are rejecting the account of
+                                    <strong>
+                                        @user.FirstName
+                                        @user.LastName
+                                    </strong>.
+                                    Please provide a reason:
+                                </p>
+                                <div class="mb-3">
+                                    <label class="form-label
+                                                           fw-semibold">
+                                        Rejection Reason
+                                        <span class="text-danger">
+                                            *
+                                        </span>
+                                    </label>
+                                    <textarea name="rejectionReason"
+                                      class="form-control"
+                                      rows="3"
+                                      required
+                                      placeholder="e.g. Student ID not found in records...">
+                                    </textarea>
+                                </div>
+                                <div class="alert alert-warning
+                                                    small">
+                                    <i class="bi bi-info-circle
+                                                       me-1"></i>
+                                    The student will receive an email
+                                    with this reason.
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                        class="btn btn-danger">
+                                    <i class="bi bi-x-circle
+                                                       me-1"></i>
+                                    Reject Account
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
