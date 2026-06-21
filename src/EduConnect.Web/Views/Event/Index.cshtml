@@ -1,0 +1,461 @@
+﻿@{
+    ViewData["Title"] = "Events";
+    var events = ViewBag.Events as
+        List<EduConnect.Web.ViewModels
+            .EventListViewModel>
+        ?? new List<EduConnect.Web.ViewModels
+            .EventListViewModel>();
+    bool canManage = (bool)ViewBag.CanManage;
+    string viewMode = ViewBag.ViewMode ?? "list";
+    string filter = ViewBag.Filter ?? "all";
+    int currentUserID = ViewBag.CurrentUserID is int cuid ? cuid : 0;
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-calendar-event
+                       me-2 text-primary"></i>
+            Campus Events
+        </h4>
+        <small class="text-muted">
+            @events.Count event(s) found
+        </small>
+    </div>
+    <div class="d-flex gap-2">
+        <!-- View Toggle -->
+        <div class="btn-group">
+            <a href="?view=list&filter=@filter"
+               class="btn btn-sm @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")">
+                <i class="bi bi-list-ul"></i>
+            </a>
+            <a href="?view=calendar&filter=@filter"
+               class="btn btn-sm @(viewMode == "calendar" ? "btn-primary" : "btn-outline-primary")">
+                <i class="bi bi-calendar3"></i>
+            </a>
+        </div>
+
+        @if (canManage)
+        {
+            <a href="/Event/Create"
+               class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>
+                Create Event
+            </a>
+        }
+    </div>
+</div>
+
+<!-- ─── SUCCESS/INFO MESSAGES ────────── -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success
+                    alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Info"] != null)
+{
+    <div class="alert alert-info
+                    alert-dismissible mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        @TempData["Info"]
+        <button type="button" class="btn-close"
+                data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- ─── FILTER TABS ──────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap
+                    align-items-center">
+
+            <!-- Filter buttons -->
+            <a href="?filter=all&view=@viewMode"
+               class="btn btn-sm @(filter == "all" ? "btn-primary" : "btn-outline-secondary")">
+                All Events
+            </a>
+            <a href="?filter=upcoming&view=@viewMode"
+               class="btn btn-sm @(filter == "upcoming" ? "btn-primary" : "btn-outline-secondary")">
+                Upcoming
+            </a>
+            <a href="?filter=today&view=@viewMode"
+               class="btn btn-sm @(filter == "today" ? "btn-primary" : "btn-outline-secondary")">
+                Today
+            </a>
+            <a href="?filter=registered&view=@viewMode"
+               class="btn btn-sm @(filter == "registered" ? "btn-success" : "btn-outline-secondary")">
+                My Registrations
+            </a>
+            <a href="?filter=past&view=@viewMode"
+               class="btn btn-sm @(filter == "past" ? "btn-secondary" : "btn-outline-secondary")">
+                Archived
+            </a>
+
+            <!-- Search -->
+            <form method="get"
+                  class="ms-auto d-flex gap-2">
+                <input type="hidden"
+                       name="view" value="@viewMode" />
+                <input type="hidden"
+                       name="filter" value="@filter" />
+                <input type="text"
+                       name="searchQuery"
+                       value="@ViewBag.SearchQuery"
+                       class="form-control
+                              form-control-sm"
+                       style="width: 200px;"
+                       placeholder="Search events..." />
+                <button type="submit"
+                        class="btn btn-primary btn-sm">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (viewMode == "calendar")
+{
+    <!-- ─── CALENDAR VIEW ─────────────── -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div id="calendar"></div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- ─── LIST VIEW ────────────────── -->
+    @if (!events.Any())
+    {
+        <div class="text-center py-5">
+            <i class="bi bi-calendar-x
+                               fs-1 text-muted
+                               d-block mb-3"></i>
+            <h5 class="text-muted">
+                No events found
+            </h5>
+            <p class="text-muted small">
+                Check back later for upcoming events
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var ev in events)
+            {
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card border-0
+                                            shadow-sm h-100
+                                            announcement-card
+                                            position-relative">
+
+                        @if (ev.OrganizerID == currentUserID)
+                        {
+                            <div class="d-flex justify-content-end
+                                        gap-1 p-2 position-absolute
+                                        top-0 end-0">
+                                <a href="/Event/Edit/@ev.EventID"
+                                   class="btn btn-sm btn-light
+                                          border shadow-sm"
+                                   title="Edit event">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button type="button"
+                                        class="btn btn-sm btn-light
+                                               border shadow-sm text-danger"
+                                        title="Delete event"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteModal-@ev.EventID">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        }
+
+                        <!-- Cover Photo -->
+                        @if (!string.IsNullOrEmpty(
+                                    ev.CoverPhotoURL))
+                        {
+                            <img src="@ev.CoverPhotoURL"
+                                 class="card-img-top"
+                                 style="height: 180px;
+                                                        object-fit: cover;"
+                                 alt="Event cover" />
+                        }
+                        else
+                        {
+                            <div class="bg-primary
+                                                        bg-gradient
+                                                        text-white
+                                                        text-center
+                                                        py-4"
+                                 style="height: 180px;
+                                                        display: flex;
+                                                        align-items:
+                                                            center;
+                                                        justify-content:
+                                                            center;">
+                                <i class="bi bi-calendar-event
+                                                           display-4"></i>
+                            </div>
+                        }
+
+                        <div class="card-body">
+
+                            <!-- Status Badges -->
+                            <div class="d-flex gap-2
+                                                    flex-wrap mb-2">
+                                @if (ev.IsRegistered)
+                                {
+                                    <span class="badge
+                                                                 bg-success">
+                                        ✅ Registered
+                                    </span>
+                                }
+                                @if (ev.IsFull &&
+                                                    !ev.IsRegistered)
+                                {
+                                    <span class="badge
+                                                                 bg-danger">
+                                        Full
+                                    </span>
+                                }
+                                @if (ev.IsOnline)
+                                {
+                                    <span class="badge
+                                                                 bg-info">
+                                        <i class="bi bi-camera-video
+                                                                   me-1"></i>
+                                        Online
+                                    </span>
+                                }
+                                @if (ev.Status == "Cancelled")
+                                {
+                                    <span class="badge
+                                                                 bg-secondary">
+                                        Cancelled
+                                    </span>
+                                }
+                            </div>
+
+                            <!-- Title -->
+                            <h5 class="fw-bold mb-2">
+                                @ev.EventTitle
+                            </h5>
+
+                            <!-- Details -->
+                            <div class="text-muted
+                                                    small mb-3">
+                                <div class="mb-1">
+                                    <i class="bi bi-calendar
+                                                           me-2"></i>
+                                    @ev.StartDateTime.ToString("MMM dd, yyyy")
+                                </div>
+                                <div class="mb-1">
+                                    <i class="bi bi-clock
+                                                           me-2"></i>
+                                    @ev.StartDateTime.ToString("hh:mm tt")
+                                    —
+                                    @ev.EndDateTime.ToString("hh:mm tt")
+                                </div>
+                                @if (!string.IsNullOrEmpty(
+                                                    ev.Location))
+                                {
+                                    <div class="mb-1">
+                                        <i class="bi bi-geo-alt
+                                                                   me-2"></i>
+                                        @ev.Location
+                                    </div>
+                                }
+                                <div class="mb-1">
+                                    <i class="bi bi-person
+                                                           me-2"></i>
+                                    @ev.OrganizerName
+                                </div>
+                            </div>
+
+                            <!-- Slots -->
+                            @if (ev.MaxAttendees
+                                            .HasValue)
+                            {
+                                var pct = (double)
+                                ev.CurrentAttendees /
+                                ev.MaxAttendees.Value
+                                * 100;
+                                <div class="mb-3">
+                                    <div class="d-flex
+                                                                justify-content-between
+                                                                small mb-1">
+                                        <span class="text-muted">
+                                            Slots
+                                        </span>
+                                        <span class="@(ev.IsFull ? "text-danger fw-bold" : "text-success")">
+                                            @ev.CurrentAttendees
+                                            /
+                                            @ev.MaxAttendees
+                                        </span>
+                                    </div>
+                                    <div class="progress"
+                                         style="height: 6px;">
+                                        <div class="progress-bar @(ev.IsFull ? "bg-danger" : "bg-success")"
+                                             style="width: @pct%">
+                                        </div>
+                                    </div>
+                                    @if (!ev.IsFull)
+                                    {
+                                        <small class="text-success">
+                                            @ev.SlotsRemaining
+                                            slots remaining
+                                        </small>
+                                    }
+                                    else
+                                    {
+                                        <small class="text-danger">
+                                            Event is full —
+                                            join waitlist
+                                        </small>
+                                    }
+                                </div>
+                            }
+
+                        </div>
+
+                        <!-- Card Footer -->
+                        <div class="card-footer
+                                                bg-white border-0
+                                                pt-0 pb-3 px-3">
+                            <a href="/Event/Details/@ev.EventID"
+                               class="btn btn-primary
+                                                  w-100">
+                                @if (ev.IsRegistered)
+                                {
+                                    <text>
+                                        <i class="bi bi-qr-code
+                                                                   me-1"></i>
+                                        View My QR Code
+                                    </text>
+                                }
+                                else if (ev.IsFull)
+                                {
+                                    <text>
+                                        <i class="bi bi-list-ol
+                                                                   me-1"></i>
+                                        Join Waitlist
+                                    </text>
+                                }
+                                else if (ev.IsRegistrationOpen)
+                                {
+                                    <text>
+                                        <i class="bi bi-calendar-check
+                                                                   me-1"></i>
+                                        Register Now
+                                    </text>
+                                }
+                                else
+                                {
+                                    <text>
+                                        <i class="bi bi-eye me-1"></i>
+                                        View Details
+                                    </text>
+                                }
+                            </a>
+                        </div>
+
+                    </div>
+                </div>
+            }
+        </div>
+
+        @foreach (var ev in events.Where(
+                      e => e.OrganizerID == currentUserID))
+        {
+            <div class="modal fade"
+                 id="deleteModal-@ev.EventID"
+                 tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title fw-bold text-danger">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Delete Event?
+                            </h5>
+                            <button type="button" class="btn-close"
+                                    data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>This will <strong>cancel</strong>
+                               "@ev.EventTitle" and notify all
+                               registered attendees by email.</p>
+                            <p class="text-danger small mb-0">
+                                This cannot be undone.
+                            </p>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    data-bs-dismiss="modal">
+                                Keep Event
+                            </button>
+                            <form method="post"
+                                  action="/Event/Delete/@ev.EventID">
+                                @Html.AntiForgeryToken()
+                                <button type="submit"
+                                        class="btn btn-danger">
+                                    <i class="bi bi-trash me-2"></i>
+                                    Yes, Cancel Event
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+}
+
+@section Scripts {
+    @if (viewMode == "calendar")
+    {
+        <!-- FullCalendar -->
+        <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css"
+              rel="stylesheet" />
+        <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js">
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded',
+            function() {
+                var calendarEl = document
+                    .getElementById('calendar');
+
+                var calendar = new FullCalendar.Calendar(
+                    calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left:   'prev,next today',
+                        center: 'title',
+                        right:  'dayGridMonth,listWeek'
+                    },
+                    events: @Html.Raw(
+                                        ViewBag.CalendarEvents),
+            eventClick: function(info) {
+                window.location.href =
+                    info.event.url;
+                info.jsEvent.preventDefault();
+            },
+            height: 'auto'
+        });
+
+                calendar.render();
+            });
+        </script>
+    }
+}
