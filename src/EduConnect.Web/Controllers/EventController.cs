@@ -751,6 +751,112 @@ namespace EduConnect.Web.Controllers
         }
 
         // ═══════════════════════════════════════
+        //  POST: /Event/Delete/5
+        //  Cancels the event; emails registrants
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var ev = await _context.Events
+                .Include(e => e.Registrations)
+                    .ThenInclude(r => r.User)
+                .FirstOrDefaultAsync(e => e.EventID == id);
+
+            if (ev == null)
+                return NotFound();
+
+            if (!IsCreator(ev))
+            {
+                TempData["Error"] =
+                    "You can only delete events you created.";
+                return RedirectToAction("Details", new { id });
+            }
+
+            ev.Status              = "Cancelled";
+            ev.IsRegistrationOpen  = false;
+            ev.UpdatedAt           = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            // Email all registered attendees (fire-and-forget)
+            var registrants = ev.Registrations
+                .Where(r => r.Status == "Registered")
+                .ToList();
+
+            foreach (var reg in registrants)
+            {
+                try
+                {
+                    await _emailService.SendEmailAsync(
+                        reg.User.Email,
+                        reg.User.FirstName + " " + reg.User.LastName,
+                        $"Event Cancelled: {ev.EventTitle}",
+                        $@"<div style='font-family: Arial;
+                                      max-width: 600px;
+                                      margin: 0 auto;'>
+                            <div style='background: #dc3545;
+                                        padding: 30px;
+                                        text-align: center;
+                                        border-radius: 8px 8px 0 0;'>
+                                <h1 style='color: white; margin: 0;'>
+                                    EduConnect
+                                </h1>
+                            </div>
+                            <div style='background: #f8f9fa;
+                                        padding: 30px;
+                                        border-radius: 0 0 8px 8px;'>
+                                <h2 style='color: #dc3545;'>
+                                    Event Cancelled
+                                </h2>
+                                <p>Hi {reg.User.FirstName},</p>
+                                <p>We regret to inform you that
+                                   the following event has been
+                                   cancelled:</p>
+                                <div style='background: white;
+                                            padding: 20px;
+                                            border-radius: 8px;
+                                            border-left: 4px solid #dc3545;
+                                            margin: 20px 0;'>
+                                    <h3 style='margin: 0 0 10px;'>
+                                        {ev.EventTitle}
+                                    </h3>
+                                    <p style='margin: 5px 0;
+                                              color: #666;'>
+                                        📅 {ev.StartDateTime
+                                            .ToString("MMMM dd, yyyy")}
+                                    </p>
+                                    <p style='margin: 5px 0;
+                                              color: #666;'>
+                                        🕐 {ev.StartDateTime
+                                            .ToString("hh:mm tt")} —
+                                        {ev.EndDateTime
+                                            .ToString("hh:mm tt")}
+                                    </p>
+                                </div>
+                                <p style='color: #666;'>
+                                    We apologise for any inconvenience.
+                                </p>
+                            </div>
+                        </div>");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        "Cancellation email failed for user {UserID}: {Error}",
+                        reg.UserID, ex.Message);
+                }
+            }
+
+            TempData["Success"] =
+                $"\"{ev.EventTitle}\" has been cancelled " +
+                $"and {registrants.Count} registrant(s) notified.";
+            return RedirectToAction("Index");
+        }
+
+        // ═══════════════════════════════════════
         //  POST: /Event/Register/5
         //  Student registers for event
         // ═══════════════════════════════════════
