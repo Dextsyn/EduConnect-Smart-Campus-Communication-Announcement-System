@@ -106,6 +106,8 @@ namespace EduConnect.Web.Controllers
             var path = Path.Combine(
                 _environment.WebRootPath,
                 url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            if (!path.StartsWith(_environment.WebRootPath,
+                    StringComparison.OrdinalIgnoreCase)) return;
             if (System.IO.File.Exists(path))
                 System.IO.File.Delete(path);
         }
