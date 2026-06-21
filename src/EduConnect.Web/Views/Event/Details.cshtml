@@ -504,16 +504,20 @@
 {
     <!-- Delete Event Modal -->
     <div class="modal fade" id="deleteEventModal"
-         tabindex="-1" aria-hidden="true">
+         tabindex="-1"
+         aria-labelledby="deleteEventModalLabel"
+         aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header border-0">
-                    <h5 class="modal-title fw-bold text-danger">
+                    <h5 class="modal-title fw-bold text-danger"
+                        id="deleteEventModalLabel">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         Delete Event?
                     </h5>
                     <button type="button" class="btn-close"
-                            data-bs-dismiss="modal"></button>
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p>This will <strong>cancel</strong>
