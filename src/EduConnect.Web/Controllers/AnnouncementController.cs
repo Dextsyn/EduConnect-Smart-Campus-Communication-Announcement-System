@@ -346,6 +346,8 @@ namespace EduConnect.Web.Controllers
         // ─── POST: /Announcement/Create ────────
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
         public async Task<IActionResult> Create(
             AnnouncementFormViewModel model)
         {
@@ -458,12 +460,19 @@ namespace EduConnect.Web.Controllers
         };
 
                 var extension = Path.GetExtension(
-                    model.Photo.FileName).ToLowerInvariant();
+                    model.Photo.FileName ?? string.Empty).ToLowerInvariant();
 
                 if (!allowedTypes.Contains(extension))
                 {
                     ModelState.AddModelError("Photo",
                         "Only image files are allowed.");
+                    model.Categories = await _context.AnnouncementCategories
+                        .Where(c => c.IsActive).ToListAsync();
+                    var photoErrIDs = roleName == "Administrator"
+                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                    model.AvailableTags = await _context.DepartmentTags
+                        .Where(d => d.IsActive && photoErrIDs.Contains(d.TagID)).ToListAsync();
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -472,6 +481,13 @@ namespace EduConnect.Web.Controllers
                 {
                     ModelState.AddModelError("Photo",
                         "File size cannot exceed 5MB.");
+                    model.Categories = await _context.AnnouncementCategories
+                        .Where(c => c.IsActive).ToListAsync();
+                    var photoSizeIDs = roleName == "Administrator"
+                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                    model.AvailableTags = await _context.DepartmentTags
+                        .Where(d => d.IsActive && photoSizeIDs.Contains(d.TagID)).ToListAsync();
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -527,8 +543,23 @@ namespace EduConnect.Web.Controllers
                 CreatedAt = DateTime.Now
             };
 
-            _context.Announcements.Add(announcement);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Announcements.Add(announcement);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to save announcement: {Error}", ex.Message);
+                ModelState.AddModelError("", "Unable to save the announcement. Please try again.");
+                model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
+                var dbErrIDs = roleName == "Administrator"
+                    ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                    : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                model.AvailableTags = await _context.DepartmentTags.Where(d => d.IsActive && dbErrIDs.Contains(d.TagID)).ToListAsync();
+                ViewBag.IsFaculty = IsFaculty();
+                return View(model);
+            }
 
             // Save tags
             if (model.SelectedTagIDs != null &&
@@ -732,6 +763,8 @@ namespace EduConnect.Web.Controllers
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
         public async Task<IActionResult> Edit(
             AnnouncementFormViewModel model)
         {
@@ -833,7 +866,7 @@ namespace EduConnect.Web.Controllers
                     ".gif", ".webp"
                 };
                 var ext = Path.GetExtension(
-                    model.Photo.FileName)
+                    model.Photo.FileName ?? string.Empty)
                     .ToLowerInvariant();
 
                 if (!allowedTypes.Contains(ext))
@@ -845,6 +878,14 @@ namespace EduConnect.Web.Controllers
                     model.Categories = await _context
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
+                        .ToListAsync();
+                    var extErrIDs = isAdmin
+                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                    model.AvailableTags = await _context.DepartmentTags
+                        .Include(d => d.TagType)
+                        .Where(d => d.IsActive && extErrIDs.Contains(d.TagID))
+                        .OrderBy(d => d.TagName)
                         .ToListAsync();
                     return View(model);
                 }
@@ -859,27 +900,43 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
+                    var sizeErrIDs = isAdmin
+                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                    model.AvailableTags = await _context.DepartmentTags
+                        .Include(d => d.TagType)
+                        .Where(d => d.IsActive && sizeErrIDs.Contains(d.TagID))
+                        .OrderBy(d => d.TagName)
+                        .ToListAsync();
                     return View(model);
                 }
 
-                DeletePhotoFile(announcement.AttachmentURL);
+                string? newPhotoURL = null;
+                try
+                {
+                    var uploadsFolder = Path.Combine(
+                        _environment.WebRootPath,
+                        "uploads", "announcements");
+                    Directory.CreateDirectory(uploadsFolder);
 
-                var uploadsFolder = Path.Combine(
-                    _environment.WebRootPath,
-                    "uploads", "announcements");
-                Directory.CreateDirectory(uploadsFolder);
+                    var fileName = Guid.NewGuid().ToString() + ext;
+                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                var fileName =
-                    Guid.NewGuid().ToString() + ext;
-                var filePath = Path.Combine(
-                    uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await model.Photo.CopyToAsync(stream);
 
-                using var stream = new FileStream(
-                    filePath, FileMode.Create);
-                await model.Photo.CopyToAsync(stream);
+                    newPhotoURL = "/uploads/announcements/" + fileName;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Photo upload failed: {Error}", ex.Message);
+                }
 
-                announcement.AttachmentURL =
-                    "/uploads/announcements/" + fileName;
+                if (newPhotoURL != null)
+                {
+                    DeletePhotoFile(announcement.AttachmentURL);
+                    announcement.AttachmentURL = newPhotoURL;
+                }
             }
 
             // Reset to Draft if Faculty edits a rejected announcement
@@ -924,7 +981,24 @@ namespace EduConnect.Web.Controllers
                 }
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to update announcement: {Error}", ex.Message);
+                ModelState.AddModelError("", "Unable to save changes. Please try again.");
+                model.ExistingPhotoURL = announcement.AttachmentURL;
+                model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
+                var errAllowedIDs = isAdmin
+                    ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
+                    : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
+                model.AvailableTags = await _context.DepartmentTags.Include(d => d.TagType)
+                    .Where(d => d.IsActive && errAllowedIDs.Contains(d.TagID)).OrderBy(d => d.TagName).ToListAsync();
+                ViewBag.IsFaculty = IsFaculty();
+                return View(model);
+            }
 
             TempData["Success"] =
                 "Announcement updated successfully!";
@@ -938,12 +1012,19 @@ namespace EduConnect.Web.Controllers
         private void DeletePhotoFile(string? url)
         {
             if (string.IsNullOrEmpty(url)) return;
-            var path = Path.Combine(
-                _environment.WebRootPath,
-                url.TrimStart('/').Replace(
-                    '/', Path.DirectorySeparatorChar));
-            if (System.IO.File.Exists(path))
-                System.IO.File.Delete(path);
+            try
+            {
+                var path = Path.Combine(
+                    _environment.WebRootPath,
+                    url.TrimStart('/').Replace(
+                        '/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(path))
+                    System.IO.File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to delete photo file: {Error}", ex.Message);
+            }
         }
 
         // ═══════════════════════════════════════

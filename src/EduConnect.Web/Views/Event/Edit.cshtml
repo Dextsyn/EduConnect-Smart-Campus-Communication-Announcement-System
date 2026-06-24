@@ -104,17 +104,12 @@
                             <input asp-for="CoverPhoto"
                                    type="file"
                                    class="form-control"
-                                   accept="image/*"
-                                   onchange="previewPhoto(this)" />
+                                   accept=".jpg,.jpeg,.png,.gif,.webp" />
+                            <div class="form-text">
+                                Accepted: JPG, PNG, GIF, WEBP &mdash; max 5 MB
+                            </div>
                             <span asp-validation-for="CoverPhoto"
                                   class="text-danger small"></span>
-                        </div>
-
-                        <div id="photoPreview" class="mt-3 d-none">
-                            <img id="previewImg"
-                                 class="img-fluid rounded"
-                                 style="max-height: 200px;"
-                                 alt="Preview" />
                         </div>
                     </div>
 
@@ -288,29 +283,6 @@
 
 @section Scripts {
     <script>
-        function previewPhoto(input) {
-            const preview = document.getElementById('photoPreview');
-            const img = document.getElementById('previewImg');
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!allowed.includes(file.type)) {
-                    alert('Only image files are allowed (JPG, PNG, GIF, WebP).');
-                    input.value = '';
-                    preview.classList.add('d-none');
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = e => {
-                    img.src = e.target.result;
-                    preview.classList.remove('d-none');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                preview.classList.add('d-none');
-            }
-        }
-
         function toggleRemovePhoto(cb) {
             const thumb = document.getElementById('existingPhotoThumb');
             const newSection = document.getElementById('newPhotoSection');

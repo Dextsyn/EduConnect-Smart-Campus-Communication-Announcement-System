@@ -103,13 +103,20 @@ namespace EduConnect.Web.Controllers
         private void DeleteEventPhoto(string? url)
         {
             if (string.IsNullOrEmpty(url)) return;
-            var path = Path.Combine(
-                _environment.WebRootPath,
-                url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-            if (!path.StartsWith(_environment.WebRootPath,
-                    StringComparison.OrdinalIgnoreCase)) return;
-            if (System.IO.File.Exists(path))
-                System.IO.File.Delete(path);
+            try
+            {
+                var path = Path.Combine(
+                    _environment.WebRootPath,
+                    url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (!path.StartsWith(_environment.WebRootPath,
+                        StringComparison.OrdinalIgnoreCase)) return;
+                if (System.IO.File.Exists(path))
+                    System.IO.File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to delete event photo: {Error}", ex.Message);
+            }
         }
 
         // ═══════════════════════════════════════
@@ -425,6 +432,8 @@ namespace EduConnect.Web.Controllers
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
         public async Task<IActionResult> Create(
     EventFormViewModel model)
         {
@@ -476,7 +485,9 @@ namespace EduConnect.Web.Controllers
             {
                 model.Announcements = await _context
                     .Announcements
-                    .Where(a => a.Status == "Published")
+                    .Where(a => a.Status == "Published" &&
+                                a.AuthorID == GetUserID())
+                    .OrderByDescending(a => a.PublishedAt)
                     .ToListAsync();
                 return View(model);
             }
@@ -496,13 +507,18 @@ namespace EduConnect.Web.Controllers
                 };
 
                 var extension = Path.GetExtension(
-                    model.CoverPhoto.FileName)
+                    model.CoverPhoto.FileName ?? string.Empty)
                     .ToLowerInvariant();
 
                 if (!allowedTypes.Contains(extension))
                 {
                     ModelState.AddModelError("CoverPhoto",
                         "Only image files are allowed (JPG, PNG, GIF, WebP).");
+                    model.Announcements = await _context.Announcements
+                        .Where(a => a.Status == "Published" &&
+                                    a.AuthorID == GetUserID())
+                        .OrderByDescending(a => a.PublishedAt)
+                        .ToListAsync();
                     return View(model);
                 }
 
@@ -510,30 +526,34 @@ namespace EduConnect.Web.Controllers
                 {
                     ModelState.AddModelError("CoverPhoto",
                         "File size cannot exceed 5MB.");
+                    model.Announcements = await _context.Announcements
+                        .Where(a => a.Status == "Published" &&
+                                    a.AuthorID == GetUserID())
+                        .OrderByDescending(a => a.PublishedAt)
+                        .ToListAsync();
                     return View(model);
                 }
 
-                var uploadsFolder = Path.Combine(
-                    _environment.WebRootPath,
-                    "uploads", "events");
+                try
+                {
+                    var uploadsFolder = Path.Combine(
+                        _environment.WebRootPath,
+                        "uploads", "events");
 
-                Directory.CreateDirectory(
-                    uploadsFolder);
+                    Directory.CreateDirectory(uploadsFolder);
 
-                var fileName =
-                    Guid.NewGuid().ToString()
-                    + extension;
+                    var fileName = Guid.NewGuid().ToString() + extension;
+                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                var filePath = Path.Combine(
-                    uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await model.CoverPhoto.CopyToAsync(stream);
 
-                using var stream = new FileStream(
-                    filePath, FileMode.Create);
-                await model.CoverPhoto
-                    .CopyToAsync(stream);
-
-                coverPhotoURL =
-                    "/uploads/events/" + fileName;
+                    coverPhotoURL = "/uploads/events/" + fileName;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Cover photo upload failed: {Error}", ex.Message);
+                }
             }
 
             var ev = new Event
@@ -557,8 +577,21 @@ namespace EduConnect.Web.Controllers
                 CreatedAt = DateTime.Now
             };
 
-            _context.Events.Add(ev);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Events.Add(ev);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to save event: {Error}", ex.Message);
+                ModelState.AddModelError("", "Unable to save the event. Please try again.");
+                model.Announcements = await _context.Announcements
+                    .Where(a => a.Status == "Published" && a.AuthorID == GetUserID())
+                    .OrderByDescending(a => a.PublishedAt)
+                    .ToListAsync();
+                return View(model);
+            }
 
             TempData["Success"] =
                 "Event created successfully!";
@@ -620,6 +653,8 @@ namespace EduConnect.Web.Controllers
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
         public async Task<IActionResult> Edit(
             int id, EventFormViewModel model)
         {
@@ -686,7 +721,7 @@ namespace EduConnect.Web.Controllers
                     ".jpg", ".jpeg", ".png", ".gif", ".webp"
                 };
                 var extension = Path.GetExtension(
-                    model.CoverPhoto.FileName).ToLowerInvariant();
+                    model.CoverPhoto.FileName ?? string.Empty).ToLowerInvariant();
 
                 if (!allowedTypes.Contains(extension))
                 {
@@ -714,20 +749,31 @@ namespace EduConnect.Web.Controllers
                     return View(model);
                 }
 
-                DeleteEventPhoto(ev.CoverPhotoURL);
+                string? newCoverPhotoURL = null;
+                try
+                {
+                    var uploadsFolder = Path.Combine(
+                        _environment.WebRootPath, "uploads", "events");
+                    Directory.CreateDirectory(uploadsFolder);
 
-                var uploadsFolder = Path.Combine(
-                    _environment.WebRootPath, "uploads", "events");
-                Directory.CreateDirectory(uploadsFolder);
+                    var fileName = Guid.NewGuid().ToString() + extension;
+                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                var fileName = Guid.NewGuid().ToString() + extension;
-                var filePath = Path.Combine(uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await model.CoverPhoto.CopyToAsync(stream);
 
-                using var stream = new FileStream(
-                    filePath, FileMode.Create);
-                await model.CoverPhoto.CopyToAsync(stream);
+                    newCoverPhotoURL = "/uploads/events/" + fileName;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Cover photo upload failed: {Error}", ex.Message);
+                }
 
-                ev.CoverPhotoURL = "/uploads/events/" + fileName;
+                if (newCoverPhotoURL != null)
+                {
+                    DeleteEventPhoto(ev.CoverPhotoURL);
+                    ev.CoverPhotoURL = newCoverPhotoURL;
+                }
             }
             // else: keep existing photo unchanged
 
@@ -744,7 +790,21 @@ namespace EduConnect.Web.Controllers
             ev.AnnouncementID        = model.LinkedAnnouncementID;
             ev.UpdatedAt             = DateTime.Now;
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to update event: {Error}", ex.Message);
+                ModelState.AddModelError("", "Unable to save changes. Please try again.");
+                model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
+                model.Announcements = await _context.Announcements
+                    .Where(a => a.Status == "Published" && a.AuthorID == GetUserID())
+                    .OrderByDescending(a => a.PublishedAt)
+                    .ToListAsync();
+                return View(model);
+            }
 
             TempData["Success"] = "Event updated successfully!";
             return RedirectToAction("Details", new { id });
