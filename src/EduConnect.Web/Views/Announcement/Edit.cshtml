@@ -122,6 +122,12 @@
                             </div>
                             <span asp-validation-for="Photo"
                                   class="text-danger small"></span>
+                            <div id="photoPreview" class="mt-3 d-none">
+                                <img id="previewImg"
+                                     class="img-fluid rounded shadow-sm"
+                                     style="max-height:300px;"
+                                     alt="Preview" />
+                            </div>
                         </div>
                     </div>
 
@@ -354,5 +360,23 @@
         const section = document.getElementById('photoInputSection');
         section.style.display = checkbox.checked ? 'none' : '';
     }
+
+    (function () {
+        var inp = document.getElementById('Photo');
+        var box = document.getElementById('photoPreview');
+        var img = document.getElementById('previewImg');
+        if (!inp || !box || !img) return;
+        inp.addEventListener('change', function () {
+            box.classList.add('d-none');
+            if (!this.files || !this.files[0]) return;
+            try {
+                var url = URL.createObjectURL(this.files[0]);
+                img.onload  = function () { URL.revokeObjectURL(url); };
+                img.onerror = function () { URL.revokeObjectURL(url); box.classList.add('d-none'); };
+                img.src = url;
+                box.classList.remove('d-none');
+            } catch (e) { /* preview not supported */ }
+        });
+    }());
 </script>
 }
