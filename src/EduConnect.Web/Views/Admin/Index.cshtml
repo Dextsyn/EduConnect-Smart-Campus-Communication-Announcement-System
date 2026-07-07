@@ -11,6 +11,14 @@
         ?? new List<EduConnect.Web.Models.User>();
 }
 
+<div class="ec-hero mb-4">
+    <div style="position:relative;z-index:1">
+        <div class="ec-hero-sub small mb-1">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</div>
+        <h3 class="fw-bold mb-1">Welcome back, @(Context.Session.GetString("UserName") ?? "Guest") 👋</h3>
+        <div class="ec-hero-sub">Here's your campus overview.</div>
+    </div>
+</div>
+
 <!-- ─── PAGE HEADER ──────────────────── -->
 <div class="d-flex justify-content-between
             align-items-center mb-4 flex-wrap gap-2">
@@ -45,9 +53,9 @@
 <div class="row g-3 mb-4">
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 ec-lift">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-primary bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-primary bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-people text-primary fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@ViewBag.TotalUsers</div>
@@ -57,10 +65,10 @@
     </div>
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100
+        <div class="card border-0 shadow-sm h-100 ec-lift
                     @(ViewBag.PendingVerifications > 0 ? "border-warning border-2" : "")">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-warning bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-warning bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-person-check text-warning fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@ViewBag.PendingVerifications</div>
@@ -70,9 +78,9 @@
     </div>
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 ec-lift">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-success bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-success bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-mortarboard text-success fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@ViewBag.CountStudent</div>
@@ -82,9 +90,9 @@
     </div>
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 ec-lift">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-info bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-info bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-person-badge text-info fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@ViewBag.CountFaculty</div>
@@ -94,9 +102,9 @@
     </div>
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 ec-lift">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-purple bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-purple bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-briefcase text-secondary fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@ViewBag.CountStaff</div>
@@ -106,9 +114,9 @@
     </div>
 
     <div class="col-6 col-md-2">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 ec-lift">
             <div class="card-body text-center p-3">
-                <div class="rounded-circle p-2 bg-secondary bg-opacity-10 d-inline-flex mb-2">
+                <div class="ec-stat-icon bg-secondary bg-opacity-10 mx-auto mb-2">
                     <i class="bi bi-building text-secondary fs-5"></i>
                 </div>
                 <div class="fw-bold fs-4">@(ViewBag.CountDean + ViewBag.CountChairPerson)</div>
@@ -257,8 +265,11 @@
                     @if (!recentUsers.Any())
                     {
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                No users yet
+                            <td colspan="5">
+                                <div class="ec-empty">
+                                    <i class="bi bi-inbox"></i>
+                                    No users yet
+                                </div>
                             </td>
                         </tr>
                     }
@@ -341,7 +352,7 @@
             labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(roleLabels)),
             datasets: [{
                 data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(roleCount)),
-                backgroundColor: ['#0d6efd','#198754','#dc3545','#ffc107','#0dcaf0','#6f42c1'],
+                backgroundColor: ['#002F6C','#198754','#dc3545','#ffc107','#0dcaf0','#6f42c1'],
                 borderWidth: 2,
                 borderColor: '#fff'
             }]
