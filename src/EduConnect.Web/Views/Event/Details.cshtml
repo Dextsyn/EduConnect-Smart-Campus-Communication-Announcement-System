@@ -53,22 +53,20 @@
     <!-- ─── MAIN CONTENT ──────────────── -->
     <div class="col-12 col-lg-8">
 
-        <!-- Cover Photo -->
-        @if (!string.IsNullOrEmpty(
-                Model.CoverPhotoURL))
-        {
-            <div class="mb-4">
+        <!-- Event Card -->
+        <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+
+            <!-- Cover Photo -->
+            @if (!string.IsNullOrEmpty(
+                    Model.CoverPhotoURL))
+            {
                 <img src="@Model.CoverPhotoURL"
-                     class="img-fluid rounded
-                                shadow-sm w-100"
+                     class="img-fluid w-100"
                      style="max-height: 350px;
                                 object-fit: cover;"
                      alt="Event cover" />
-            </div>
-        }
+            }
 
-        <!-- Event Card -->
-        <div class="card border-0 shadow-sm mb-4">
             <div class="card-body p-4">
 
                 <!-- Status Badges -->
@@ -265,7 +263,7 @@
                         Your Event QR Code
                     </h6>
                 </div>
-                <div class="card-body text-center">
+                <div class="card-body p-4 text-center">
                     <p class="text-muted small mb-3">
                         Present this QR code at the
                         event entrance for attendance
@@ -385,22 +383,23 @@
                                        me-2"></i>
                         You are registered!
                     </div>
-                    <form asp-action="CancelRegistration"
-                          method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden"
-                               name="eventID"
-                               value="@Model.EventID" />
-                        <button type="submit"
-                                class="btn btn-outline-danger
-                                           w-100"
-                                onclick="return confirm(
-                                        'Cancel your registration?')">
-                            <i class="bi bi-x-circle me-2">
-                            </i>
-                            Cancel Registration
-                        </button>
-                    </form>
+                    <div class="d-grid d-sm-block">
+                        <form asp-action="CancelRegistration"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden"
+                                   name="eventID"
+                                   value="@Model.EventID" />
+                            <button type="submit"
+                                    class="btn btn-outline-danger"
+                                    onclick="return confirm(
+                                            'Cancel your registration?')">
+                                <i class="bi bi-x-circle me-2">
+                                </i>
+                                Cancel Registration
+                            </button>
+                        </form>
+                    </div>
                 }
                 else if (Model.IsOnWaitlist)
                 {
@@ -414,47 +413,52 @@
                 else if (Model.RegistrationStatus
                 == "Open")
                 {
-                    <form asp-action="Register"
-                          method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden"
-                               name="eventID"
-                               value="@Model.EventID" />
-                        <button type="submit"
-                                class="btn btn-primary
-                                           w-100 py-2
-                                           fw-semibold">
-                            <i class="bi bi-calendar-check
-                                           me-2"></i>
-                            Register Now
-                        </button>
-                    </form>
+                    <div class="d-grid d-sm-block">
+                        <form asp-action="Register"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden"
+                                   name="eventID"
+                                   value="@Model.EventID" />
+                            <button type="submit"
+                                    class="btn btn-primary
+                                               py-2
+                                               fw-semibold">
+                                <i class="bi bi-calendar-check
+                                               me-2"></i>
+                                Register Now
+                            </button>
+                        </form>
+                    </div>
                 }
                 else if (Model.RegistrationStatus
                 == "Full")
                 {
-                    <form asp-action="Register"
-                          method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden"
-                               name="eventID"
-                               value="@Model.EventID" />
-                        <button type="submit"
-                                class="btn btn-warning
-                                           w-100 py-2
-                                           fw-semibold">
-                            <i class="bi bi-list-ol me-2">
-                            </i>
-                            Join Waitlist
-                        </button>
-                    </form>
+                    <div class="d-grid d-sm-block">
+                        <form asp-action="Register"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden"
+                                   name="eventID"
+                                   value="@Model.EventID" />
+                            <button type="submit"
+                                    class="btn btn-warning
+                                               py-2
+                                               fw-semibold">
+                                <i class="bi bi-list-ol me-2">
+                                </i>
+                                Join Waitlist
+                            </button>
+                        </form>
+                    </div>
                 }
                 else
                 {
-                    <button class="btn btn-secondary
-                                       w-100" disabled>
-                        Registration Closed
-                    </button>
+                    <div class="d-grid d-sm-block">
+                        <button class="btn btn-secondary" disabled>
+                            Registration Closed
+                        </button>
+                    </div>
                 }
 
             </div>
