@@ -81,7 +81,7 @@ else
             ud => ud.IsPrimary);
 
             <div class="col-12">
-                <div class="card border-0
+                <div class="card ec-lift border-0
                                     shadow-sm">
                     <div class="card-body">
                         <div class="row align-items-center">
@@ -155,7 +155,7 @@ else
                                                name="userID"
                                                value="@user.UserID" />
                                         <button type="submit"
-                                                class="btn btn-success
+                                                class="btn btn-primary
                                                                btn-sm w-100"
                                                 onclick="return confirm(
                                                             'Approve account for @user.FirstName @user.LastName?')">
@@ -167,7 +167,7 @@ else
 
                                     <!-- Reject Button -->
                                     <button type="button"
-                                            class="btn btn-danger
+                                            class="btn btn-outline-danger
                                                            btn-sm w-100"
                                             data-bs-toggle="modal"
                                             data-bs-target="#rejectModal_@user.UserID">
