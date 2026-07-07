@@ -127,7 +127,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; letter-spacing: -.01em; }
 }
 .ec-topbar .ec-brand { color: var(--ec-navy); font-weight: 800; font-size: 1.2rem; text-decoration: none; letter-spacing: -.01em; }
 .ec-topbar .ec-brand .bi { color: var(--ec-gold); }
-.ec-burger { border: 0; background: transparent; font-size: 1.4rem; color: var(--ec-navy); padding: .4rem .6rem; }
+.ec-burger { border: 0; background: transparent; font-size: 1.4rem; color: var(--ec-navy); padding: .4rem .6rem; min-width: 44px; min-height: 44px; }
 
 /* ── Sidebar (laptop) ── */
 .ec-sidebar {
