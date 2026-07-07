@@ -17,10 +17,10 @@
 <div class="d-flex justify-content-between
             align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold mb-1">
+        <h3 class="fw-bold mb-1">
             <i class="bi bi-megaphone me-2 text-primary"></i>
             Announcements
-        </h4>
+        </h3>
         <small class="text-muted">
             @totalItems announcement(s) found
         </small>
@@ -122,10 +122,10 @@
 <!-- ─── ANNOUNCEMENT CARDS ───────────── -->
 @if (announcements == null || !announcements.Any())
 {
-    <div class="text-center py-5">
-        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+    <div class="ec-empty">
+        <i class="bi bi-megaphone"></i>
         <h5 class="text-muted">No announcements found</h5>
-        <p class="text-muted small">
+        <p class="text-muted small mb-0">
             Try adjusting your filters or check back later
         </p>
     </div>
@@ -137,7 +137,7 @@ else
         {
             <div class="col-12">
                 <div class="card border-0 shadow-sm
-                                    announcement-card">
+                                    announcement-card ec-lift">
                     <div class="card-body">
                         <div class="d-flex justify-content-between
                                             align-items-start flex-wrap gap-2">
@@ -154,21 +154,21 @@ else
 
                                     @if (item.FeedType == "Emergency")
                                     {
-                                        <span class="badge bg-danger">
+                                        <span class="ec-chip ec-chip-emergency">
                                             <i class="bi bi-exclamation-triangle me-1"></i>
                                             Emergency
                                         </span>
                                     }
                                     else if (item.FeedType == "Academic")
                                     {
-                                        <span class="badge bg-primary">
+                                        <span class="ec-chip ec-chip-academic">
                                             <i class="bi bi-mortarboard me-1"></i>
                                             Academic
                                         </span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">
+                                        <span class="ec-chip ec-chip-nonacademic">
                                             <i class="bi bi-building me-1"></i>
                                             Non-Academic
                                         </span>
@@ -191,8 +191,7 @@ else
 
                                     @foreach (var tag in item.Tags.Take(3))
                                     {
-                                        <span class="badge bg-light
-                                                                 text-dark border">
+                                        <span class="ec-chip ec-chip-neutral">
                                             @tag
                                         </span>
                                     }

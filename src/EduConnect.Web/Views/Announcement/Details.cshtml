@@ -47,20 +47,20 @@
 
                     @if (Model.FeedType == "Academic")
                     {
-                        <span class="badge bg-primary">
+                        <span class="ec-chip ec-chip-academic">
                             <i class="bi bi-mortarboard me-1"></i>
                             Academic
                         </span>
                     }
                     else if (Model.FeedType == "Emergency")
                     {
-                        <span class="badge bg-danger">
+                        <span class="ec-chip ec-chip-emergency">
                             Emergency
                         </span>
                     }
                     else
                     {
-                        <span class="badge bg-secondary">
+                        <span class="ec-chip ec-chip-nonacademic">
                             <i class="bi bi-building me-1"></i>
                             Non-Academic
                         </span>
@@ -68,8 +68,7 @@
 
                     @foreach (var tag in Model.Tags)
                     {
-                        <span class="badge bg-light
-                                         text-dark border">
+                        <span class="ec-chip ec-chip-neutral">
                             @tag
                         </span>
                     }

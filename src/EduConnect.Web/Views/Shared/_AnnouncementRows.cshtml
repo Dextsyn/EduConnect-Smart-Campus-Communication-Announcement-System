@@ -33,19 +33,19 @@
                 <td>
                     @if (item.FeedType == "Academic")
                     {
-                        <span class="badge bg-primary">
+                        <span class="ec-chip ec-chip-academic">
                             <i class="bi bi-mortarboard me-1"></i>Academic
                         </span>
                     }
                     else if (item.FeedType == "Emergency")
                     {
-                        <span class="badge bg-danger">
+                        <span class="ec-chip ec-chip-emergency">
                             <i class="bi bi-exclamation-triangle me-1"></i>Emergency
                         </span>
                     }
                     else
                     {
-                        <span class="badge bg-secondary">
+                        <span class="ec-chip ec-chip-nonacademic">
                             <i class="bi bi-building me-1"></i>Non-Academic
                         </span>
                     }
@@ -54,11 +54,11 @@
                 <td>
                     @foreach (var tag in item.Tags.Take(2))
                     {
-                        <span class="badge bg-light text-dark border me-1">@tag</span>
+                        <span class="ec-chip ec-chip-neutral me-1">@tag</span>
                     }
                     @if (item.Tags.Count > 2)
                     {
-                        <span class="badge bg-light text-muted border">
+                        <span class="ec-chip ec-chip-neutral">
                             +@(item.Tags.Count - 2)
                         </span>
                     }
