@@ -7,46 +7,46 @@
         ?? new List<OrgAnnouncement>();
 }
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-4">
+<div class="ec-hero mb-4">
+    <div style="position:relative;z-index:1">
         <div class="d-flex align-items-start gap-4 flex-wrap">
             @if (!string.IsNullOrEmpty(Model.LogoURL))
             {
                 <img src="@Model.LogoURL"
-                     class="rounded-circle"
+                     class="rounded-circle ec-avatar-ring"
                      width="80" height="80"
                      style="object-fit:cover;" />
             }
             else
             {
-                <div class="rounded-circle bg-primary bg-opacity-10
+                <div class="rounded-circle bg-white bg-opacity-10
                             d-flex align-items-center justify-content-center"
                      style="width:80px;height:80px;">
-                    <i class="bi bi-building text-primary fs-2"></i>
+                    <i class="bi bi-building text-white fs-2"></i>
                 </div>
             }
             <div class="flex-grow-1">
                 <h4 class="fw-bold mb-1">@Model.OrgName</h4>
                 @if (Model.DepartmentTag != null)
                 {
-                    <span class="badge bg-secondary mb-2">
+                    <span class="ec-chip ec-chip-neutral mb-2">
                         @Model.DepartmentTag.TagName
                     </span>
                 }
                 else
                 {
-                    <span class="badge bg-info mb-2">University-wide</span>
+                    <span class="ec-chip ec-chip-neutral mb-2">University-wide</span>
                 }
                 @if (!string.IsNullOrEmpty(Model.Description))
                 {
-                    <p class="text-muted mb-0">@Model.Description</p>
+                    <p class="ec-hero-sub mb-0">@Model.Description</p>
                 }
             </div>
             <div class="d-flex gap-2">
                 @if (isAdviser)
                 {
                     <a href="/Org/Post/@Model.OrgID"
-                       class="btn btn-primary btn-sm">
+                       class="btn btn-warning btn-sm">
                         <i class="bi bi-plus-circle me-1"></i>
                         New Post
                     </a>
@@ -75,17 +75,19 @@
 @if (!posts.Any())
 {
     <div class="card border-0 shadow-sm">
-        <div class="card-body text-center py-5 text-muted">
-            <i class="bi bi-megaphone fs-1 d-block mb-3"></i>
-            No announcements yet.
-            @if (isAdviser)
-            {
-                <div class="mt-2">
-                    <a href="/Org/Post/@Model.OrgID" class="btn btn-primary btn-sm">
-                        Post the first announcement
-                    </a>
-                </div>
-            }
+        <div class="card-body">
+            <div class="ec-empty">
+                <i class="bi bi-people"></i>
+                No announcements yet.
+                @if (isAdviser)
+                {
+                    <div class="mt-2">
+                        <a href="/Org/Post/@Model.OrgID" class="btn btn-primary btn-sm">
+                            Post the first announcement
+                        </a>
+                    </div>
+                }
+            </div>
         </div>
     </div>
 }

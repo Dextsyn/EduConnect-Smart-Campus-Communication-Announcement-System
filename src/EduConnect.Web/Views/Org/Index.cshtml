@@ -47,22 +47,24 @@
 @if (!Model.Groups.Any())
 {
     <div class="card border-0 shadow-sm">
-        <div class="card-body text-center py-5 text-muted">
-            <i class="bi bi-building fs-1 d-block mb-3"></i>
-            No organizations found.
+        <div class="card-body">
+            <div class="ec-empty">
+                <i class="bi bi-people"></i>
+                No organizations found.
+            </div>
         </div>
     </div>
 }
 
 @foreach (var group in Model.Groups)
 {
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4 ec-lift">
         <div class="card-header bg-white border-0 pt-3 pb-2">
             <div class="d-flex align-items-center gap-3">
                 @if (!string.IsNullOrEmpty(group.Org.LogoURL))
                 {
                     <img src="@group.Org.LogoURL"
-                         class="rounded-circle"
+                         class="rounded-circle ec-avatar-ring"
                          width="40" height="40"
                          style="object-fit:cover;" />
                 }
@@ -81,13 +83,13 @@
                     </a>
                     @if (group.Org.DepartmentTag != null)
                     {
-                        <span class="badge bg-secondary ms-2 small">
+                        <span class="ec-chip ec-chip-neutral ms-2">
                             @group.Org.DepartmentTag.ShortName
                         </span>
                     }
                     else
                     {
-                        <span class="badge bg-info ms-2 small">University-wide</span>
+                        <span class="ec-chip ec-chip-neutral ms-2">University-wide</span>
                     }
                 </div>
                 <a href="/Org/Details/@group.Org.OrgID"
