@@ -87,7 +87,7 @@ a:hover { color: var(--ec-navy); }
 .text-bg-success { background-color: #198754 !important; color: #fff !important; }
 .text-bg-danger { background-color: #dc3545 !important; color: #fff !important; }
 .text-primary { color: var(--ec-navy) !important; }
-.bg-primary { background-color: var(--ec-navy) !important; }
+.bg-primary { background-color: rgba(0, 47, 108, var(--bs-bg-opacity, 1)) !important; }
 .text-bg-primary { background-color: var(--ec-navy) !important; color: #fff !important; }
 .border-primary { border-color: var(--ec-navy) !important; }
 .form-control, .form-select, .input-group-text { border-radius: 12px; border-color: var(--ec-border); }

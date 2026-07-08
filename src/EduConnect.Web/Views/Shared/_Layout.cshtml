@@ -186,9 +186,16 @@
     <script>
         (function () {
             var path = location.pathname.toLowerCase().replace(/\/$/, '') || '/';
-            document.querySelectorAll('.ec-side-link, .ec-tab[href]').forEach(function (a) {
-                var href = (a.getAttribute('href') || '').toLowerCase().replace(/\/$/, '') || '/';
-                if (href === path || (href !== '/' && path.startsWith(href))) a.classList.add('active');
+            // Highlight only the most specific matching link per nav group,
+            // so parent links (e.g. /Admin) don't glow alongside children (/Admin/Users).
+            ['.ec-sidebar .ec-side-link', '#ecDrawer .ec-side-link', '.ec-bottom-nav .ec-tab[href]'].forEach(function (scope) {
+                var best = null, bestLen = -1;
+                document.querySelectorAll(scope).forEach(function (a) {
+                    var href = (a.getAttribute('href') || '').toLowerCase().replace(/\/$/, '') || '/';
+                    var match = href === path || (href !== '/' && (path === href || path.indexOf(href + '/') === 0));
+                    if (match && href.length > bestLen) { best = a; bestLen = href.length; }
+                });
+                if (best) best.classList.add('active');
             });
         })();
     </script>
