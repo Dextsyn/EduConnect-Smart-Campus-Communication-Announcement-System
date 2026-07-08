@@ -4,9 +4,9 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0">
-        <i class="bi bi-file-earmark-text me-2"></i>My Announcements
-    </h4>
+    <h3 class="fw-bold mb-1">
+        <i class="bi bi-file-earmark-text me-2 text-primary"></i>My Announcements
+    </h3>
     <a href="/Announcement/Create" class="btn btn-primary">
         <i class="bi bi-plus-circle me-2"></i>New Draft
     </a>
@@ -31,8 +31,8 @@
     <div class="card-body p-0">
         @if (announcements == null || !((IEnumerable<dynamic>)announcements).Any())
         {
-            <div class="text-center text-muted py-5">
-                <i class="bi bi-file-earmark-x fs-1 d-block mb-2"></i>
+            <div class="ec-empty">
+                <i class="bi bi-megaphone"></i>
                 No announcements yet. <a href="/Announcement/Create">Create your first draft.</a>
             </div>
         }
@@ -55,12 +55,12 @@
                         string approvalStatus = a.ApprovalStatus;
                         string badgeClass = approvalStatus switch
                         {
-                            "Draft"        => "bg-secondary",
-                            "PendingChair" => "bg-warning text-dark",
-                            "PendingDean"  => "bg-warning text-dark",
-                            "Approved"     => "bg-success",
-                            "Rejected"     => "bg-danger",
-                            _              => "bg-secondary"
+                            "Draft"        => "badge bg-secondary",
+                            "PendingChair" => "ec-chip ec-chip-gold",
+                            "PendingDean"  => "ec-chip ec-chip-gold",
+                            "Approved"     => "badge text-bg-success",
+                            "Rejected"     => "badge text-bg-danger",
+                            _              => "badge bg-secondary"
                         };
                         string badgeLabel = approvalStatus switch
                         {
@@ -74,7 +74,7 @@
                             <td class="align-middle">@a.CategoryName</td>
                             <td class="align-middle">@a.FeedType</td>
                             <td class="align-middle">
-                                <span class="badge @badgeClass">@badgeLabel</span>
+                                <span class="@badgeClass">@badgeLabel</span>
                                 @if (approvalStatus == "Rejected")
                                 {
                                     string reason = !string.IsNullOrEmpty((string)a.ChairRejectionReason)

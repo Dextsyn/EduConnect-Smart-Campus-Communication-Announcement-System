@@ -3,11 +3,11 @@
     ViewData["Title"] = $"Report #{Model.ReportID}";
     var (badgeClass, badgeLabel) = Model.Status switch
     {
-        "Pending"       => ("bg-warning text-dark", "Pending"),
-        "Investigating" => ("bg-primary",           "Investigating"),
-        "Resolved"      => ("bg-success",           "Resolved"),
-        "Dismissed"     => ("bg-secondary",         "Dismissed"),
-        _               => ("bg-light text-dark",   Model.Status)
+        "Pending"       => ("ec-chip ec-chip-gold",     "Pending"),
+        "Investigating" => ("ec-chip ec-chip-academic", "Investigating"),
+        "Resolved"      => ("badge text-bg-success",    "Resolved"),
+        "Dismissed"     => ("ec-chip ec-chip-neutral",  "Dismissed"),
+        _               => ("bg-light text-dark",       Model.Status)
     };
 }
 
@@ -20,7 +20,7 @@
         </h4>
         <small class="text-muted">
             <span class="badge bg-secondary me-1">@Model.IncidentType</span>
-            <span class="badge @badgeClass">@badgeLabel</span>
+            <span class="@badgeClass">@badgeLabel</span>
         </small>
     </div>
     <a href="/Staff" class="btn btn-outline-secondary btn-sm">

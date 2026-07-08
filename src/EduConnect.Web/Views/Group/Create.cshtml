@@ -2,15 +2,23 @@
     ViewData["Title"] = "Create Group";
 }
 
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-plus-circle me-2 text-primary"></i>
+            Create a Group
+        </h4>
+        <small class="text-muted">Find your people — academic or otherwise.</small>
+    </div>
+    <a href="/Group" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
+
 <div class="row justify-content-center">
     <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-plus-circle me-2"></i>Create a Group
-                </h5>
-            </div>
-            <div class="card-body">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
                 @if (TempData["Error"] != null)
                 {
                     <div class="alert alert-danger">@TempData["Error"]</div>

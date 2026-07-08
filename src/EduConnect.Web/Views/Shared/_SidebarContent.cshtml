@@ -1,0 +1,325 @@
+<!-- User Info -->
+<div class="ec-user-card mb-4">
+    <img src="https://ui-avatars.com/api/?name=@(Context.Session.GetString("UserName") ?? "Guest")&background=002F6C&color=fff"
+         class="rounded-circle ec-avatar-ring"
+         width="45" height="45"
+         alt="Avatar" />
+    <div>
+        @if (Context.Session.GetString("UserID") != null)
+        {
+            <div class="fw-semibold small">Welcome back,</div>
+            <div class="fw-bold">
+                @Context.Session.GetString("UserName")
+            </div>
+            <small>
+                @Context.Session.GetString("RoleName")
+            </small>
+        }
+        else
+        {
+            <div class="fw-semibold small">Welcome,</div>
+            <div class="fw-bold">Guest</div>
+        }
+    </div>
+</div>
+
+<!-- Feed Toggle -->
+<div class="mb-3">
+    <div class="ec-side-heading">Feed</div>
+    <div class="d-flex gap-2 mt-2 px-2">
+        <a href="#" class="btn btn-sm flex-fill btn-warning">
+            <i class="bi bi-mortarboard"></i> Academic
+        </a>
+        <a href="/Org" class="btn btn-sm flex-fill btn-outline-light">
+            <i class="bi bi-people"></i> Org Post
+        </a>
+    </div>
+</div>
+
+<hr />
+
+<!-- Navigation Links -->
+<div class="ec-side-heading">Navigation</div>
+<div class="d-flex flex-column gap-1 mt-2">
+
+    @{
+        var currentRole = Context.Session
+        .GetString("RoleName");
+    }
+
+    @if (currentRole == "Administrator")
+    {
+        <a href="/Admin" class="ec-side-link">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
+        </a>
+        <a href="/Admin/PendingUsers" class="ec-side-link">
+            <i class="bi bi-person-check"></i>
+            Verify Students
+        </a>
+        <a href="/Admin/Users" class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Manage Users
+        </a>
+        <a href="/Admin/AddUser" class="ec-side-link">
+            <i class="bi bi-person-plus"></i>
+            Add User
+        </a>
+        <a href="/Announcement" class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event" class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+    }
+    else if (currentRole == "Dean")
+    {
+        <a href="/Dean"
+           class="ec-side-link">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
+        </a>
+        <a href="/Announcement/ReviewQueue"
+           class="ec-side-link">
+            <i class="bi bi-hourglass-split"></i>
+            Pending Approvals
+        </a>
+        <a href="/Announcement/Create"
+           class="ec-side-link">
+            <i class="bi bi-plus-circle"></i>
+            New Announcement
+        </a>
+        <a href="/Announcement"
+           class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event"
+           class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+        <a href="/Group"
+           class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Group Finder
+        </a>
+        <a href="/Event/Scanner"
+           class="ec-side-link">
+            <i class="bi bi-qr-code-scan"></i>
+            QR Scanner
+        </a>
+        <a href="/Notification"
+           class="ec-side-link">
+            <i class="bi bi-bell"></i>
+            Notifications
+        </a>
+        <a href="/SafetyReport/Submit"
+           class="ec-side-link">
+            <i class="bi bi-flag"></i>
+            Report Safety Issue
+        </a>
+    }
+    else if (currentRole == "Faculty")
+    {
+        <a href="/Faculty"
+           class="ec-side-link">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
+        </a>
+        <a href="/Announcement/Create"
+           class="ec-side-link">
+            <i class="bi bi-plus-circle"></i>
+            New Announcement
+        </a>
+        <a href="/Announcement/MyAnnouncements"
+           class="ec-side-link">
+            <i class="bi bi-file-earmark-text"></i>
+            My Announcements
+        </a>
+        <a href="/Announcement"
+           class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event"
+           class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+        <a href="/Group"
+           class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Group Finder
+        </a>
+        <a href="/Event/Scanner"
+           class="ec-side-link">
+            <i class="bi bi-qr-code-scan"></i>
+            QR Scanner
+        </a>
+        <a href="/Notification"
+           class="ec-side-link">
+            <i class="bi bi-bell"></i>
+            Notifications
+        </a>
+        <a href="/SafetyReport/Submit"
+           class="ec-side-link">
+            <i class="bi bi-flag"></i>
+            Report Safety Issue
+        </a>
+    }
+    else if (currentRole == "Chair Person")
+    {
+        <a href="/Announcement/ReviewQueue"
+           class="ec-side-link">
+            <i class="bi bi-hourglass-split"></i>
+            Pending Reviews
+        </a>
+        <a href="/Announcement/Create"
+           class="ec-side-link">
+            <i class="bi bi-plus-circle"></i>
+            New Announcement
+        </a>
+        <a href="/Announcement"
+           class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event"
+           class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+        <a href="/Group"
+           class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Group Finder
+        </a>
+        <a href="/Event/Scanner"
+           class="ec-side-link">
+            <i class="bi bi-qr-code-scan"></i>
+            QR Scanner
+        </a>
+        <a href="/Notification"
+           class="ec-side-link">
+            <i class="bi bi-bell"></i>
+            Notifications
+        </a>
+        <a href="/SafetyReport/Submit"
+           class="ec-side-link">
+            <i class="bi bi-flag"></i>
+            Report Safety Issue
+        </a>
+    }
+    else if (currentRole == "Staff")
+    {
+        <a href="/Staff"
+           class="ec-side-link">
+            <i class="bi bi-shield-exclamation"></i>
+            Safety Reports
+        </a>
+        <a href="/SafetyReport/Submit"
+           class="ec-side-link">
+            <i class="bi bi-flag"></i>
+            Report Safety Issue
+        </a>
+        <a href="/Announcement"
+           class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event"
+           class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+        <a href="/Group"
+           class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Group Finder
+        </a>
+        <a href="/Notification"
+           class="ec-side-link">
+            <i class="bi bi-bell"></i>
+            Notifications
+        </a>
+    }
+    else
+    {
+        <!-- Student -->
+        <a href="/"
+           class="ec-side-link">
+            <i class="bi bi-house"></i>
+            Dashboard
+        </a>
+        <a href="/Announcement"
+           class="ec-side-link">
+            <i class="bi bi-megaphone"></i>
+            Announcements
+        </a>
+        <a href="/Event"
+           class="ec-side-link">
+            <i class="bi bi-calendar-event"></i>
+            Events
+        </a>
+        <a href="/Org" class="ec-side-link">
+            <i class="bi bi-people-fill"></i>
+            Organizations
+        </a>
+        <a href="/Notification"
+           class="ec-side-link">
+            <i class="bi bi-bell"></i>
+            Notifications
+        </a>
+        <a href="/SafetyReport/Submit"
+           class="ec-side-link">
+            <i class="bi bi-flag"></i>
+            Report Safety Issue
+        </a>
+        <a href="/Group"
+           class="ec-side-link">
+            <i class="bi bi-people"></i>
+            Group Finder
+        </a>
+    }
+
+</div>
+
+<hr />
+
+<!-- Department Tags -->
+<div class="ec-side-heading">My Department</div>
+<div class="mt-2 px-2">
+    <span class="ec-chip ec-chip-gold" style="background:rgba(255,255,255,.12);color:#fff">CCIT</span>
+    <span class="ec-chip ec-chip-neutral mt-1" style="background:rgba(255,255,255,.12);color:#fff">School Wide</span>
+</div>
+
+<hr />
+<a href="/Account/Profile" class="ec-side-link d-lg-none">
+    <i class="bi bi-person"></i> Profile
+</a>
+<a href="/Account/Logout" class="ec-side-link d-lg-none" style="color:#FFB4A8;">
+    <i class="bi bi-box-arrow-right"></i> Logout
+</a>

@@ -95,7 +95,7 @@
                 My Registrations
             </a>
             <a href="?filter=past&view=@viewMode"
-               class="btn btn-sm @(filter == "past" ? "btn-secondary" : "btn-outline-secondary")">
+               class="btn btn-sm @(filter == "past" ? "btn-primary" : "btn-outline-secondary")">
                 Archived
             </a>
 
@@ -136,14 +136,12 @@ else
     <!-- ─── LIST VIEW ────────────────── -->
     @if (!events.Any())
     {
-        <div class="text-center py-5">
-            <i class="bi bi-calendar-x
-                               fs-1 text-muted
-                               d-block mb-3"></i>
+        <div class="ec-empty">
+            <i class="bi bi-calendar-event"></i>
             <h5 class="text-muted">
                 No events found
             </h5>
-            <p class="text-muted small">
+            <p class="text-muted small mb-0">
                 Check back later for upcoming events
             </p>
         </div>
@@ -157,6 +155,7 @@ else
                     <div class="card border-0
                                             shadow-sm h-100
                                             announcement-card
+                                            ec-lift
                                             position-relative">
 
                         @if (ev.OrganizerID == currentUserID)
@@ -185,11 +184,13 @@ else
                         @if (!string.IsNullOrEmpty(
                                     ev.CoverPhotoURL))
                         {
-                            <img src="@ev.CoverPhotoURL"
-                                 class="card-img-top"
-                                 style="height: 180px;
-                                                        object-fit: cover;"
-                                 alt="Event cover" />
+                            <div class="rounded-top overflow-hidden">
+                                <img src="@ev.CoverPhotoURL"
+                                     class="card-img-top"
+                                     style="height: 180px;
+                                                            object-fit: cover;"
+                                     alt="Event cover" />
+                            </div>
                         }
                         else
                         {
@@ -252,14 +253,25 @@ else
                                 @ev.EventTitle
                             </h5>
 
+                            <!-- Date / Capacity chips -->
+                            <div class="d-flex gap-2
+                                                    flex-wrap mb-2">
+                                <span class="ec-chip ec-chip-neutral">
+                                    <i class="bi bi-calendar"></i>
+                                    @ev.StartDateTime.ToString("MMM dd, yyyy")
+                                </span>
+                                @if (ev.MaxAttendees.HasValue)
+                                {
+                                    <span class="ec-chip ec-chip-neutral">
+                                        <i class="bi bi-people"></i>
+                                        @ev.CurrentAttendees / @ev.MaxAttendees
+                                    </span>
+                                }
+                            </div>
+
                             <!-- Details -->
                             <div class="text-muted
                                                     small mb-3">
-                                <div class="mb-1">
-                                    <i class="bi bi-calendar
-                                                           me-2"></i>
-                                    @ev.StartDateTime.ToString("MMM dd, yyyy")
-                                </div>
                                 <div class="mb-1">
                                     <i class="bi bi-clock
                                                            me-2"></i>
@@ -292,18 +304,6 @@ else
                                 ev.MaxAttendees.Value
                                 * 100;
                                 <div class="mb-3">
-                                    <div class="d-flex
-                                                                justify-content-between
-                                                                small mb-1">
-                                        <span class="text-muted">
-                                            Slots
-                                        </span>
-                                        <span class="@(ev.IsFull ? "text-danger fw-bold" : "text-success")">
-                                            @ev.CurrentAttendees
-                                            /
-                                            @ev.MaxAttendees
-                                        </span>
-                                    </div>
                                     <div class="progress"
                                          style="height: 6px;">
                                         <div class="progress-bar @(ev.IsFull ? "bg-danger" : "bg-success")"

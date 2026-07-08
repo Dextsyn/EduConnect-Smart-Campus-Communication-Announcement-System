@@ -5,13 +5,13 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0">
-        <i class="bi bi-hourglass-split me-2"></i>
+    <h3 class="fw-bold mb-1">
+        <i class="bi bi-hourglass-split me-2 text-primary"></i>
         Pending Reviews
         <small class="text-muted fs-6 ms-2">
             (@(role == "Chair Person" ? "Chair Person Queue" : "Dean Queue"))
         </small>
-    </h4>
+    </h3>
 </div>
 
 @if (TempData["Success"] != null)
@@ -26,8 +26,8 @@
     <div class="card-body p-0">
         @if (announcements == null || !((IEnumerable<dynamic>)announcements).Any())
         {
-            <div class="text-center text-muted py-5">
-                <i class="bi bi-check2-circle fs-1 d-block mb-2"></i>
+            <div class="ec-empty">
+                <i class="bi bi-megaphone"></i>
                 No announcements pending your review.
             </div>
         }

@@ -88,19 +88,20 @@ else
                 "NewPendingStudent" => "text-info",
                 _ => "text-secondary"
             };
-            var bgClass = n.IsRead ? "" : "border-start border-primary border-3";
+            var unreadStyle = n.IsRead ? "" : "border-left:3px solid var(--ec-gold)";
 
-            <div class="card border-0 shadow-sm notif-card @bgClass"
+            <div class="card mb-2 border-0 shadow-sm notif-card"
                  data-id="@n.NotificationID"
                  data-type="@n.Type"
-                 data-read="@n.IsRead.ToString().ToLower()">
+                 data-read="@n.IsRead.ToString().ToLower()"
+                 style="@unreadStyle">
                 <div class="card-body py-3 px-4">
                     <div class="d-flex align-items-start gap-3">
 
                         <!-- Icon bubble -->
-                        <div class="rounded-circle p-2 bg-light flex-shrink-0 d-flex align-items-center justify-content-center"
-                             style="width:42px;height:42px;">
-                            <i class="bi @icon @iconColor fs-5"></i>
+                        <div class="ec-stat-icon bg-light flex-shrink-0"
+                             style="width:40px;height:40px;font-size:1rem">
+                            <i class="bi @icon @iconColor"></i>
                         </div>
 
                         <!-- Content -->
@@ -197,7 +198,7 @@ else
                 .then(function () {
                     var card = document.querySelector('.notif-card[data-id="' + id + '"]');
                     if (card) {
-                        card.classList.remove('border-start', 'border-primary', 'border-3');
+                        card.style.borderLeft = '';
                         card.dataset.read = 'true';
                         var badge = card.querySelector('.badge.bg-primary');
                         if (badge) badge.remove();
@@ -226,7 +227,7 @@ else
             fetch('/Notification/MarkAllRead', { method: 'POST' })
                 .then(function () {
                     document.querySelectorAll('.notif-card').forEach(function (card) {
-                        card.classList.remove('border-start', 'border-primary', 'border-3');
+                        card.style.borderLeft = '';
                         card.dataset.read = 'true';
                         var badge = card.querySelector('.badge.bg-primary');
                         if (badge) badge.remove();
