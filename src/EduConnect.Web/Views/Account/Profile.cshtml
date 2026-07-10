@@ -1,0 +1,248 @@
+@model EduConnect.Web.ViewModels.ProfileViewModel
+@{
+    ViewData["Title"] = "My Profile";
+    var avatarSrc = string.IsNullOrEmpty(Model.ProfilePicturePath)
+        ? $"https://ui-avatars.com/api/?name={Uri.EscapeDataString(Model.FullName)}&background=002F6C&color=fff"
+        : Model.ProfilePicturePath;
+}
+
+<!-- Success / Error alerts -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ChangePasswordError"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["ChangePasswordError"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<h4 class="fw-bold mb-4">My Profile</h4>
+
+<div class="row g-4">
+
+    <!-- ── Card 1: Profile Info ─────────────── -->
+    <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header fw-semibold py-3"
+                 style="background:var(--ec-navy);color:#fff;">
+                <i class="bi bi-person-circle me-2"></i>Profile Information
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="Profile"
+                      asp-controller="Account"
+                      method="post"
+                      enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Avatar -->
+                    <div class="d-flex align-items-center gap-4 mb-4">
+                        <img id="avatarPreview"
+                             src="@avatarSrc"
+                             class="rounded-circle ec-avatar-ring"
+                             width="96" height="96"
+                             alt="Profile picture"
+                             style="object-fit:cover;" />
+                        <div>
+                            <label class="form-label fw-semibold mb-1 d-block">
+                                Profile Picture
+                            </label>
+                            <input type="file"
+                                   asp-for="NewProfilePicture"
+                                   class="form-control form-control-sm"
+                                   accept=".jpg,.jpeg,.png,.gif,.webp"
+                                   onchange="previewAvatar(this)" />
+                            <div class="form-text">JPG, PNG, GIF or WebP · max 5 MB</div>
+                            <span asp-validation-for="NewProfilePicture"
+                                  class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Full Name (read-only) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Full Name</label>
+                        <input type="text"
+                               class="form-control"
+                               value="@Model.FullName"
+                               disabled />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.StudentID))
+                    {
+                        <!-- Student No. (read-only) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Student No.</label>
+                            <input type="text"
+                                   class="form-control"
+                                   value="@Model.StudentID"
+                                   disabled />
+                        </div>
+                    }
+
+                    <!-- Email (read-only) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email</label>
+                        <input type="email"
+                               class="form-control"
+                               value="@Model.Email"
+                               disabled />
+                    </div>
+
+                    <!-- Role (read-only) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Role</label>
+                        <input type="text"
+                               class="form-control"
+                               value="@Model.RoleName"
+                               disabled />
+                    </div>
+
+                    <!-- Suffix (editable) -->
+                    <div class="mb-4">
+                        <label asp-for="Suffix"
+                               class="form-label fw-semibold">Name Suffix</label>
+                        <select asp-for="Suffix" class="form-select">
+                            <option value="">None</option>
+                            <option value="Jr.">Jr.</option>
+                            <option value="Sr.">Sr.</option>
+                            <option value="II">II</option>
+                            <option value="III">III</option>
+                            <option value="IV">IV</option>
+                            <option value="V">V</option>
+                        </select>
+                        <span asp-validation-for="Suffix"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit"
+                            class="btn ec-btn-primary px-4">
+                        <i class="bi bi-check-lg me-2"></i>Save Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Card 2: Change Password ──────────── -->
+    <div class="col-12 col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header fw-semibold py-3"
+                 style="background:var(--ec-navy);color:#fff;">
+                <i class="bi bi-shield-lock me-2"></i>Change Password
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="ChangePassword"
+                      asp-controller="Account"
+                      method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Current Password -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Current Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password"
+                                   name="CurrentPassword"
+                                   class="form-control"
+                                   id="currPwd"
+                                   placeholder="Enter current password" />
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    onclick="togglePwd('currPwd','eyeCurr')">
+                                <i class="bi bi-eye" id="eyeCurr"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- New Password -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">New Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                            <input type="password"
+                                   name="NewPassword"
+                                   class="form-control"
+                                   id="newPwd"
+                                   placeholder="Minimum 8 characters"
+                                   minlength="8" />
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    onclick="togglePwd('newPwd','eyeNew')">
+                                <i class="bi bi-eye" id="eyeNew"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Confirm New Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                            <input type="password"
+                                   name="ConfirmPassword"
+                                   class="form-control"
+                                   id="confPwd"
+                                   placeholder="Re-enter new password"
+                                   minlength="8" />
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    onclick="togglePwd('confPwd','eyeConf')">
+                                <i class="bi bi-eye" id="eyeConf"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                            class="btn ec-btn-primary px-4">
+                        <i class="bi bi-check-lg me-2"></i>Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script>
+        function togglePwd(fieldId, iconId) {
+            const f = document.getElementById(fieldId);
+            const i = document.getElementById(iconId);
+            if (f.type === 'password') {
+                f.type = 'text';
+                i.className = 'bi bi-eye-slash';
+            } else {
+                f.type = 'password';
+                i.className = 'bi bi-eye';
+            }
+        }
+
+        function previewAvatar(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    document.getElementById('avatarPreview').src = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}
