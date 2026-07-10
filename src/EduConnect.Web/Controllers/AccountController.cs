@@ -120,6 +120,8 @@ namespace EduConnect.Web.Controllers
                 user.RoleID.ToString());
             HttpContext.Session.SetString("RoleName",
                 user.Role.RoleName);
+            HttpContext.Session.SetString("ProfilePicture",
+                user.ProfilePicture ?? "");
 
             _logger.LogInformation(
                 "User {Email} logged in at {Time}",
@@ -313,6 +315,128 @@ namespace EduConnect.Web.Controllers
                 _ => RedirectToAction(
                     "Index", "Home")
             };
+        }
+
+        // ─── GET: /Account/Profile ────────────
+        [HttpGet]
+        public async Task<IActionResult> Profile()
+        {
+            var userIdStr = HttpContext.Session.GetString("UserID");
+            if (userIdStr == null)
+                return RedirectToAction("Login");
+
+            var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u =>
+                    u.UserID == int.Parse(userIdStr));
+
+            if (user == null)
+                return RedirectToAction("Login");
+
+            var model = new ProfileViewModel
+            {
+                FullName = $"{user.FirstName} {(string.IsNullOrEmpty(user.Suffix) ? "" : user.Suffix + " ")}{user.LastName}".Trim(),
+                StudentID = user.StudentID,
+                Email = user.Email,
+                RoleName = user.Role.RoleName,
+                ProfilePicturePath = user.ProfilePicture,
+                Suffix = user.Suffix
+            };
+
+            return View(model);
+        }
+
+        // ─── POST: /Account/Profile ───────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Profile(
+            ProfileViewModel model)
+        {
+            var userIdStr = HttpContext.Session.GetString("UserID");
+            if (userIdStr == null)
+                return RedirectToAction("Login");
+
+            var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u =>
+                    u.UserID == int.Parse(userIdStr));
+
+            if (user == null)
+                return RedirectToAction("Login");
+
+            // ─── Handle profile picture upload ────
+            if (model.NewProfilePicture != null &&
+                model.NewProfilePicture.Length > 0)
+            {
+                var allowedTypes = new[]
+                {
+                    ".jpg", ".jpeg",
+                    ".png", ".gif", ".webp"
+                };
+
+                var extension = Path.GetExtension(
+                    model.NewProfilePicture.FileName ?? string.Empty)
+                    .ToLowerInvariant();
+
+                if (!allowedTypes.Contains(extension))
+                {
+                    ModelState.AddModelError("NewProfilePicture",
+                        "Only image files are allowed (JPG, PNG, GIF, WebP).");
+                }
+                else if (model.NewProfilePicture.Length > 5 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("NewProfilePicture",
+                        "File size cannot exceed 5 MB.");
+                }
+                else
+                {
+                    var uploadsFolder = Path.Combine(
+                        _environment.WebRootPath, "uploads", "avatars");
+                    Directory.CreateDirectory(uploadsFolder);
+
+                    // Delete old avatar file if it exists
+                    if (!string.IsNullOrEmpty(user.ProfilePicture))
+                    {
+                        var oldPath = Path.Combine(
+                            _environment.WebRootPath,
+                            user.ProfilePicture.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                        if (System.IO.File.Exists(oldPath))
+                            System.IO.File.Delete(oldPath);
+                    }
+
+                    var fileName = Guid.NewGuid().ToString() + extension;
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await model.NewProfilePicture.CopyToAsync(stream);
+
+                    user.ProfilePicture = "/uploads/avatars/" + fileName;
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                // Re-populate read-only display fields before returning
+                model.FullName = $"{user.FirstName} {(string.IsNullOrEmpty(user.Suffix) ? "" : user.Suffix + " ")}{user.LastName}".Trim();
+                model.StudentID = user.StudentID;
+                model.Email = user.Email;
+                model.RoleName = user.Role.RoleName;
+                model.ProfilePicturePath = user.ProfilePicture;
+                return View(model);
+            }
+
+            // Update editable fields only
+            user.Suffix = string.IsNullOrWhiteSpace(model.Suffix) ? null : model.Suffix;
+            user.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            // Refresh session
+            HttpContext.Session.SetString("ProfilePicture",
+                user.ProfilePicture ?? "");
+
+            TempData["Success"] = "Profile updated successfully.";
+            return RedirectToAction("Profile");
         }
 
         // ─── GET: /Account/ForgotPassword ─────
