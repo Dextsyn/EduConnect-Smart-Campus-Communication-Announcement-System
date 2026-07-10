@@ -36,6 +36,9 @@ namespace EduConnect.Web.Models
 
         [MaxLength(500)]
         public string? ProfilePicture { get; set; }
+
+        [MaxLength(10)]
+        public string? Suffix { get; set; }
         public int? VerifiedByID { get; set; }
         public DateTime? VerifiedAt { get; set; }
         public string? VerificationRejectionReason { get; set; }
