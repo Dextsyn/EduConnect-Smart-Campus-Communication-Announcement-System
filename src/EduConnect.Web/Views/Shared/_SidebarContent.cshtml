@@ -1,9 +1,16 @@
 <!-- User Info -->
 <div class="ec-user-card mb-4">
-    <img src="https://ui-avatars.com/api/?name=@(Context.Session.GetString("UserName") ?? "Guest")&background=002F6C&color=fff"
+    @{
+        var _sidePic = Context.Session.GetString("ProfilePicture");
+        var _sideAvatar = string.IsNullOrEmpty(_sidePic)
+            ? $"https://ui-avatars.com/api/?name={Uri.EscapeDataString(Context.Session.GetString("UserName") ?? "Guest")}&background=002F6C&color=fff"
+            : _sidePic;
+    }
+    <img src="@_sideAvatar"
          class="rounded-circle ec-avatar-ring"
          width="45" height="45"
-         alt="Avatar" />
+         alt="Avatar"
+         style="object-fit:cover;" />
     <div>
         @if (Context.Session.GetString("UserID") != null)
         {

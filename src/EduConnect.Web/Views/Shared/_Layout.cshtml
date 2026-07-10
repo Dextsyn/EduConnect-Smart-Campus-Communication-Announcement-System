@@ -83,10 +83,17 @@
                     <a class="nav-link dropdown-toggle d-flex align-items-center gap-2"
                        href="#"
                        data-bs-toggle="dropdown">
-                        <img src="https://ui-avatars.com/api/?name=@Context.Session.GetString("UserName")&background=002F6C&color=fff"
+                        @{
+                            var _navPic = Context.Session.GetString("ProfilePicture");
+                            var _navAvatar = string.IsNullOrEmpty(_navPic)
+                                ? $"https://ui-avatars.com/api/?name={Uri.EscapeDataString(Context.Session.GetString("UserName") ?? "")}&background=002F6C&color=fff"
+                                : _navPic;
+                        }
+                        <img src="@_navAvatar"
                              class="rounded-circle ec-avatar-ring"
                              width="32" height="32"
-                             alt="Avatar" />
+                             alt="Avatar"
+                             style="object-fit:cover;" />
                         <span class="d-none d-sm-inline text-dark">@Context.Session.GetString("UserName")</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow">
