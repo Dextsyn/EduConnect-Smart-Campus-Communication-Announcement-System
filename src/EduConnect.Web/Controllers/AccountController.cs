@@ -414,6 +414,13 @@ namespace EduConnect.Web.Controllers
                 }
             }
 
+            // ─── Suffix allow-list validation ─────
+            var allowedSuffixes = new[] { "", "Jr.", "Sr.", "II", "III", "IV", "V" };
+            if (model.Suffix != null && !allowedSuffixes.Contains(model.Suffix))
+            {
+                ModelState.AddModelError("Suffix", "Invalid suffix value.");
+            }
+
             if (!ModelState.IsValid)
             {
                 // Re-populate read-only display fields before returning
@@ -434,6 +441,8 @@ namespace EduConnect.Web.Controllers
             // Refresh session
             HttpContext.Session.SetString("ProfilePicture",
                 user.ProfilePicture ?? "");
+            HttpContext.Session.SetString("UserName",
+                $"{user.FirstName} {(string.IsNullOrEmpty(user.Suffix) ? "" : user.Suffix + " ")}{user.LastName}".Trim());
 
             TempData["Success"] = "Profile updated successfully.";
             return RedirectToAction("Profile");
