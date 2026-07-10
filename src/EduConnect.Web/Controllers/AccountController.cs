@@ -439,6 +439,56 @@ namespace EduConnect.Web.Controllers
             return RedirectToAction("Profile");
         }
 
+        // ─── POST: /Account/ChangePassword ────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(
+            ChangePasswordViewModel model)
+        {
+            var userIdStr = HttpContext.Session.GetString("UserID");
+            if (userIdStr == null)
+                return RedirectToAction("Login");
+
+            if (!ModelState.IsValid)
+            {
+                TempData["ChangePasswordError"] =
+                    "Please fix the errors below.";
+                return RedirectToAction("Profile");
+            }
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.UserID == int.Parse(userIdStr));
+
+            if (user == null)
+                return RedirectToAction("Login");
+
+            // Verify current password
+            bool currentValid = BCrypt.Net.BCrypt
+                .Verify(model.CurrentPassword, user.PasswordHash);
+
+            if (!currentValid)
+            {
+                TempData["ChangePasswordError"] =
+                    "Current password is incorrect.";
+                return RedirectToAction("Profile");
+            }
+
+            // Set new password
+            user.PasswordHash = BCrypt.Net.BCrypt
+                .HashPassword(model.NewPassword);
+            user.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "User {UserID} changed their password.",
+                user.UserID);
+
+            TempData["Success"] = "Password changed successfully.";
+            return RedirectToAction("Profile");
+        }
+
         // ─── GET: /Account/ForgotPassword ─────
         [HttpGet]
         public IActionResult ForgotPassword()
