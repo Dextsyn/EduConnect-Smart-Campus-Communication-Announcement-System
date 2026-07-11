@@ -137,39 +137,59 @@
 
 </div>
 
-<!-- ─── CHARTS ROW ────────────────────── -->
+<!-- ─── UPCOMING EVENTS ───────────────── -->
 <div class="row g-3 mb-4">
-
-    <!-- Line Chart — Monthly -->
-    <div class="col-12 col-lg-8">
+    <div class="col-12">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0 pt-3">
+            <div class="card-header bg-white border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
                 <h6 class="fw-bold mb-0">
-                    <i class="bi bi-graph-up me-2 text-primary"></i>
-                    Announcements — Last 6 Months
+                    <i class="bi bi-calendar-event me-2 text-primary"></i>
+                    Upcoming Events
                 </h6>
+                <a href="/Event" class="btn btn-sm btn-outline-primary">See all</a>
             </div>
-            <div class="card-body">
-                <canvas id="monthlyChart" height="100"></canvas>
+            <div class="card-body p-0">
+                @if (Model.UpcomingEventsList.Count == 0)
+                {
+                    <div class="ec-empty">
+                        <i class="bi bi-calendar-x"></i>
+                        No upcoming events right now
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var ev in Model.UpcomingEventsList)
+                        {
+                            <li class="list-group-item d-flex align-items-center gap-3 py-3">
+                                <div class="text-center flex-shrink-0" style="min-width:48px;">
+                                    <div class="fw-bold text-primary lh-1 fs-5">@ev.StartDateTime.ToString("dd")</div>
+                                    <div class="text-muted small text-uppercase">@ev.StartDateTime.ToString("MMM")</div>
+                                </div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="fw-semibold text-truncate">@ev.EventTitle</div>
+                                    <small class="text-muted">
+                                        @if (ev.IsOnline)
+                                        {
+                                            <i class="bi bi-camera-video me-1"></i>@:Online
+                                        }
+                                        else if (!string.IsNullOrEmpty(ev.Location))
+                                        {
+                                            <i class="bi bi-geo-alt me-1"></i>@ev.Location
+                                        }
+                                    </small>
+                                </div>
+                                <a href="/Event/Details/@ev.EventID"
+                                   class="btn btn-sm btn-outline-primary flex-shrink-0">
+                                    View
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                }
             </div>
         </div>
     </div>
-
-    <!-- Pie Chart — By Category -->
-    <div class="col-12 col-lg-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0 pt-3">
-                <h6 class="fw-bold mb-0">
-                    <i class="bi bi-pie-chart me-2 text-primary"></i>
-                    By Category
-                </h6>
-            </div>
-            <div class="card-body">
-                <canvas id="categoryChart" height="200"></canvas>
-            </div>
-        </div>
-    </div>
-
 </div>
 
 @{
@@ -439,82 +459,3 @@ else
     </div>
 }
 
-@section Scripts {
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        // ─── Monthly Line Chart ───────────────
-        const monthlyCtx = document
-            .getElementById('monthlyChart')
-            .getContext('2d');
-
-        new Chart(monthlyCtx, {
-            type: 'line',
-            data: {
-                labels: @Html.Raw(
-                                    System.Text.Json.JsonSerializer
-                                            .Serialize(Model.MonthLabels)),
-            datasets: [{
-                label: 'Announcements',
-                data: @Html.Raw(
-                                        System.Text.Json.JsonSerializer
-                                                .Serialize(Model.MonthlyCount)),
-                borderColor: '#002F6C',
-                backgroundColor: 'rgba(13,110,253,0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#002F6C',
-                pointRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { stepSize: 1 }
-                }
-            }
-        }
-    });
-
-        // ─── Category Pie Chart ───────────────
-        const categoryCtx = document
-            .getElementById('categoryChart')
-            .getContext('2d');
-
-        new Chart(categoryCtx, {
-            type: 'doughnut',
-            data: {
-                labels: @Html.Raw(
-                                System.Text.Json.JsonSerializer
-                                        .Serialize(Model.CategoryLabels)),
-            datasets: [{
-                data: @Html.Raw(
-                                        System.Text.Json.JsonSerializer
-                                                .Serialize(Model.CategoryCount)),
-                backgroundColor: [
-                    '#002F6C', '#198754', '#dc3545',
-                    '#ffc107', '#0dcaf0', '#6f42c1',
-                    '#fd7e14'
-                ],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { font: { size: 11 } }
-                }
-            }
-        }
-    });
-</script>
-}

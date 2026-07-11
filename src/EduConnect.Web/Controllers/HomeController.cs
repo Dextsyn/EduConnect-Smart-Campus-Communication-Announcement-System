@@ -105,43 +105,6 @@ namespace EduConnect.Web.Controllers
                     .SumAsync(a => a.ViewCount);
             }
 
-            // ─── Graph Data ────────────────────
-            // Last 6 months labels
-            var months = Enumerable.Range(0, 6)
-                .Select(i => DateTime.Now.AddMonths(-i))
-                .Reverse()
-                .ToList();
-
-            model.MonthLabels = months
-                .Select(m => m.ToString("MMM yyyy"))
-                .ToList();
-
-            model.MonthlyCount = months
-                .Select(m => _context.Announcements
-                    .Count(a =>
-                        a.Status == "Published" &&
-                        a.PublishedAt.HasValue &&
-                        a.PublishedAt.Value.Month == m.Month &&
-                        a.PublishedAt.Value.Year == m.Year))
-                .ToList();
-
-            // Announcements by category
-            var categoryData = await _context
-                .Announcements
-                .Where(a => a.Status == "Published")
-                .GroupBy(a => a.Category.CategoryName)
-                .Select(g => new
-                {
-                    Category = g.Key,
-                    Count = g.Count()
-                })
-                .ToListAsync();
-
-            model.CategoryLabels = categoryData
-                .Select(c => c.Category).ToList();
-            model.CategoryCount = categoryData
-                .Select(c => c.Count).ToList();
-
             // ─── Table Data ────────────────────
             var query = _context.Announcements
                 .Include(a => a.Category)
@@ -169,6 +132,22 @@ namespace EduConnect.Web.Controllers
 
             if (roleName == "Student")
             {
+                model.UpcomingEventsList = await _context.Events
+                    .Where(e => e.StartDateTime >= DateTime.Now
+                             && e.Status != "Cancelled")
+                    .OrderBy(e => e.StartDateTime)
+                    .Take(3)
+                    .Select(e => new UpcomingEventItem
+                    {
+                        EventID = e.EventID,
+                        EventTitle = e.EventTitle,
+                        StartDateTime = e.StartDateTime,
+                        Location = e.Location ?? "",
+                        IsOnline = e.IsOnline,
+                        MeetingURL = e.MeetingURL
+                    })
+                    .ToListAsync();
+
                 // Personalized feed: 3 sections ranked by behavior
                 var userTagIDs = await _context
                     .UserDepartments

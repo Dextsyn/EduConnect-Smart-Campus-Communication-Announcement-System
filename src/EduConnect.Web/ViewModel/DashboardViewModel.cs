@@ -12,18 +12,9 @@
         public int MyAnnouncements { get; set; }
         public int TotalViews { get; set; }
 
-        // ─── Graph Data ─────────────────────────
-        // Announcements per month (last 6 months)
-        public List<string> MonthLabels { get; set; }
-            = new List<string>();
-        public List<int> MonthlyCount { get; set; }
-            = new List<int>();
-
-        // Announcements by category
-        public List<string> CategoryLabels { get; set; }
-            = new List<string>();
-        public List<int> CategoryCount { get; set; }
-            = new List<int>();
+        // ─── Upcoming Events (Student dashboard) ─
+        public List<UpcomingEventItem> UpcomingEventsList { get; set; }
+            = new List<UpcomingEventItem>();
 
         // ─── Table Data ─────────────────────────
         public List<AnnouncementTableViewModel>
@@ -51,6 +42,16 @@
         public string? SearchQuery { get; set; }
         public string? FilterCategory { get; set; }
         public string? FilterFeedType { get; set; }
+    }
+
+    public class UpcomingEventItem
+    {
+        public int EventID { get; set; }
+        public string EventTitle { get; set; } = "";
+        public DateTime StartDateTime { get; set; }
+        public string Location { get; set; } = "";
+        public bool IsOnline { get; set; }
+        public string? MeetingURL { get; set; }
     }
 
     public class AnnouncementTableViewModel
