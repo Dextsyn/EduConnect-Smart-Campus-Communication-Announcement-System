@@ -130,24 +130,24 @@ namespace EduConnect.Web.Controllers
                 query = query.Where(a =>
                     a.FeedType == filterFeedType);
 
+            model.UpcomingEventsList = await _context.Events
+                .Where(e => e.StartDateTime >= DateTime.Now
+                         && e.Status != "Cancelled")
+                .OrderBy(e => e.StartDateTime)
+                .Take(3)
+                .Select(e => new UpcomingEventItem
+                {
+                    EventID = e.EventID,
+                    EventTitle = e.EventTitle,
+                    StartDateTime = e.StartDateTime,
+                    Location = e.Location ?? "",
+                    IsOnline = e.IsOnline,
+                    MeetingURL = e.MeetingURL
+                })
+                .ToListAsync();
+
             if (roleName == "Student")
             {
-                model.UpcomingEventsList = await _context.Events
-                    .Where(e => e.StartDateTime >= DateTime.Now
-                             && e.Status != "Cancelled")
-                    .OrderBy(e => e.StartDateTime)
-                    .Take(3)
-                    .Select(e => new UpcomingEventItem
-                    {
-                        EventID = e.EventID,
-                        EventTitle = e.EventTitle,
-                        StartDateTime = e.StartDateTime,
-                        Location = e.Location ?? "",
-                        IsOnline = e.IsOnline,
-                        MeetingURL = e.MeetingURL
-                    })
-                    .ToListAsync();
-
                 // Personalized feed: 3 sections ranked by behavior
                 var userTagIDs = await _context
                     .UserDepartments
