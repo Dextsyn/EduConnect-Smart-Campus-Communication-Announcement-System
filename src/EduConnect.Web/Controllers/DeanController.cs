@@ -19,9 +19,8 @@ namespace EduConnect.Web.Controllers
 
         // ─── Helpers ───────────────────────────
         private bool IsDean() =>
-            HttpContext.Session
-                .GetString("RoleName")
-                    == "Dean";
+            HttpContext.Session.GetString("RoleName")
+                is "Dean" or "Chair Person";
 
         private int GetUserID() =>
             int.Parse(HttpContext.Session
