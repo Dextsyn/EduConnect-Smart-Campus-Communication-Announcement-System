@@ -1,5 +1,6 @@
 using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EduConnect.Web.Controllers
 {
@@ -54,6 +55,7 @@ namespace EduConnect.Web.Controllers
         }
 
         [HttpPost]
+        [EnableRateLimiting("chatbot")]
         public async Task<IActionResult> Send([FromBody] ChatSendRequest request)
         {
             if (!IsLoggedIn())

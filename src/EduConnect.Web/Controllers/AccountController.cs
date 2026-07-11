@@ -3,6 +3,7 @@ using EduConnect.Web.Models;
 using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -47,6 +48,7 @@ namespace EduConnect.Web.Controllers
         // ─── POST: /Account/Login ──────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Login(
             LoginViewModel model)
         {
@@ -150,6 +152,7 @@ namespace EduConnect.Web.Controllers
         // ─── POST: /Account/Register ───────────
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Register(
             RegisterViewModel model)
         {
@@ -508,6 +511,7 @@ namespace EduConnect.Web.Controllers
         // ─── POST: /Account/ForgotPassword ────
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> ForgotPassword(
             ForgotPasswordViewModel model)
         {

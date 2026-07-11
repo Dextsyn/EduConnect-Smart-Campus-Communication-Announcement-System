@@ -147,10 +147,8 @@
                     </div>
                 }
 
-                <!-- Body -->
-                <div class="announcement-body lh-lg">
-                    @Html.Raw(Model.Body)
-                </div>
+                <!-- Body (HTML-encoded to prevent stored XSS; pre-line keeps paragraphs) -->
+                <div class="announcement-body lh-lg" style="white-space: pre-line;">@Model.Body</div>
 
             </div>
         </div>

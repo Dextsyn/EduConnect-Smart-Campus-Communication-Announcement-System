@@ -315,7 +315,7 @@
             if (data.response) {
                 appendMessage('bot', data.response, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
             } else {
-                appendMessage('bot', 'Sorry, I could not process that request. Please try again.', '');
+                appendMessage('bot', data.error || 'Sorry, I could not process that request. Please try again.', '');
             }
         } catch {
             setLoading(false);
