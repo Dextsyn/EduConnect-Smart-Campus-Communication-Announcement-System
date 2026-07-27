@@ -19,6 +19,7 @@ namespace EduConnect.Web.Controllers
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
         private readonly IHubContext<EventHub> _eventHub;
+        private readonly IBlobStorageService _blobStorageService;
 
         public EventController(
             ApplicationDbContext context,
@@ -26,7 +27,8 @@ namespace EduConnect.Web.Controllers
             IWebHostEnvironment environment,
             IEmailService emailService,
             INotificationService notificationService,
-            IHubContext<EventHub> eventHub)
+            IHubContext<EventHub> eventHub,
+            IBlobStorageService blobStorageService)
         {
             _context = context;
             _logger = logger;
@@ -34,6 +36,7 @@ namespace EduConnect.Web.Controllers
             _emailService = emailService;
             _notificationService = notificationService;
             _eventHub = eventHub;
+            _blobStorageService = blobStorageService;
         }
 
         // ─── Helpers ───────────────────────────
@@ -72,7 +75,7 @@ namespace EduConnect.Web.Controllers
             $"{Request.Scheme}://{Request.Host}";
 
         // ─── Generate QR Code ──────────────────
-        private string GenerateQRCode(
+        private async Task<string> GenerateQRCode(
             int registrationID,
             int eventID,
             int userID)
@@ -89,15 +92,16 @@ namespace EduConnect.Web.Controllers
 
             var qrBytes = qrCode.GetGraphic(10);
 
-            var qrFolder = Path.Combine(
-                _environment.WebRootPath,
-                "uploads", "qrcodes");
-            Directory.CreateDirectory(qrFolder);
-
             var fileName = $"qr_reg{registrationID}.png";
-            System.IO.File.WriteAllBytes(Path.Combine(qrFolder, fileName), qrBytes);
 
-            return $"/uploads/qrcodes/{fileName}";
+            // Upload to the 'qrcodes' blob container and return
+            // the blob's public URL (replaces the old local
+            // wwwroot/uploads/qrcodes write).
+            return await _blobStorageService.UploadAsync(
+                qrBytes,
+                fileName,
+                "qrcodes",
+                "image/png");
         }
 
         private void DeleteEventPhoto(string? url)
@@ -1043,7 +1047,7 @@ namespace EduConnect.Web.Controllers
                 await _context.SaveChangesAsync();
 
                 // Generate QR Code
-                var qrCodePath = GenerateQRCode(
+                var qrCodePath = await GenerateQRCode(
                     registration.RegistrationID,
                     eventID, userID);
 

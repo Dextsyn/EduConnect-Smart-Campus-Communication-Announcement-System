@@ -12,6 +12,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddTransient<EduConnect.Web.Services.IEmailService, EduConnect.Web.Services.EmailService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IFeedRankingService, EduConnect.Web.Services.FeedRankingService>();
 builder.Services.AddScoped<EduConnect.Web.Services.INotificationService, EduConnect.Web.Services.NotificationService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IBlobStorageService, EduConnect.Web.Services.BlobStorageService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
@@ -26,7 +27,7 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SameSite = SameSiteMode.Lax; 
 });
 
 builder.Services.AddRateLimiter(options =>
