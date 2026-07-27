@@ -59,11 +59,13 @@ Named roles: `Administrator`, `Dean`, `Chair Person`, `Faculty`, `Staff`, `Stude
 
 **DepartmentTags** are used to target announcements and filter feeds. Users are assigned to departments via the `UserDepartments` junction table (`IsPrimary` flag marks the main department). Announcements tagged with `ShortName = "ALL"` are shown to everyone.
 
-**Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and stored as PNG files under `wwwroot/uploads/qrcodes/`.
+**Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and uploaded to the Azure Blob Storage container `qrcodes` (see `IBlobStorageService`); `EventRegistration.QRCode` stores the resulting public blob URL, which views render directly in `<img src>`.
 
 ### Services
 
 `IEmailService` / `EmailService` — sends HTML email via Gmail SMTP (MailKit). Credentials are in `appsettings.json` under `EmailSettings`. In Development, SSL cert validation is skipped. Email is fire-and-forget (failures are logged but don't break the request).
+
+`IBlobStorageService` / `BlobStorageService` — uploads a byte array to an Azure Blob Storage container and returns the blob's public URL. Reads the connection string from the `AzureBlobStorage` configuration key; **never hardcode it** — it lives in user-secrets locally and as an App Service application setting in production. Currently used for event QR codes (container `qrcodes`, which has Blob-level public read access). Throws `InvalidOperationException` if the key is missing.
 
 ### Database
 
@@ -74,7 +76,7 @@ Server=localhost\SQLEXPRESS;Database=EduConnectDB;Trusted_Connection=True;TrustS
 
 All EF model configuration is in `ApplicationDbContext.OnModelCreating`. Composite unique indexes are defined there (e.g., `{EventID, UserID}` on EventRegistration).
 
-File uploads (event covers, QR codes) go into `wwwroot/uploads/<subfolder>/`. Max upload size is 10 MB (configured in `Program.cs` via `FormOptions` and Kestrel limits).
+Event cover photos and announcement images go into `wwwroot/uploads/<subfolder>/`. QR codes are the exception — they go to Azure Blob Storage (App Service's local disk is not persistent across restarts/redeploys). Max upload size is 10 MB (configured in `Program.cs` via `FormOptions` and Kestrel limits).
 
 ### View Layer
 
