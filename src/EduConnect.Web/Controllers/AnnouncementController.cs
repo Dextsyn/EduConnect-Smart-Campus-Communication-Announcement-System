@@ -14,19 +14,24 @@ namespace EduConnect.Web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
+        private readonly IBlobStorageService _blobStorageService;
+
+        private const string PhotoContainer = "announcements";
 
         public AnnouncementController(
             ApplicationDbContext context,
             ILogger<AnnouncementController> logger,
             IWebHostEnvironment environment,
             INotificationService notificationService,
-            IEmailService emailService)
+            IEmailService emailService,
+            IBlobStorageService blobStorageService)
         {
             _context = context;
             _logger = logger;
             _environment = environment;
             _notificationService = notificationService;
             _emailService = emailService;
+            _blobStorageService = blobStorageService;
         }
 
         // ─── CHECK LOGIN HELPER ────────────────
@@ -494,24 +499,17 @@ namespace EduConnect.Web.Controllers
 
                 try
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath,
-                        "uploads", "announcements");
+                    byte[] photoBytes;
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        await model.Photo.CopyToAsync(memoryStream);
+                        photoBytes = memoryStream.ToArray();
+                    }
 
-                    Directory.CreateDirectory(uploadsFolder);
+                    var fileName = Guid.NewGuid().ToString() + extension;
 
-                    var fileName = Guid.NewGuid().ToString()
-                        + extension;
-
-                    var filePath = Path.Combine(
-                        uploadsFolder, fileName);
-
-                    using var stream = new FileStream(
-                        filePath, FileMode.Create);
-                    await model.Photo.CopyToAsync(stream);
-
-                    photoURL = "/uploads/announcements/"
-                             + fileName;
+                    photoURL = await _blobStorageService.UploadAsync(
+                        photoBytes, fileName, PhotoContainer, model.Photo.ContentType);
                 }
                 catch (Exception ex)
                 {
@@ -854,7 +852,7 @@ namespace EduConnect.Web.Controllers
             // ─── Photo handling ────────────────
             if (model.RemovePhoto)
             {
-                DeletePhotoFile(announcement.AttachmentURL);
+                await DeletePhotoBlobAsync(announcement.AttachmentURL);
                 announcement.AttachmentURL = null;
             }
             else if (model.Photo != null &&
@@ -914,18 +912,17 @@ namespace EduConnect.Web.Controllers
                 string? newPhotoURL = null;
                 try
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath,
-                        "uploads", "announcements");
-                    Directory.CreateDirectory(uploadsFolder);
+                    byte[] photoBytes;
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        await model.Photo.CopyToAsync(memoryStream);
+                        photoBytes = memoryStream.ToArray();
+                    }
 
                     var fileName = Guid.NewGuid().ToString() + ext;
-                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                    using var stream = new FileStream(filePath, FileMode.Create);
-                    await model.Photo.CopyToAsync(stream);
-
-                    newPhotoURL = "/uploads/announcements/" + fileName;
+                    newPhotoURL = await _blobStorageService.UploadAsync(
+                        photoBytes, fileName, PhotoContainer, model.Photo.ContentType);
                 }
                 catch (Exception ex)
                 {
@@ -934,7 +931,7 @@ namespace EduConnect.Web.Controllers
 
                 if (newPhotoURL != null)
                 {
-                    DeletePhotoFile(announcement.AttachmentURL);
+                    await DeletePhotoBlobAsync(announcement.AttachmentURL);
                     announcement.AttachmentURL = newPhotoURL;
                 }
             }
@@ -1009,21 +1006,19 @@ namespace EduConnect.Web.Controllers
             return RedirectToAction("Index");
         }
 
-        private void DeletePhotoFile(string? url)
+        private async Task DeletePhotoBlobAsync(string? url)
         {
             if (string.IsNullOrEmpty(url)) return;
+            if (!url.Contains($"/{PhotoContainer}/", StringComparison.OrdinalIgnoreCase)) return;
+
             try
             {
-                var path = Path.Combine(
-                    _environment.WebRootPath,
-                    url.TrimStart('/').Replace(
-                        '/', Path.DirectorySeparatorChar));
-                if (System.IO.File.Exists(path))
-                    System.IO.File.Delete(path);
+                var blobName = url.Substring(url.LastIndexOf('/') + 1);
+                await _blobStorageService.DeleteAsync(blobName, PhotoContainer);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to delete photo file: {Error}", ex.Message);
+                _logger.LogError("Failed to delete photo blob: {Error}", ex.Message);
             }
         }
 

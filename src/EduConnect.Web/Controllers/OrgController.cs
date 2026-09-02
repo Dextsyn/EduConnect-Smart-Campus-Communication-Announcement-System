@@ -1,5 +1,6 @@
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
+using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -12,15 +13,18 @@ namespace EduConnect.Web.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<OrgController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly IBlobStorageService _blobStorageService;
 
         public OrgController(
             ApplicationDbContext context,
             ILogger<OrgController> logger,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IBlobStorageService blobStorageService)
         {
             _context = context;
             _logger = logger;
             _environment = environment;
+            _blobStorageService = blobStorageService;
         }
 
         // ─── Helpers ───────────────────────────
@@ -127,6 +131,7 @@ namespace EduConnect.Web.Controllers
         }
 
         // ─── GET: /Org/Post/{orgId} ────────────
+        [HttpGet("Org/Post/{orgId:int}")]
         public async Task<IActionResult> Post(int orgId)
         {
             if (!IsLoggedIn())
@@ -148,7 +153,7 @@ namespace EduConnect.Web.Controllers
         }
 
         // ─── POST: /Org/Post/{orgId} ───────────
-        [HttpPost]
+        [HttpPost("Org/Post/{orgId:int}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Post(int orgId, OrgPostViewModel vm)
         {
@@ -182,14 +187,15 @@ namespace EduConnect.Web.Controllers
                     return View(vm);
                 }
 
-                var uploadsDir = Path.Combine(
-                    _environment.WebRootPath, "uploads", "org-attachments");
-                Directory.CreateDirectory(uploadsDir);
+                byte[] attachmentBytes;
+                using (var memoryStream = new MemoryStream())
+                {
+                    await vm.Attachment.CopyToAsync(memoryStream);
+                    attachmentBytes = memoryStream.ToArray();
+                }
                 var fileName = $"{Guid.NewGuid()}{ext}";
-                using var stream = new FileStream(
-                    Path.Combine(uploadsDir, fileName), FileMode.Create);
-                await vm.Attachment.CopyToAsync(stream);
-                attachmentUrl = $"/uploads/org-attachments/{fileName}";
+                attachmentUrl = await _blobStorageService.UploadAsync(
+                    attachmentBytes, fileName, "org-attachments", vm.Attachment.ContentType);
             }
 
             _context.OrgAnnouncements.Add(new OrgAnnouncement
@@ -243,6 +249,14 @@ namespace EduConnect.Web.Controllers
 
             if (!ModelState.IsValid)
             {
+                await PopulateOrgFormDropdowns(vm);
+                return View(vm);
+            }
+
+            var logoError = ValidateLogo(vm.Logo);
+            if (logoError != null)
+            {
+                ModelState.AddModelError("Logo", logoError);
                 await PopulateOrgFormDropdowns(vm);
                 return View(vm);
             }
@@ -319,13 +333,27 @@ namespace EduConnect.Web.Controllers
                 return View(vm);
             }
 
+            var logoError = ValidateLogo(vm.Logo);
+            if (logoError != null)
+            {
+                ModelState.AddModelError("Logo", logoError);
+                await PopulateOrgFormDropdowns(vm);
+                vm.ExistingLogoURL = org.LogoURL;
+                ViewBag.OrgID = id;
+                return View(vm);
+            }
+
             org.OrgName = vm.OrgName;
             org.Description = vm.Description;
             org.DepartmentTagID = vm.DepartmentTagID;
             org.UpdatedAt = DateTime.Now;
 
             if (vm.Logo != null && vm.Logo.Length > 0)
+            {
+                var oldLogoURL = org.LogoURL;
                 org.LogoURL = await SaveLogoFile(vm.Logo);
+                await DeleteLogoBlobAsync(oldLogoURL);
+            }
 
             var currentAdviser = org.Members
                 .FirstOrDefault(m => m.OrgRole == "Adviser" && m.IsActive);
@@ -410,18 +438,61 @@ namespace EduConnect.Web.Controllers
                 .ToList();
         }
 
+        private static readonly string[] AllowedLogoExtensions =
+            { ".jpg", ".jpeg", ".png", ".webp" };
+        private static readonly string[] AllowedLogoContentTypes =
+            { "image/jpeg", "image/png", "image/webp" };
+
+        private static string? ValidateLogo(IFormFile? file)
+        {
+            if (file == null || file.Length == 0) return null;
+
+            var extension = Path.GetExtension(file.FileName ?? string.Empty)
+                .ToLowerInvariant();
+
+            if (!AllowedLogoExtensions.Contains(extension) ||
+                !AllowedLogoContentTypes.Contains(file.ContentType?.ToLowerInvariant()))
+                return "Please upload a valid image file (JPG, PNG, or WEBP) under 5MB.";
+
+            if (file.Length > 5 * 1024 * 1024)
+                return "Please upload a valid image file (JPG, PNG, or WEBP) under 5MB.";
+
+            return null;
+        }
+
         private async Task<string?> SaveLogoFile(IFormFile? file)
         {
             if (file == null || file.Length == 0) return null;
 
-            var uploadsDir = Path.Combine(
-                _environment.WebRootPath, "uploads", "org-logos");
-            Directory.CreateDirectory(uploadsDir);
-            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-            using var stream = new FileStream(
-                Path.Combine(uploadsDir, fileName), FileMode.Create);
-            await file.CopyToAsync(stream);
-            return $"/uploads/org-logos/{fileName}";
+            byte[] fileBytes;
+            using (var memoryStream = new MemoryStream())
+            {
+                await file.CopyToAsync(memoryStream);
+                fileBytes = memoryStream.ToArray();
+            }
+
+            var extension = Path.GetExtension(file.FileName ?? string.Empty)
+                .ToLowerInvariant();
+            var fileName = $"{Guid.NewGuid()}{extension}";
+
+            return await _blobStorageService.UploadAsync(
+                fileBytes, fileName, "org-logos", file.ContentType);
+        }
+
+        private async Task DeleteLogoBlobAsync(string? url)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+            if (!url.Contains("/org-logos/", StringComparison.OrdinalIgnoreCase)) return;
+
+            try
+            {
+                var blobName = url.Substring(url.LastIndexOf('/') + 1);
+                await _blobStorageService.DeleteAsync(blobName, "org-logos");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to delete org logo blob: {Error}", ex.Message);
+            }
         }
     }
 }

@@ -14,19 +14,22 @@ namespace EduConnect.Web.Controllers
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
         private readonly ILogger<SafetyReportController> _logger;
+        private readonly IBlobStorageService _blobStorageService;
 
         public SafetyReportController(
             ApplicationDbContext context,
             IWebHostEnvironment environment,
             INotificationService notificationService,
             IEmailService emailService,
-            ILogger<SafetyReportController> logger)
+            ILogger<SafetyReportController> logger,
+            IBlobStorageService blobStorageService)
         {
             _context = context;
             _environment = environment;
             _notificationService = notificationService;
             _emailService = emailService;
             _logger = logger;
+            _blobStorageService = blobStorageService;
         }
 
         private bool IsLoggedIn() =>
@@ -80,18 +83,17 @@ namespace EduConnect.Web.Controllers
                     return View(model);
                 }
 
-                var uploadFolder = Path.Combine(
-                    _environment.WebRootPath,
-                    "uploads", "safety-reports");
-                Directory.CreateDirectory(uploadFolder);
+                byte[] photoBytes;
+                using (var memoryStream = new MemoryStream())
+                {
+                    await model.Photo.CopyToAsync(memoryStream);
+                    photoBytes = memoryStream.ToArray();
+                }
 
                 var fileName = Guid.NewGuid().ToString() + extension;
-                var filePath = Path.Combine(uploadFolder, fileName);
 
-                using var stream = new FileStream(filePath, FileMode.Create);
-                await model.Photo.CopyToAsync(stream);
-
-                photoURL = "/uploads/safety-reports/" + fileName;
+                photoURL = await _blobStorageService.UploadAsync(
+                    photoBytes, fileName, "safety-reports", model.Photo.ContentType);
             }
 
             var report = new IncidentReport

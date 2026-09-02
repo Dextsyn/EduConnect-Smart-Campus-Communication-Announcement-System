@@ -104,22 +104,19 @@ namespace EduConnect.Web.Controllers
                 "image/png");
         }
 
-        private void DeleteEventPhoto(string? url)
+        private async Task DeleteEventPhoto(string? url)
         {
             if (string.IsNullOrEmpty(url)) return;
+            if (!url.Contains("/events/", StringComparison.OrdinalIgnoreCase)) return;
+
             try
             {
-                var path = Path.Combine(
-                    _environment.WebRootPath,
-                    url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                if (!path.StartsWith(_environment.WebRootPath,
-                        StringComparison.OrdinalIgnoreCase)) return;
-                if (System.IO.File.Exists(path))
-                    System.IO.File.Delete(path);
+                var blobName = url.Substring(url.LastIndexOf('/') + 1);
+                await _blobStorageService.DeleteAsync(blobName, "events");
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to delete event photo: {Error}", ex.Message);
+                _logger.LogError("Failed to delete event photo blob: {Error}", ex.Message);
             }
         }
 
@@ -540,19 +537,17 @@ namespace EduConnect.Web.Controllers
 
                 try
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath,
-                        "uploads", "events");
-
-                    Directory.CreateDirectory(uploadsFolder);
+                    byte[] photoBytes;
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        await model.CoverPhoto.CopyToAsync(memoryStream);
+                        photoBytes = memoryStream.ToArray();
+                    }
 
                     var fileName = Guid.NewGuid().ToString() + extension;
-                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                    using var stream = new FileStream(filePath, FileMode.Create);
-                    await model.CoverPhoto.CopyToAsync(stream);
-
-                    coverPhotoURL = "/uploads/events/" + fileName;
+                    coverPhotoURL = await _blobStorageService.UploadAsync(
+                        photoBytes, fileName, "events", model.CoverPhoto.ContentType);
                 }
                 catch (Exception ex)
                 {
@@ -714,7 +709,7 @@ namespace EduConnect.Web.Controllers
             // ─── Photo handling ────────────────────────
             if (model.RemoveCoverPhoto)
             {
-                DeleteEventPhoto(ev.CoverPhotoURL);
+                await DeleteEventPhoto(ev.CoverPhotoURL);
                 ev.CoverPhotoURL = null;
             }
             else if (model.CoverPhoto != null &&
@@ -756,17 +751,17 @@ namespace EduConnect.Web.Controllers
                 string? newCoverPhotoURL = null;
                 try
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath, "uploads", "events");
-                    Directory.CreateDirectory(uploadsFolder);
+                    byte[] photoBytes;
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        await model.CoverPhoto.CopyToAsync(memoryStream);
+                        photoBytes = memoryStream.ToArray();
+                    }
 
                     var fileName = Guid.NewGuid().ToString() + extension;
-                    var filePath = Path.Combine(uploadsFolder, fileName);
 
-                    using var stream = new FileStream(filePath, FileMode.Create);
-                    await model.CoverPhoto.CopyToAsync(stream);
-
-                    newCoverPhotoURL = "/uploads/events/" + fileName;
+                    newCoverPhotoURL = await _blobStorageService.UploadAsync(
+                        photoBytes, fileName, "events", model.CoverPhoto.ContentType);
                 }
                 catch (Exception ex)
                 {
@@ -775,7 +770,7 @@ namespace EduConnect.Web.Controllers
 
                 if (newCoverPhotoURL != null)
                 {
-                    DeleteEventPhoto(ev.CoverPhotoURL);
+                    await DeleteEventPhoto(ev.CoverPhotoURL);
                     ev.CoverPhotoURL = newCoverPhotoURL;
                 }
             }
