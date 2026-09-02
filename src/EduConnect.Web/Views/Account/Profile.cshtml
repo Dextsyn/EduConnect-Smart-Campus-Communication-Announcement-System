@@ -62,9 +62,9 @@
                             <input type="file"
                                    asp-for="NewProfilePicture"
                                    class="form-control form-control-sm"
-                                   accept=".jpg,.jpeg,.png,.gif,.webp"
+                                   accept=".jpg,.jpeg,.png,.webp"
                                    onchange="previewAvatar(this)" />
-                            <div class="form-text">JPG, PNG, GIF or WebP · max 5 MB</div>
+                            <div class="form-text">JPG, PNG, or WebP · max 5 MB</div>
                             <span asp-validation-for="NewProfilePicture"
                                   class="text-danger small"></span>
                         </div>

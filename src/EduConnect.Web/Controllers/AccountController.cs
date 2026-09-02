@@ -17,6 +17,7 @@ namespace EduConnect.Web.Controllers
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
         private readonly IConfiguration _configuration;
+        private readonly IBlobStorageService _blobStorageService;
 
         public AccountController(
             ApplicationDbContext context,
@@ -24,7 +25,8 @@ namespace EduConnect.Web.Controllers
             IWebHostEnvironment environment,
             IEmailService emailService,
             INotificationService notificationService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IBlobStorageService blobStorageService)
         {
             _context = context;
             _logger = logger;
@@ -32,6 +34,7 @@ namespace EduConnect.Web.Controllers
             _emailService = emailService;
             _notificationService = notificationService;
             _configuration = configuration;
+            _blobStorageService = blobStorageService;
         }
 
         // ─── GET: /Account/Login ───────────────
@@ -371,49 +374,74 @@ namespace EduConnect.Web.Controllers
             if (model.NewProfilePicture != null &&
                 model.NewProfilePicture.Length > 0)
             {
-                var allowedTypes = new[]
+                var allowedExtensions = new[]
                 {
-                    ".jpg", ".jpeg",
-                    ".png", ".gif", ".webp"
+                    ".jpg", ".jpeg", ".png", ".webp"
+                };
+                var allowedContentTypes = new[]
+                {
+                    "image/jpeg", "image/png", "image/webp"
                 };
 
                 var extension = Path.GetExtension(
                     model.NewProfilePicture.FileName ?? string.Empty)
                     .ToLowerInvariant();
 
-                if (!allowedTypes.Contains(extension))
+                if (!allowedExtensions.Contains(extension) ||
+                    !allowedContentTypes.Contains(
+                        model.NewProfilePicture.ContentType?.ToLowerInvariant()))
                 {
                     ModelState.AddModelError("NewProfilePicture",
-                        "Only image files are allowed (JPG, PNG, GIF, WebP).");
+                        "Please upload a valid image file (JPG, PNG, or WEBP) under 5MB.");
                 }
                 else if (model.NewProfilePicture.Length > 5 * 1024 * 1024)
                 {
                     ModelState.AddModelError("NewProfilePicture",
-                        "File size cannot exceed 5 MB.");
+                        "Please upload a valid image file (JPG, PNG, or WEBP) under 5MB.");
                 }
                 else
                 {
-                    var uploadsFolder = Path.Combine(
-                        _environment.WebRootPath, "uploads", "avatars");
-                    Directory.CreateDirectory(uploadsFolder);
-
-                    // Delete old avatar file if it exists
-                    if (!string.IsNullOrEmpty(user.ProfilePicture))
+                    byte[] fileBytes;
+                    using (var memoryStream = new MemoryStream())
                     {
-                        var oldPath = Path.Combine(
-                            _environment.WebRootPath,
-                            user.ProfilePicture.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                        if (System.IO.File.Exists(oldPath))
-                            System.IO.File.Delete(oldPath);
+                        await model.NewProfilePicture.CopyToAsync(memoryStream);
+                        fileBytes = memoryStream.ToArray();
                     }
 
-                    var fileName = Guid.NewGuid().ToString() + extension;
-                    var filePath = Path.Combine(uploadsFolder, fileName);
+                    if (!HasValidImageSignature(fileBytes, extension))
+                    {
+                        ModelState.AddModelError("NewProfilePicture",
+                            "Please upload a valid image file (JPG, PNG, or WEBP) under 5MB.");
+                    }
+                    else
+                    {
+                        var oldProfilePicture = user.ProfilePicture;
+                        var fileName = Guid.NewGuid().ToString() + extension;
 
-                    using var stream = new FileStream(filePath, FileMode.Create);
-                    await model.NewProfilePicture.CopyToAsync(stream);
+                        user.ProfilePicture = await _blobStorageService.UploadAsync(
+                            fileBytes,
+                            fileName,
+                            "profiles",
+                            model.NewProfilePicture.ContentType);
 
-                    user.ProfilePicture = "/uploads/avatars/" + fileName;
+                        // Delete the old avatar blob now that the new one is stored
+                        if (!string.IsNullOrEmpty(oldProfilePicture) &&
+                            oldProfilePicture.Contains("/profiles/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var oldBlobName = oldProfilePicture.Substring(
+                                oldProfilePicture.LastIndexOf('/') + 1);
+                            try
+                            {
+                                await _blobStorageService.DeleteAsync(oldBlobName, "profiles");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex,
+                                    "Failed to delete old profile picture blob {BlobName}",
+                                    oldBlobName);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -449,6 +477,47 @@ namespace EduConnect.Web.Controllers
 
             TempData["Success"] = "Profile updated successfully.";
             return RedirectToAction("Profile");
+        }
+
+        // Verifies file-signature (magic-number) bytes match the
+        // claimed image extension, since extension/content-type
+        // headers can both be spoofed.
+        private static bool HasValidImageSignature(byte[] fileBytes, string extension)
+        {
+            switch (extension)
+            {
+                case ".jpg":
+                case ".jpeg":
+                    return fileBytes.Length >= 3 &&
+                        fileBytes[0] == 0xFF &&
+                        fileBytes[1] == 0xD8 &&
+                        fileBytes[2] == 0xFF;
+
+                case ".png":
+                    return fileBytes.Length >= 8 &&
+                        fileBytes[0] == 0x89 &&
+                        fileBytes[1] == 0x50 &&
+                        fileBytes[2] == 0x4E &&
+                        fileBytes[3] == 0x47 &&
+                        fileBytes[4] == 0x0D &&
+                        fileBytes[5] == 0x0A &&
+                        fileBytes[6] == 0x1A &&
+                        fileBytes[7] == 0x0A;
+
+                case ".webp":
+                    return fileBytes.Length >= 12 &&
+                        fileBytes[0] == 0x52 && // R
+                        fileBytes[1] == 0x49 && // I
+                        fileBytes[2] == 0x46 && // F
+                        fileBytes[3] == 0x46 && // F
+                        fileBytes[8] == 0x57 && // W
+                        fileBytes[9] == 0x45 && // E
+                        fileBytes[10] == 0x42 && // B
+                        fileBytes[11] == 0x50;   // P
+
+                default:
+                    return false;
+            }
         }
 
         // ─── POST: /Account/ChangePassword ────

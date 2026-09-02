@@ -12,6 +12,11 @@ namespace EduConnect.Web.Services
             string fileName,
             string containerName,
             string contentType);
+
+        // Deletes a blob from the target container, if it exists.
+        Task DeleteAsync(
+            string fileName,
+            string containerName);
     }
 
     public class BlobStorageService : IBlobStorageService
@@ -61,6 +66,28 @@ namespace EduConnect.Web.Services
                 });
 
             return blobClient.Uri.ToString();
+        }
+
+        public async Task DeleteAsync(
+            string fileName,
+            string containerName)
+        {
+            var connectionString =
+                _config["AzureBlobStorage"];
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new InvalidOperationException(
+                    "Azure Blob Storage connection string is not " +
+                    "configured. Set the 'AzureBlobStorage' app " +
+                    "setting.");
+
+            var containerClient = new BlobContainerClient(
+                connectionString, containerName);
+
+            var blobClient =
+                containerClient.GetBlobClient(fileName);
+
+            await blobClient.DeleteIfExistsAsync();
         }
     }
 }
