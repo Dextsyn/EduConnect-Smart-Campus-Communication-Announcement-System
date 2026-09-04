@@ -22,6 +22,14 @@ namespace EduConnect.Web.Controllers
         private string GetRoleName() =>
             HttpContext.Session.GetString("RoleName") ?? "";
 
+        private static readonly HashSet<string> BlockedRoles =
+            new(StringComparer.OrdinalIgnoreCase) { "Staff", "Student Pending" };
+
+        public static bool IsRoleAllowed(string? roleName) =>
+            !string.IsNullOrWhiteSpace(roleName) && !BlockedRoles.Contains(roleName.Trim());
+
+        private bool IsChatbotAllowed() => IsRoleAllowed(GetRoleName());
+
         private string GetOrCreateSessionToken()
         {
             var token = HttpContext.Session.GetString("ChatSessionToken");
@@ -38,6 +46,12 @@ namespace EduConnect.Web.Controllers
         {
             if (!IsLoggedIn())
                 return Json(new { error = "Unauthorized" });
+
+            if (!IsChatbotAllowed())
+            {
+                Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Json(new { error = "The AI assistant is not available for your role." });
+            }
 
             var token = HttpContext.Session.GetString("ChatSessionToken");
             if (string.IsNullOrEmpty(token))
@@ -60,6 +74,12 @@ namespace EduConnect.Web.Controllers
         {
             if (!IsLoggedIn())
                 return Json(new { error = "Unauthorized" });
+
+            if (!IsChatbotAllowed())
+            {
+                Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Json(new { error = "The AI assistant is not available for your role." });
+            }
 
             if (string.IsNullOrWhiteSpace(request?.Message))
                 return Json(new { error = "Message cannot be empty" });

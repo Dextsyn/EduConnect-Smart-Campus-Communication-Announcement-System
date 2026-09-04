@@ -184,7 +184,9 @@
          class="position-fixed bottom-0 end-0 p-3"
          style="z-index:9999;"></div>
 
-    @if (Context.Session.GetString("UserID") != null)
+    @* Presentation only — ChatbotController enforces the same rule server-side. *@
+    @if (Context.Session.GetString("UserID") != null &&
+         EduConnect.Web.Controllers.ChatbotController.IsRoleAllowed(Context.Session.GetString("RoleName")))
     {
         @await Html.PartialAsync("_ChatbotWidget")
     }

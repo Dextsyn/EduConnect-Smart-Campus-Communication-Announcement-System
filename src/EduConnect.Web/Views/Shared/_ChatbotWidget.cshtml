@@ -113,6 +113,97 @@
         30%            { transform: translateY(-8px); }
     }
 
+    /* ── Suggested-question chips ── */
+    #chatbot-suggestions {
+        border-top: 1px solid #dee2e6;
+        background: #fff;
+        padding: 8px 12px 0 12px;
+        flex-shrink: 0;
+    }
+
+    #chatbot-suggestions.hidden { display: none; }
+
+    #chatbot-suggestions-label {
+        font-size: .68rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+
+    /* Single horizontally scrollable row — keeps height constant no matter how
+       many chips exist, so a 380px screen never gets a wall of buttons. */
+    #chatbot-chips {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 8px;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #chatbot-chips::-webkit-scrollbar { height: 4px; }
+
+    #chatbot-chips::-webkit-scrollbar-thumb {
+        background: #ced4da;
+        border-radius: 2px;
+    }
+
+    .chatbot-chip {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        border: 1px solid var(--ec-navy);
+        background: #fff;
+        color: var(--ec-navy);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: .78rem;
+        line-height: 1.2;
+        cursor: pointer;
+        transition: background .15s ease, color .15s ease;
+        /* Comfortable tap target on touch screens. */
+        min-height: 32px;
+    }
+
+    .chatbot-chip:hover,
+    .chatbot-chip:focus-visible {
+        background: var(--ec-navy);
+        color: #fff;
+        outline: none;
+    }
+
+    .chatbot-chip:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+    }
+
+    /* Tappable announcement picker inside a bot bubble. Wraps (unlike the
+       suggestion chips) because announcement titles can be long. */
+    .chatbot-inline-chip {
+        display: block;
+        width: 100%;
+        text-align: left;
+        margin: 4px 0;
+        border: 1px solid #dee2e6;
+        background: var(--ec-bg);
+        color: var(--ec-navy);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: .82rem;
+        line-height: 1.35;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease;
+    }
+
+    .chatbot-inline-chip:hover,
+    .chatbot-inline-chip:focus-visible {
+        background: var(--ec-gold-soft);
+        border-color: var(--ec-gold);
+        outline: none;
+    }
+
     #chatbot-footer {
         display: flex;
         padding: 10px 12px;
@@ -120,6 +211,31 @@
         background: #fff;
         gap: 8px;
         align-items: flex-end;
+    }
+
+    /* ── Small screens ── */
+    @@media (max-width: 420px) {
+        #chatbot-panel {
+            width: auto;
+            left: 12px;
+            right: 12px;
+            bottom: 80px;
+            height: min(70vh, 460px);
+        }
+
+        #chatbot-toggle {
+            bottom: 16px;
+            right: 16px;
+        }
+
+        #chatbot-suggestions { padding: 6px 10px 0 10px; }
+
+        #chatbot-suggestions-label { margin-bottom: 4px; }
+
+        .chatbot-chip {
+            font-size: .74rem;
+            padding: 5px 10px;
+        }
     }
 
     #chatbot-input {
@@ -208,6 +324,17 @@
         </span>
     </div>
 
+    <!-- Suggested questions -->
+    <div id="chatbot-suggestions">
+        <div id="chatbot-suggestions-label">Suggestions</div>
+        <div id="chatbot-chips">
+            <button type="button" class="chatbot-chip" data-question="What are the recent announcements?">Recent announcements</button>
+            <button type="button" class="chatbot-chip" data-question="What are the upcoming events?">Upcoming events</button>
+            <button type="button" class="chatbot-chip" data-question="Are there any emergency announcements?">Emergency alerts</button>
+            <button type="button" class="chatbot-chip" data-question="Summarize an announcement">Summarize an announcement</button>
+        </div>
+    </div>
+
     <!-- Input footer -->
     <div id="chatbot-footer">
         <textarea id="chatbot-input"
@@ -229,6 +356,8 @@
     const typing   = document.getElementById('chatbot-typing');
     const input    = document.getElementById('chatbot-input');
     const sendBtn  = document.getElementById('chatbot-send');
+    const suggestions = document.getElementById('chatbot-suggestions');
+    const chips      = Array.from(document.querySelectorAll('.chatbot-chip'));
 
     let historyLoaded = false;
 
@@ -242,10 +371,19 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
-        return escaped.replace(
-            /\[([^\]]+)\]\((\/(?:Announcement|Event)\/Details\/\d+)\)/g,
-            '<a href="$2" class="chatbot-link" target="_blank" rel="noopener noreferrer">$1</a>'
-        );
+        return escaped
+            // **bold** — used by summary headings and by Gemini's own replies.
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(
+                /\[([^\]]+)\]\((\/(?:Announcement|Event)\/Details\/\d+)\)/g,
+                '<a href="$2" class="chatbot-link" target="_blank" rel="noopener noreferrer">$1</a>'
+            )
+            // "summarize:ID" is an in-chat action, not a destination — render it as a
+            // tappable button that asks for that specific announcement's summary.
+            .replace(
+                /\[([^\]]+)\]\(summarize:(\d+)\)/g,
+                '<button type="button" class="chatbot-inline-chip" data-summarize="$2">$1</button>'
+            );
     }
 
     function appendMessage(role, text, timestamp) {
@@ -275,6 +413,7 @@
     function setLoading(loading) {
         sendBtn.disabled = loading;
         input.disabled   = loading;
+        chips.forEach(c => c.disabled = loading);
         typing.style.display = loading ? 'block' : 'none';
         if (loading) scrollToBottom();
     }
@@ -294,12 +433,15 @@
         } catch { /* silently ignore — greeting stays */ }
     }
 
-    async function sendMessage() {
-        const text = input.value.trim();
+    async function sendMessage(presetText) {
+        const text = (presetText !== undefined ? presetText : input.value).trim();
         if (!text || sendBtn.disabled) return;
 
-        input.value = '';
-        input.style.height = 'auto';
+        if (presetText === undefined) {
+            input.value = '';
+            input.style.height = 'auto';
+        }
+        // Suggestions stay visible so the user can fire another one straight after.
         appendMessage('user', text, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         setLoading(true);
 
@@ -341,7 +483,23 @@
         toggle.innerHTML = '<i class="bi bi-chat-dots-fill"></i>';
     });
 
-    sendBtn.addEventListener('click', sendMessage);
+    // Wrapped so the click Event is never passed as the preset message text.
+    sendBtn.addEventListener('click', () => sendMessage());
+
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const question = chip.getAttribute('data-question');
+            if (question) sendMessage(question);
+        });
+    });
+
+    // Delegated: the announcement buttons in a "which one?" reply are created after load.
+    messages.addEventListener('click', e => {
+        const btn = e.target.closest('[data-summarize]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-summarize');
+        if (id) sendMessage('Summarize announcement ' + id);
+    });
 
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
