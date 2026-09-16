@@ -18,7 +18,19 @@ namespace EduConnect.Web.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await ExpireChats();
+                // A failed sweep must never escape: an unhandled exception in
+                // a BackgroundService stops the whole host by default, which
+                // takes the web app down with it. Log it and retry next cycle.
+                try
+                {
+                    await ExpireChats();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Chat expiry sweep failed; retrying next cycle.");
+                }
+
                 try { await Task.Delay(TimeSpan.FromMinutes(60), stoppingToken); }
                 catch (OperationCanceledException) { break; }
             }
