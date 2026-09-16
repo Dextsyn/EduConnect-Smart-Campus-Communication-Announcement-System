@@ -21,6 +21,10 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Priority is required")]
         public byte Priority { get; set; } = 1;
 
+        // An untagged announcement matches no feed filter, so it would
+        // publish to nobody and notify nobody.
+        [MinLength(1, ErrorMessage =
+            "Please add at least one department tag before submitting.")]
         public List<int> SelectedTagIDs { get; set; }
             = new List<int>();
 

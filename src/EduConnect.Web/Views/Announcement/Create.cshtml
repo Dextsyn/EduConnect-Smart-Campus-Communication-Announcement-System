@@ -205,7 +205,7 @@
                 <div class="card-header bg-white border-0 pt-3">
                     <h6 class="fw-bold mb-0">
                         <i class="bi bi-tags me-2 text-primary"></i>
-                        Target Departments
+                        Target Departments <span class="text-danger">*</span>
                     </h6>
                     <small class="text-muted">
                         Select who can see this
@@ -213,6 +213,8 @@
                 </div>
                 <div class="card-body"
                      style="max-height: 300px; overflow-y: auto;">
+                    <span asp-validation-for="SelectedTagIDs"
+                          class="text-danger small d-block mb-2"></span>
                     @foreach (var tag in Model.AvailableTags)
                     {
                         <div class="form-check mb-2">
@@ -330,6 +332,22 @@
                 img.src = url;
                 box.classList.remove('d-none');
             } catch (e) { /* preview not supported */ }
+        });
+    }());
+
+    (function () {
+        var form = document.querySelector('form[action*="/Announcement/Create"]');
+        var msg = document.querySelector('[data-valmsg-for="SelectedTagIDs"]');
+        if (!form) return;
+        form.addEventListener('submit', function (e) {
+            var checked = form.querySelector('input[name="SelectedTagIDs"]:checked');
+            if (checked) return;
+            e.preventDefault();
+            if (msg) {
+                msg.textContent =
+                    'Please add at least one department tag before submitting.';
+                msg.scrollIntoView({ block: 'center' });
+            }
         });
     }());
 </script>
