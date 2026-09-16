@@ -206,6 +206,10 @@ namespace EduConnect.Web.Controllers
 
             var userID = GetUserID();
 
+            // Intentionally NOT department-scoped, unlike Index(). Department
+            // tags rank relevance, not access — the Explore section of
+            // FeedRankingService deliberately links students to other
+            // departments' announcements and depends on this staying open.
             var announcement = await _context.Announcements
                 .Include(a => a.Category)
                 .Include(a => a.Author)
@@ -1242,6 +1246,15 @@ namespace EduConnect.Web.Controllers
                 ? "PendingChair"
                 : "PendingDean";
 
+            // Submit() routes by the AUTHOR's primary department, so
+            // authorization has to use the same rule. Matching on the
+            // announcement's tags instead would let a reviewer from a
+            // department Submit() never notified act on it.
+            var routedAuthorIDs = _context.UserDepartments
+                .Where(ud => ud.IsPrimary &&
+                             ud.TagID == primaryDept.TagID)
+                .Select(ud => ud.UserID);
+
             var announcements = await _context.Announcements
                 .Include(a => a.Author)
                 .Include(a => a.Category)
@@ -1249,8 +1262,7 @@ namespace EduConnect.Web.Controllers
                     .ThenInclude(at => at.DepartmentTag)
                 .Where(a =>
                     a.ApprovalStatus == pendingStatus &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == primaryDept.TagID))
+                    routedAuthorIDs.Contains(a.AuthorID))
                 .OrderBy(a => a.SubmittedAt)
                 .Select(a => new
                 {
@@ -1298,6 +1310,11 @@ namespace EduConnect.Web.Controllers
                 ? "PendingChair"
                 : "PendingDean";
 
+            var routedAuthorIDs = _context.UserDepartments
+                .Where(ud => ud.IsPrimary &&
+                             ud.TagID == primaryDept.TagID)
+                .Select(ud => ud.UserID);
+
             var announcement = await _context.Announcements
                 .Include(a => a.Author)
                     .ThenInclude(u => u.Role)
@@ -1307,8 +1324,7 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
                     a.ApprovalStatus == expectedStatus &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == primaryDept.TagID));
+                    routedAuthorIDs.Contains(a.AuthorID));
 
             if (announcement == null)
                 return RedirectToAction("ReviewQueue");
@@ -1345,13 +1361,17 @@ namespace EduConnect.Web.Controllers
                 ? "PendingChair"
                 : "PendingDean";
 
+            var routedAuthorIDs = _context.UserDepartments
+                .Where(ud => ud.IsPrimary &&
+                             ud.TagID == primaryDept.TagID)
+                .Select(ud => ud.UserID);
+
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
                     a.ApprovalStatus == expectedStatus &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == primaryDept.TagID));
+                    routedAuthorIDs.Contains(a.AuthorID));
 
             if (announcement == null)
                 return RedirectToAction("ReviewQueue");
@@ -1469,13 +1489,17 @@ namespace EduConnect.Web.Controllers
                 ? "PendingChair"
                 : "PendingDean";
 
+            var routedAuthorIDs = _context.UserDepartments
+                .Where(ud => ud.IsPrimary &&
+                             ud.TagID == primaryDept.TagID)
+                .Select(ud => ud.UserID);
+
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
                     a.ApprovalStatus == expectedStatus &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == primaryDept.TagID));
+                    routedAuthorIDs.Contains(a.AuthorID));
 
             if (announcement == null)
                 return RedirectToAction("ReviewQueue");
