@@ -314,6 +314,20 @@ a:hover { color: var(--ec-navy); }
 .ec-chip-neutral { background: #EDF1F7; color: var(--ec-muted); }
 .feed-badge { font-size: .7rem; padding: 4px 10px; border-radius: 20px; }
 
+/* ── Form action buttons ── */
+/* Sized to sit with the form's other controls (category cards, file
+   input) rather than tower over them, while keeping the same 44px
+   touch target .ec-burger uses. */
+.ec-form-actions .btn { font-size: .95rem; padding: .5rem 1rem; }
+@media (max-width: 575.98px) {
+    .ec-form-actions .btn {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
 /* ── Empty state ── */
 .ec-empty { text-align: center; padding: 3rem 1rem; color: var(--ec-muted); }
 .ec-empty .bi { font-size: 2.6rem; display: block; margin-bottom: .75rem; color: #B9C4D8; }

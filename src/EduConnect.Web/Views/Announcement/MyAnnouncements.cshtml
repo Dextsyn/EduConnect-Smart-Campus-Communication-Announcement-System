@@ -95,7 +95,10 @@
                             </td>
                             <td class="align-middle">
                                 <div class="d-flex gap-2 flex-wrap">
-                                    @if (approvalStatus == "Draft" || approvalStatus == "Rejected")
+                                    @if (approvalStatus == "Draft" ||
+                                         approvalStatus == "Rejected" ||
+                                         (approvalStatus == "Approved" &&
+                                          (string)a.Status != "Published"))
                                     {
                                         <a href="/Announcement/Edit/@a.AnnouncementID"
                                            class="btn btn-sm btn-outline-secondary">

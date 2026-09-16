@@ -358,7 +358,8 @@ namespace EduConnect.Web.Controllers
         [RequestSizeLimit(10 * 1024 * 1024)]
         [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
         public async Task<IActionResult> Create(
-            AnnouncementFormViewModel model)
+            AnnouncementFormViewModel model,
+            string? action = null)
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
@@ -439,7 +440,9 @@ namespace EduConnect.Web.Controllers
                 return View(model);
             }
 
-            // Faculty saves as Draft; everyone else publishes directly
+            // Faculty always drafts for review. Dean / Chair Person need no
+            // review, so they pick: publish straight away, or park it as a
+            // draft that's already "Approved" and simply not out yet.
             string approvalStatus;
             string status;
             DateTime? publishedAt;
@@ -447,6 +450,12 @@ namespace EduConnect.Web.Controllers
             if (IsFaculty())
             {
                 approvalStatus = "Draft";
+                status = "Draft";
+                publishedAt = null;
+            }
+            else if (action == "draft")
+            {
+                approvalStatus = "Approved";
                 status = "Draft";
                 publishedAt = null;
             }
@@ -622,10 +631,11 @@ namespace EduConnect.Web.Controllers
                 }
             }
 
-            if (IsFaculty())
+            if (announcement.Status != "Published")
             {
-                TempData["Success"] =
-                    "Draft saved. Submit it for review when ready.";
+                TempData["Success"] = IsFaculty()
+                    ? "Draft saved. Submit it for review when ready."
+                    : "Draft saved. Publish it when ready.";
                 return RedirectToAction("MyAnnouncements");
             }
 
@@ -1546,7 +1556,7 @@ namespace EduConnect.Web.Controllers
 
         // ═══════════════════════════════════════
         //  POST: /Announcement/Publish/{id}
-        //  Faculty self-publishes after approval
+        //  Author publishes an approved announcement
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1555,7 +1565,10 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
-            if (!IsFaculty())
+            var roleName = GetRoleName();
+            if (roleName != "Faculty" &&
+                roleName != "Dean" &&
+                roleName != "Chair Person")
                 return RedirectToAction("Index");
 
             var userID = GetUserID();

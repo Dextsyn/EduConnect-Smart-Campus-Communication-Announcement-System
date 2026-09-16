@@ -237,12 +237,30 @@
             </div>
 
             <!-- Submit Button -->
-            <div class="d-grid gap-2 d-sm-flex">
-                <button type="submit"
-                        class="btn btn-primary btn-lg">
-                    <i class="bi bi-send me-2"></i>
-                    @(ViewBag.IsFaculty == true ? "Save Draft" : "Publish Announcement")
-                </button>
+            @* Stacked, not d-sm-flex: this sits in the narrow col-lg-4
+               sidebar, where side-by-side btn-lg buttons wrap mid-word. *@
+            <div class="d-grid gap-2 ec-form-actions">
+                @if (ViewBag.IsFaculty == true)
+                {
+                    <button type="submit" name="action" value="draft"
+                            class="btn btn-primary">
+                        <i class="bi bi-send me-2"></i>
+                        Save Draft
+                    </button>
+                }
+                else
+                {
+                    <button type="submit" name="action" value="publish"
+                            class="btn btn-primary">
+                        <i class="bi bi-broadcast me-2"></i>
+                        Publish Now
+                    </button>
+                    <button type="submit" name="action" value="draft"
+                            class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-text me-2"></i>
+                        Save as Draft
+                    </button>
+                }
                 <a href="/Announcement"
                    class="btn btn-outline-secondary">
                     Cancel
