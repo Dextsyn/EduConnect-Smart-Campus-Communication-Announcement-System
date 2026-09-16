@@ -112,25 +112,16 @@ namespace EduConnect.Web.Controllers
                     a.Title.Contains(searchQuery) ||
                     a.Body.Contains(searchQuery));
 
-            // Student sees only their dept
-            if (roleName == "Student")
-            {
-                var userTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
+            // Fail closed: name the roles that may see every department,
+            // and scope everyone else. Listing the scoped roles instead
+            // would silently expose any role missing from the list —
+            // Student Pending did exactly that.
+            bool seesAllDepartments =
+                roleName == "Administrator" ||
+                roleName == "Dean" ||
+                roleName == "Chair Person";
 
-                query = query.Where(a =>
-                    a.AnnouncementTags.Any(at =>
-                        userTagIDs.Contains(at.TagID)) ||
-                    a.AnnouncementTags.Any(at =>
-                        at.DepartmentTag.ShortName == "ALL"));
-            }
-
-            // Faculty sees their own dept
-            if (roleName == "Faculty" ||
-                roleName == "Staff")
+            if (!seesAllDepartments)
             {
                 var userTagIDs = await _context
                     .UserDepartments
@@ -1074,7 +1065,8 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
-            if (!IsFaculty())
+            var role = GetRoleName();
+            if (role != "Faculty" && role != "Dean" && role != "Chair Person")
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1340,6 +1332,19 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("ReviewQueue");
 
             ViewBag.Role = roleName;
+
+            if (roleName == "Chair Person")
+            {
+                var hasDean = await _context.UserDepartments
+                    .Include(ud => ud.User)
+                        .ThenInclude(u => u.Role)
+                    .AnyAsync(ud =>
+                        ud.TagID == primaryDept.TagID &&
+                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.IsActive);
+                ViewBag.HasDean = hasDean;
+            }
+
             return View(announcement);
         }
 
@@ -1388,10 +1393,8 @@ namespace EduConnect.Web.Controllers
 
             if (roleName == "Chair Person")
             {
-                announcement.ApprovalStatus = "PendingDean";
                 announcement.ChairApprovedByID = userID;
                 announcement.ChairApprovedAt = DateTime.Now;
-                await _context.SaveChangesAsync();
 
                 // Find Dean in same department
                 var dean = await _context.UserDepartments
@@ -1406,6 +1409,9 @@ namespace EduConnect.Web.Controllers
 
                 if (dean != null)
                 {
+                    announcement.ApprovalStatus = "PendingDean";
+                    await _context.SaveChangesAsync();
+
                     _ = _notificationService.SendAsync(
                         dean.UserID,
                         "AnnouncementReview",
@@ -1422,10 +1428,44 @@ namespace EduConnect.Web.Controllers
                         $"your review: <strong>{announcement.Title}</strong></p>" +
                         $"<p><a href='https://localhost:7135/Announcement/Review/" +
                         $"{announcement.AnnouncementID}'>Click here to review</a></p>");
-                }
 
-                TempData["Success"] =
-                    "Announcement approved and forwarded to the Dean.";
+                    TempData["Success"] =
+                        "Announcement approved and forwarded to the Dean.";
+                }
+                else
+                {
+                    // No Dean in department — Chair Person gives final approval
+                    announcement.ApprovalStatus = "Approved";
+                    announcement.ApprovedByID = userID;
+                    announcement.ApprovedAt = DateTime.Now;
+                    await _context.SaveChangesAsync();
+
+                    var author = await _context.Users
+                        .FindAsync(announcement.AuthorID);
+
+                    _ = _notificationService.SendAsync(
+                        announcement.AuthorID,
+                        "AnnouncementApproved",
+                        $"Your announcement has been approved — you can now publish it",
+                        "/Announcement/MyAnnouncements",
+                        announcement.AnnouncementID);
+
+                    if (author != null)
+                    {
+                        _ = _emailService.SendEmailAsync(
+                            author.Email,
+                            $"{author.FirstName} {author.LastName}",
+                            "EduConnect: Announcement Approved",
+                            $"<p>Hello {author.FirstName},</p>" +
+                            $"<p>Your announcement <strong>{announcement.Title}</strong> " +
+                            $"has been approved by the Chair Person. You can now publish it.</p>" +
+                            $"<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
+                            $"Go to My Announcements</a></p>");
+                    }
+
+                    TempData["Success"] =
+                        "No Dean in department — announcement fully approved. Faculty has been notified.";
+                }
             }
             else // Dean
             {

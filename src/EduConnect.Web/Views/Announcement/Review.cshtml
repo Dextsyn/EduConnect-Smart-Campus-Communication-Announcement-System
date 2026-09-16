@@ -67,7 +67,14 @@
                     @Html.AntiForgeryToken()
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-check2 me-2"></i>
-                        @(role == "Chair Person" ? "Approve & Forward to Dean" : "Approve & Notify Faculty")
+                        @if (role == "Chair Person")
+                        {
+                            @(ViewBag.HasDean == true ? "Approve & Forward to Dean" : "Approve & Notify Faculty")
+                        }
+                        else
+                        {
+                            @("Approve & Notify Faculty")
+                        }
                     </button>
                 </form>
             </div>

@@ -38,7 +38,7 @@ namespace EduConnect.Web.Controllers
             if (roleName == "Administrator")
                 return RedirectToAction("Index", "Admin");
 
-            if (roleName == "Dean")
+            if (roleName == "Dean" || roleName == "Chair Person")
                 return RedirectToAction("Index", "Dean");
 
             if (roleName == "Faculty")
@@ -170,6 +170,21 @@ namespace EduConnect.Web.Controllers
                 roleName == "Staff")
                 query = query.Where(a =>
                     a.AuthorID == userID);
+
+            // Fail closed: every named role returned above, so anything
+            // still here (Student Pending, or a role added later) gets the
+            // same department scope a Student would, never the full feed.
+            var scopedTagIDs = await _context
+                .UserDepartments
+                .Where(ud => ud.UserID == userID)
+                .Select(ud => ud.TagID)
+                .ToListAsync();
+
+            query = query.Where(a =>
+                a.AnnouncementTags.Any(at =>
+                    scopedTagIDs.Contains(at.TagID)) ||
+                a.AnnouncementTags.Any(at =>
+                    at.DepartmentTag.ShortName == "ALL"));
 
             model.RecentAnnouncements = await query
                 .OrderByDescending(a => a.PublishedAt)
