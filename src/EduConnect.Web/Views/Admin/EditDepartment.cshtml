@@ -1,0 +1,142 @@
+@model EduConnect.Web.ViewModels.AdminDepartmentFormViewModel
+@{
+    ViewData["Title"] = "Edit Department";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-pencil-square me-2 text-primary"></i>
+            Edit Department
+        </h4>
+        <small class="text-muted">Rename or restyle an existing department</small>
+    </div>
+    <a href="/Admin/Departments" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mx-auto" style="max-width:640px;">
+    <div class="card-body p-4">
+
+        <form asp-action="EditDepartment" asp-route-id="@Model.TagID" method="post">
+            @Html.AntiForgeryToken()
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger mb-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Please fix the errors below.
+                </div>
+            }
+
+            @if (Model.IsSystemDepartment)
+            {
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    This is a system department. Its short code, type and
+                    active state are used by the announcement feed and
+                    cannot be changed — but you can still rename it and
+                    change its description and color.
+                </div>
+            }
+
+            <div class="row g-3">
+
+                <div class="col-12">
+                    <label asp-for="TagName" class="form-label fw-semibold">
+                        Department Name
+                    </label>
+                    <input asp-for="TagName" class="form-control" />
+                    <span asp-validation-for="TagName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="ShortName" class="form-label fw-semibold">
+                        Short Code
+                    </label>
+                    @if (Model.IsSystemDepartment)
+                    {
+                        <input class="form-control" value="@Model.ShortName" disabled />
+                        <div class="form-text text-warning">
+                            <i class="bi bi-shield-lock me-1"></i>
+                            Referenced by the announcement feed.
+                        </div>
+                    }
+                    else
+                    {
+                        <input asp-for="ShortName" class="form-control" />
+                        <span asp-validation-for="ShortName" class="text-danger small"></span>
+                    }
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="TagTypeID" class="form-label fw-semibold">Type</label>
+                    @if (Model.IsSystemDepartment)
+                    {
+                        <select class="form-select" disabled>
+                            @foreach (var type in Model.TagTypes)
+                            {
+                                <option value="@type.Value"
+                                        selected="@(type.Value == Model.TagTypeID.ToString())">
+                                    @type.Text
+                                </option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <select asp-for="TagTypeID" asp-items="Model.TagTypes"
+                                class="form-select"></select>
+                        <span asp-validation-for="TagTypeID" class="text-danger small"></span>
+                    }
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label fw-semibold">
+                        Description <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input asp-for="Description" class="form-control" />
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="ColorHex" class="form-label fw-semibold">Color</label>
+                    <div class="input-group">
+                        <input type="color" class="form-control form-control-color
+                                                   flex-grow-0"
+                               style="width:3.5rem"
+                               value="@Model.ColorHex"
+                               onchange="document.getElementById('ColorHex').value = this.value;" />
+                        <input asp-for="ColorHex" id="ColorHex" class="form-control" />
+                    </div>
+                    <span asp-validation-for="ColorHex" class="text-danger small"></span>
+                </div>
+
+                @if (!Model.IsSystemDepartment)
+                {
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                            <label asp-for="IsActive" class="form-check-label">
+                                Active (available in dropdowns and feeds)
+                            </label>
+                        </div>
+                    </div>
+                }
+
+                <div class="col-12 d-flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save Changes
+                    </button>
+                    <a href="/Admin/Departments" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
