@@ -130,6 +130,15 @@ namespace EduConnect.Web.Services
                     .ThenInclude(at => at.DepartmentTag)
                 .Where(a => a.Status == "Published" &&
                             (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now) &&
+                            // An emergency reaches everyone only via the School
+                            // Wide ("ALL") tag, which already puts it in every
+                            // user's authorized set above. Explore is the
+                            // opposite set — announcements the user is NOT
+                            // authorized for — so any emergency arriving here
+                            // belongs to someone else's department, and the
+                            // +10000 boost in ComputeScore would hand it a slot
+                            // on every student's dashboard.
+                            !a.IsEmergency &&
                             !a.AnnouncementTags.Any(at => userTagIDs.Contains(at.TagID)) &&
                             !a.AnnouncementTags.Any(at => at.DepartmentTag.ShortName == "ALL"))
                 .ToListAsync();
@@ -187,6 +196,7 @@ namespace EduConnect.Web.Services
                 CategoryName = a.Category.CategoryName,
                 CategoryColor = a.Category.ColorHex,
                 FeedType = a.FeedType,
+                IsEmergency = a.IsEmergency,
                 AuthorName = a.Author.FirstName + " " + a.Author.LastName,
                 Status = a.Status,
                 ViewCount = a.ViewCount,

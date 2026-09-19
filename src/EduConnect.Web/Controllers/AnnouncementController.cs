@@ -67,6 +67,18 @@ namespace EduConnect.Web.Controllers
                    role == "Faculty";
         }
 
+        // Departments flag their own emergencies. The flag pins the
+        // announcement to the top of the tagged departments' feeds and shows
+        // a red badge — it never widens who can see it. Campus-wide reach
+        // still comes only from the School Wide ("ALL") tag.
+        private bool CanSetEmergency()
+        {
+            var role = GetRoleName();
+            return role == "Dean" ||
+                   role == "Chair Person" ||
+                   role == "Faculty";
+        }
+
         // ═══════════════════════════════════════
         //  GET: /Announcement
         //  List all announcements
@@ -156,6 +168,7 @@ namespace EduConnect.Web.Controllers
                     CategoryName = a.Category.CategoryName,
                     CategoryColor = a.Category.ColorHex,
                     FeedType = a.FeedType,
+                    IsEmergency = a.IsEmergency,
                     AuthorName = a.Author.FirstName
                                    + " " + a.Author.LastName,
                     Status = a.Status,
@@ -297,6 +310,7 @@ namespace EduConnect.Web.Controllers
 
             var model = new AnnouncementFormViewModel
             {
+                CanSetEmergency = CanSetEmergency(),
                 Categories = await _context
                     .AnnouncementCategories
                     .Where(c => c.IsActive)
@@ -361,8 +375,12 @@ namespace EduConnect.Web.Controllers
             var roleName = GetRoleName();
             var userID = GetUserID();
 
-            // Strip fields Faculty is not allowed to set
-            if (IsFaculty())
+            // The form only renders this toggle for roles that may set it,
+            // but a disabled/absent input proves nothing about what was
+            // posted — re-assert it here. Assigning the flag on the model
+            // also covers every validation re-render below.
+            model.CanSetEmergency = CanSetEmergency();
+            if (!model.CanSetEmergency)
                 model.IsEmergency = false;
 
             // ─── SECURITY: Validate tags ───────────
@@ -590,8 +608,11 @@ namespace EduConnect.Web.Controllers
                     .Where(t => model.SelectedTagIDs.Contains(t.TagID))
                     .ToListAsync();
 
-                bool broadcastAll = tags.Any(t =>
-                    t.ShortName == "ALL" || t.ShortName == "Emergency");
+                // Department tags decide reach. IsEmergency never widens it —
+                // it only pins and badges the announcement for whoever the
+                // tags already reach. School Wide ("ALL") is the only
+                // campus-wide lever.
+                bool broadcastAll = tags.Any(t => t.ShortName == "ALL");
 
                 List<int> recipientIds;
                 if (broadcastAll)
@@ -721,6 +742,7 @@ namespace EduConnect.Web.Controllers
                 CategoryID = announcement.CategoryID,
                 Priority = announcement.Priority,
                 IsEmergency = announcement.IsEmergency,
+                CanSetEmergency = CanSetEmergency(),
                 ExpiresAt = announcement.ExpiresAt,
                 ExistingPhotoURL = announcement.AttachmentURL,
                 SelectedTagIDs = announcement.AnnouncementTags
@@ -799,8 +821,12 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("MyAnnouncements");
             }
 
-            // Strip fields Faculty is not allowed to set
-            if (IsFaculty())
+            // The form only renders this toggle for roles that may set it,
+            // but a disabled/absent input proves nothing about what was
+            // posted — re-assert it here. Assigning the flag on the model
+            // also covers every validation re-render below.
+            model.CanSetEmergency = CanSetEmergency();
+            if (!model.CanSetEmergency)
                 model.IsEmergency = false;
 
             // Tag security for non-admins
@@ -1636,10 +1662,9 @@ namespace EduConnect.Web.Controllers
 
             if (tagIDs.Any())
             {
+                // See Create: School Wide ("ALL") is the only campus-wide lever.
                 bool broadcastAll = announcement.AnnouncementTags
-                    .Any(at =>
-                        at.DepartmentTag.ShortName == "ALL" ||
-                        at.DepartmentTag.ShortName == "Emergency");
+                    .Any(at => at.DepartmentTag.ShortName == "ALL");
 
                 List<int> recipientIds;
                 if (broadcastAll)

@@ -306,7 +306,12 @@ namespace EduConnect.Web.Services
                 .Take(announcementTake)
                 .ToListAsync();
 
-            // Emergency announcements are always in scope — they are never department-filtered out.
+            // Emergency announcements are department-scoped like everything
+            // else: BuildVisibleAnnouncementsQueryAsync still applies the
+            // role-based scope, so Students, Student Pending, Faculty and
+            // Staff see only their own departments' emergencies plus School
+            // Wide ones. Omitting forceDepartmentScope here only skips the
+            // extra intent-driven narrowing, not the scope itself.
             var emergencyQuery = await BuildVisibleAnnouncementsQueryAsync(userId, roleName);
             var emergencies = await emergencyQuery
                 .Where(a => a.IsEmergency)

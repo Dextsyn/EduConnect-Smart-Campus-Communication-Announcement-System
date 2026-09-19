@@ -180,8 +180,8 @@
                         </div>
                     </div>
 
-                    <!-- Emergency Toggle (Admin only) -->
-                    @if (roleName == "Administrator")
+                    <!-- Emergency Toggle -->
+                    @if (Model.CanSetEmergency)
                     {
                         <div class="mb-1">
                             <div class="form-check form-switch">
@@ -193,6 +193,11 @@
                                        class="form-check-label fw-semibold text-danger">
                                     Mark as Emergency
                                 </label>
+                            </div>
+                            <div class="form-text">
+                                Pins this to the top of the feed for the
+                                departments you tagged above. To reach the
+                                whole campus, also tag <strong>School Wide</strong>.
                             </div>
                         </div>
                     }

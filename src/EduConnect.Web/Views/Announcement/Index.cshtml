@@ -147,6 +147,17 @@ else
 
                                 <!-- Badges -->
                                 <div class="d-flex flex-wrap gap-2 mb-2">
+                                    @* Author-flagged urgency. Guarded so the
+                                       Emergency feed type below doesn't render
+                                       a second identical chip. *@
+                                    @if (item.IsEmergency && item.FeedType != "Emergency")
+                                    {
+                                        <span class="ec-chip ec-chip-emergency">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            Emergency
+                                        </span>
+                                    }
+
                                     <span class="badge rounded-pill"
                                           style="background-color: @item.CategoryColor">
                                         @item.CategoryName

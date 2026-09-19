@@ -31,6 +31,10 @@ namespace EduConnect.Web.ViewModels
         public DateTime? ExpiresAt { get; set; }
         public bool IsEmergency { get; set; } = false;
 
+        // Set by the controller: whether this author's role may mark an
+        // announcement as an emergency. The server re-checks on POST.
+        public bool CanSetEmergency { get; set; } = false;
+
         // Optional photo
         public IFormFile? Photo { get; set; }
         public string? ExistingPhotoURL { get; set; }

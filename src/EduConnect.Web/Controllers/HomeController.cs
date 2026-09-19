@@ -196,6 +196,7 @@ namespace EduConnect.Web.Controllers
                     CategoryName = a.Category.CategoryName,
                     CategoryColor = a.Category.ColorHex,
                     FeedType = a.FeedType,
+                    IsEmergency = a.IsEmergency,
                     AuthorName = a.Author.FirstName + " "
                                    + a.Author.LastName,
                     Status = a.Status,
