@@ -13,9 +13,19 @@
     </div>
     @if (role == "Student")
     {
-        <a href="/Group/Create" class="btn btn-primary">
-            <i class="bi bi-plus-lg me-1"></i>Create Group
-        </a>
+        if (ViewBag.ActiveGroupID != null)
+        {
+            <a href="/Group/Details/@ViewBag.ActiveGroupID"
+               class="btn btn-outline-primary">
+                <i class="bi bi-people me-1"></i>My Group
+            </a>
+        }
+        else
+        {
+            <a href="/Group/Create" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Create Group
+            </a>
+        }
     }
 </div>
 

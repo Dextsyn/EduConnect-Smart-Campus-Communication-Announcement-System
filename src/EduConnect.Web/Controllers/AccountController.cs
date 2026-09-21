@@ -128,6 +128,14 @@ namespace EduConnect.Web.Controllers
             HttpContext.Session.SetString("ProfilePicture",
                 user.ProfilePicture ?? "");
 
+            // Identifies this login to the browser-presence script in _Layout.
+            // A fresh login gets a fresh key, so a stale presence record left
+            // by an earlier login can never log this one straight back out.
+            HttpContext.Session.SetString("SessionKey",
+                Guid.NewGuid().ToString("N"));
+            HttpContext.Session.SetString("LoginAtTicks",
+                DateTime.UtcNow.Ticks.ToString());
+
             _logger.LogInformation(
                 "User {Email} logged in at {Time}",
                 user.Email, DateTime.Now);

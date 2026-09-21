@@ -208,5 +208,50 @@
             });
         })();
     </script>
+
+    @if (Context.Session.GetString("SessionKey") != null)
+    {
+        <script>
+            // Browser-close auto-logout.
+            //
+            // Every open page stamps localStorage every few seconds. While the
+            // browser is shut nothing stamps it, so a page that loads to find
+            // its own login's stamp gone stale knows every tab was closed, and
+            // logs out. This catches what a server-side timeout cannot: Chrome
+            // restoring tabs and their session cookies on relaunch.
+            //
+            // A stamp left by a different login is simply adopted, so logging
+            // in again after a long absence does not log you straight back out.
+            (function () {
+                var KEY = 'ec-presence';
+                var SESSION = '@Context.Session.GetString("SessionKey")';
+                var STALE_MS = 60000;
+                var BEAT_MS = 5000;
+
+                function stamp() {
+                    try {
+                        localStorage.setItem(KEY, JSON.stringify({
+                            session: SESSION, seen: Date.now()
+                        }));
+                    } catch (e) { /* private mode: idle timeout still applies */ }
+                }
+
+                var last = null;
+                try { last = JSON.parse(localStorage.getItem(KEY) || 'null'); }
+                catch (e) { last = null; }
+
+                if (last && last.session === SESSION
+                    && Date.now() - last.seen > STALE_MS) {
+                    try { localStorage.removeItem(KEY); } catch (e) { }
+                    location.replace('/Account/Logout');
+                    return;
+                }
+
+                stamp();
+                setInterval(stamp, BEAT_MS);
+                window.addEventListener('pageshow', stamp);
+            })();
+        </script>
+    }
 </body>
 </html>

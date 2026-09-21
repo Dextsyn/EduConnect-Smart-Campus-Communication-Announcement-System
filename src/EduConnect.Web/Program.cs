@@ -136,6 +136,25 @@ app.UseRouting();
 
 app.UseSession();
 
+// Absolute session lifetime. IdleTimeout is sliding, so a session clicked
+// once every 29 minutes would live forever; this caps it outright no matter
+// how active it has been.
+app.Use(async (context, next) =>
+{
+    var loginAt = context.Session.GetString("LoginAtTicks");
+
+    if (loginAt != null && long.TryParse(loginAt, out var ticks)
+        && DateTime.UtcNow - new DateTime(ticks, DateTimeKind.Utc)
+           > TimeSpan.FromHours(8))
+    {
+        context.Session.Clear();
+        context.Response.Redirect("/Account/Login");
+        return;
+    }
+
+    await next();
+});
+
 // After UseSession so the chatbot policy can partition by logged-in user
 app.UseRateLimiter();
 

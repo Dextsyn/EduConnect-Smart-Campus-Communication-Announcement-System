@@ -30,6 +30,17 @@ namespace EduConnect.Web.Controllers
             "Volunteer & Advocacy", "Culture & Faith"
         };
 
+        // A student may run one live group at a time. Dissolved groups do not
+        // count: dissolving frees the slot, otherwise winding up a finished
+        // group would lock the student out of ever starting another.
+        private Task<Group?> FindActiveCreatedGroupAsync(int userId) =>
+            _context.Groups.FirstOrDefaultAsync(
+                g => g.CreatorID == userId && g.Status != "Dissolved");
+
+        private const string OneGroupMessage =
+            "You can only run one group at a time. Dissolve your current "
+            + "group before creating another.";
+
         // GET /Group
         public async Task<IActionResult> Index()
         {
@@ -42,14 +53,27 @@ namespace EduConnect.Web.Controllers
                 .OrderByDescending(g => g.CreatedAt)
                 .ToListAsync();
 
+            // Drives the header button on Index: Create Group or My Group.
+            ViewBag.ActiveGroupID = IsStudent()
+                ? (await FindActiveCreatedGroupAsync(GetUserID()))?.GroupID
+                : null;
+
             return View(groups);
         }
 
         // GET /Group/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
             if (!IsStudent()) return Forbid();
+
+            var existing = await FindActiveCreatedGroupAsync(GetUserID());
+            if (existing != null)
+            {
+                TempData["Error"] = OneGroupMessage;
+                return RedirectToAction(nameof(Details), new { id = existing.GroupID });
+            }
+
             return View();
         }
 
@@ -76,6 +100,14 @@ namespace EduConnect.Web.Controllers
             }
 
             var userId = GetUserID();
+
+            // Authoritative check: the GET guard only hides the form.
+            var existing = await FindActiveCreatedGroupAsync(userId);
+            if (existing != null)
+            {
+                TempData["Error"] = OneGroupMessage;
+                return RedirectToAction(nameof(Details), new { id = existing.GroupID });
+            }
 
             var group = new Group
             {
