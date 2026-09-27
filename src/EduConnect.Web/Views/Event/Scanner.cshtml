@@ -9,7 +9,39 @@
             min-height: 44px;
         }
     }
+
+    /* Non-blocking scan result popup — auto-hides so scanning never pauses */
+    #scanPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        z-index: 1090;
+        width: min(360px, calc(100vw - 32px));
+        padding: 24px 20px;
+        border-radius: 12px;
+        color: #fff;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease, transform .15s ease;
+    }
+    #scanPopup.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    #scanPopup.popup-success { background: #198754; }
+    #scanPopup.popup-info    { background: #1B4A8F; }
+    #scanPopup.popup-error   { background: #dc3545; }
+    #scanPopup i { font-size: 3rem; display: block; margin-bottom: 6px; }
 </style>
+
+<div id="scanPopup" role="status" aria-live="assertive">
+    <i id="scanPopupIcon" class="bi"></i>
+    <div id="scanPopupTitle" class="fw-bold fs-5"></div>
+    <div id="scanPopupText" class="small mt-1"></div>
+</div>
 
 <div class="container py-4">
     <div class="d-flex align-items-center gap-2 mb-4">
@@ -50,7 +82,7 @@
                         </button>
                     </div>
                     <p class="text-muted small text-center mt-2 mb-0">
-                        Allow camera access when prompted. Hold a student QR code up to the camera.
+                        Allow camera access when prompted. Scanned QR codes are checked in automatically.
                     </p>
                 </div>
             </div>
@@ -140,47 +172,54 @@
 <script>
     let scanner = null;
     let scanning = false;
-    let cooldown = false;
+    let busy = false;
+    let lastScanID = null;
+    let lastScanTime = 0;
+    const REPEAT_WINDOW_MS = 5000;
 
-    const btnStart  = document.getElementById('btnStart');
-    const btnStop   = document.getElementById('btnStop');
-    const btnLookup = document.getElementById('btnLookup');
-    const btnAttend = document.getElementById('btnAttend');
+    const btnStart   = document.getElementById('btnStart');
+    const btnStop    = document.getElementById('btnStop');
+    const btnLookup  = document.getElementById('btnLookup');
+    const btnAttend  = document.getElementById('btnAttend');
     const attendForm = document.getElementById('attendForm');
+
+    const errorMessages = {
+        not_found:    'Registration not found. The QR code may be invalid.',
+        unauthorized: 'You must be logged in to use the scanner.',
+        forbidden:    'You do not have permission to check in attendees for this event.',
+        wrong_event:  'This QR code belongs to a different event.',
+        cancelled:    'This registration was cancelled.',
+        invalid_qr:   'This is not an EduConnect event QR code.',
+        network:      'Could not reach the server. Please try again.'
+    };
 
     btnStart.addEventListener('click', startScanner);
     btnStop.addEventListener('click', stopScanner);
     btnLookup.addEventListener('click', () => {
         const val = document.getElementById('manualID').value.trim();
-        if (val) loadScanInfo(parseInt(val));
+        if (val) manualLookup(parseInt(val));
     });
     document.getElementById('manualID').addEventListener('keydown', e => {
         if (e.key === 'Enter') btnLookup.click();
     });
 
+    // Manual lookup keeps the explicit "Mark as Attended" button
     attendForm.addEventListener('submit', async e => {
         e.preventDefault();
         const regID = document.getElementById('hiddenRegID').value;
-        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
         btnAttend.disabled = true;
         btnAttend.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Marking...';
 
-        const fd = new FormData();
-        fd.append('registrationID', regID);
-        fd.append('__RequestVerificationToken', token);
-
-        const res = await fetch('/Event/MarkAttendanceAjax', { method: 'POST', body: fd });
-        const data = await res.json();
+        const data = await markAttended(regID);
 
         if (data.success) {
             setStatus('attended');
-            btnAttend.classList.add('d-none');
-            document.getElementById('alreadyNote').classList.remove('d-none');
+            showAttendResult(data);
         } else {
             btnAttend.disabled = false;
             btnAttend.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Mark as Attended';
-            alert('Failed to mark attendance. Please try again.');
+            showPopup('error', 'Check-in failed', errorMessages[data.error] || 'Please try again.');
         }
     });
 
@@ -207,54 +246,122 @@
         btnStop.classList.add('d-none');
     }
 
-    function onScanSuccess(decodedText) {
-        if (cooldown) return;
-        cooldown = true;
+    // Camera scan: look up and check in immediately, no click needed
+    async function onScanSuccess(decodedText) {
+        if (busy) return;
 
         // Extract registrationID from URL like /Event/Scan/42
         const match = decodedText.match(/\/Event\/Scan\/(\d+)/i);
+        const scanKey = match ? match[1] : decodedText;
+
+        // The camera reads a held-up code many times per second —
+        // ignore repeats of the same code for a few seconds.
+        const now = Date.now();
+        if (scanKey === lastScanID && now - lastScanTime < REPEAT_WINDOW_MS) return;
+        lastScanID = scanKey;
+        lastScanTime = now;
+
         if (!match) {
-            setTimeout(() => { cooldown = false; }, 2000);
+            showPopup('error', 'Invalid QR code', errorMessages.invalid_qr);
             return;
         }
 
-        const regID = parseInt(match[1]);
+        busy = true;
+        try {
+            const regID = parseInt(match[1]);
+            const data = await fetchScanInfo(regID);
 
-        // Filter by event if selected
-        const eventFilter = document.getElementById('eventFilter').value;
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
 
-        loadScanInfo(regID, eventFilter).then(() => {
-            setTimeout(() => { cooldown = false; }, 2500);
-        });
+            const eventFilter = document.getElementById('eventFilter').value;
+            if (eventFilter && data.eventID != eventFilter) {
+                showError('wrong_event');
+                return;
+            }
+
+            renderScanInfo(data);
+
+            if (data.status === 'Cancelled') {
+                showPopup('error', 'Registration cancelled',
+                    data.studentFullName + ' cancelled their registration.');
+                return;
+            }
+
+            if (data.status === 'Attended') {
+                showAttendResult({ alreadyAttended: true, studentFullName: data.studentFullName });
+                return;
+            }
+
+            const result = await markAttended(regID);
+            if (result.success) {
+                setStatus('attended');
+                showAttendResult(result);
+            } else {
+                showPopup('error', 'Check-in failed', errorMessages[result.error] || 'Please try again.');
+            }
+        } finally {
+            busy = false;
+        }
     }
 
     function onScanError() { /* suppress continuous frame errors */ }
 
-    async function loadScanInfo(regID, filterEventID) {
-        const res = await fetch('/Event/ScanInfo/' + regID);
-        const data = await res.json();
-
+    async function manualLookup(regID) {
+        const data = await fetchScanInfo(regID);
         if (data.error) {
             showError(data.error);
             return;
         }
+        renderScanInfo(data);
+    }
 
-        // Optional event filter
-        if (filterEventID && data.eventID != filterEventID) {
-            showError('wrong_event');
-            return;
+    async function fetchScanInfo(regID) {
+        try {
+            const res = await fetch('/Event/ScanInfo/' + regID);
+            return await res.json();
+        } catch {
+            return { error: 'network' };
         }
+    }
 
+    async function markAttended(regID) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        const fd = new FormData();
+        fd.append('registrationID', regID);
+        fd.append('__RequestVerificationToken', token);
+
+        try {
+            const res = await fetch('/Event/MarkAttendanceAjax', { method: 'POST', body: fd });
+            return await res.json();
+        } catch {
+            return { success: false, error: 'network' };
+        }
+    }
+
+    function showAttendResult(result) {
+        if (result.alreadyAttended) {
+            showPopup('info', 'Already checked in',
+                result.studentFullName + ' was already marked as attended.');
+        } else {
+            showPopup('success', 'Scanned successfully',
+                result.studentFullName + ' marked as attended.');
+        }
+    }
+
+    function renderScanInfo(data) {
         document.getElementById('resultPanel').classList.remove('d-none');
         document.getElementById('emptyState').classList.add('d-none');
         document.getElementById('hiddenRegID').value = data.registrationID;
 
-        document.getElementById('studentName').textContent  = data.studentFullName;
-        document.getElementById('studentID').textContent    = data.studentID;
-        document.getElementById('studentDept').textContent  = data.department;
-        document.getElementById('studentEmail').textContent = data.email;
-        document.getElementById('eventTitle').textContent   = data.eventTitle;
-        document.getElementById('eventDate').textContent    = data.startDateTime;
+        document.getElementById('studentName').textContent   = data.studentFullName;
+        document.getElementById('studentID').textContent     = data.studentID;
+        document.getElementById('studentDept').textContent   = data.department;
+        document.getElementById('studentEmail').textContent  = data.email;
+        document.getElementById('eventTitle').textContent    = data.eventTitle;
+        document.getElementById('eventDate').textContent     = data.startDateTime;
         document.getElementById('eventLocation').textContent = data.location;
         document.getElementById('registeredAt').textContent  = data.registeredAt;
 
@@ -280,7 +387,7 @@
         } else if (status === 'attended') {
             banner.classList.add('alert-success');
             icon.className   = 'bi bi-check-circle-fill fs-5';
-            text.textContent = 'Already checked in';
+            text.textContent = 'Checked in';
             btnAttend.classList.add('d-none');
             document.getElementById('alreadyNote').classList.remove('d-none');
         } else if (status === 'cancelled') {
@@ -291,20 +398,39 @@
         }
     }
 
+    let popupTimer = null;
+    function showPopup(kind, title, message) {
+        const popup = document.getElementById('scanPopup');
+        const icons = {
+            success: 'bi-check-circle-fill',
+            info:    'bi-info-circle-fill',
+            error:   'bi-x-circle-fill'
+        };
+
+        popup.className = 'popup-' + kind;
+        document.getElementById('scanPopupIcon').className = 'bi ' + icons[kind];
+        document.getElementById('scanPopupTitle').textContent = title;
+        document.getElementById('scanPopupText').textContent  = message;
+
+        // restart the transition so back-to-back scans still animate
+        void popup.offsetWidth;
+        popup.classList.add('show');
+
+        clearTimeout(popupTimer);
+        popupTimer = setTimeout(() => popup.classList.remove('show'), 2000);
+    }
+
     function showError(code) {
         document.getElementById('resultPanel').classList.add('d-none');
         document.getElementById('emptyState').classList.remove('d-none');
 
-        const msgs = {
-            not_found:    'Registration not found. The QR code may be invalid.',
-            unauthorized: 'You must be logged in to use the scanner.',
-            forbidden:    'You do not have permission to scan QR codes.',
-            wrong_event:  'This QR code belongs to a different event.'
-        };
+        const message = errorMessages[code] || 'Unknown error. Try again.';
+        showPopup('error', 'Cannot check in', message);
+
         const emptyState = document.getElementById('emptyState');
         emptyState.innerHTML = `
             <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
-            <p class="mt-3 text-warning fw-semibold">${msgs[code] || 'Unknown error. Try again.'}</p>`;
+            <p class="mt-3 text-warning fw-semibold">${message}</p>`;
         setTimeout(() => {
             emptyState.innerHTML = `
                 <i class="bi bi-qr-code display-4 opacity-25"></i>

@@ -68,6 +68,38 @@ namespace EduConnect.Web.Controllers
                    role == "Chair Person";
         }
 
+        // Organizer, or a Dean / Chair Person sharing a
+        // department with the organizer. Requires
+        // Event.Organizer.UserDepartments to be loaded.
+        private async Task<bool> CanScanRegistration(
+            EventRegistration registration)
+        {
+            var userID = GetUserID();
+            var roleName = GetRoleName();
+
+            if (registration.Event.OrganizerID == userID)
+                return true;
+
+            if (roleName != "Dean" &&
+                roleName != "Chair Person")
+                return false;
+
+            var userDeptTagIDs = await _context
+                .UserDepartments
+                .Where(ud => ud.UserID == userID)
+                .Select(ud => ud.TagID)
+                .ToListAsync();
+
+            var organizerDeptTagIDs = registration
+                .Event.Organizer.UserDepartments
+                .Select(ud => ud.TagID)
+                .ToList();
+
+            return userDeptTagIDs
+                .Intersect(organizerDeptTagIDs)
+                .Any();
+        }
+
         private bool IsCreator(Event ev) =>
             ev.OrganizerID == GetUserID();
 
@@ -922,7 +954,8 @@ namespace EduConnect.Web.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(
-            int eventID)
+            int eventID,
+            bool consentGiven = false)
         {
             if (!IsLoggedIn())
                 return RedirectToAction(
@@ -937,7 +970,23 @@ namespace EduConnect.Web.Controllers
                     "Details", new { id = eventID });
             }
 
+            // Data privacy consent is required to join.
+            // Not persisted (no DB column) — logged instead.
+            if (!consentGiven)
+            {
+                TempData["Error"] =
+                    "You must accept the data privacy " +
+                    "consent to join this event.";
+                return RedirectToAction(
+                    "Details", new { id = eventID });
+            }
+
             var userID = GetUserID();
+
+            _logger.LogInformation(
+                "Event consent accepted: User {UserID}, " +
+                "Event {EventID}, {Time}",
+                userID, eventID, DateTime.Now);
 
             var ev = await _context.Events
                 .Include(e => e.Registrations)
@@ -1322,18 +1371,39 @@ namespace EduConnect.Web.Controllers
 
             var registration = await _context
                 .EventRegistrations
+                .Include(r => r.Event)
+                    .ThenInclude(e => e.Organizer)
+                        .ThenInclude(o => o.UserDepartments)
                 .FirstOrDefaultAsync(r =>
                     r.RegistrationID == registrationID);
 
-            if (registration != null)
+            if (registration == null)
+            {
+                TempData["Error"] = "Registration not found.";
+            }
+            else if (!await CanScanRegistration(registration))
+            {
+                TempData["Error"] =
+                    "You do not have permission to mark " +
+                    "attendance for this event.";
+            }
+            else if (registration.Status == "Cancelled")
+            {
+                TempData["Error"] =
+                    "This registration was cancelled " +
+                    "and cannot be marked as attended.";
+            }
+            else
             {
                 registration.Status = "Attended";
                 registration.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
-            }
 
-            TempData["Success"] =
-                "Attendance marked successfully.";
+                TempData["Success"] =
+                    "Attendance marked successfully.";
+                if (source == "scan")
+                    TempData["CheckedIn"] = "1";
+            }
 
             if (source == "scan")
                 return RedirectToAction(
@@ -1485,9 +1555,6 @@ namespace EduConnect.Web.Controllers
             if (!CanScan())
                 return RedirectToAction("Index");
 
-            var userID = GetUserID();
-            var roleName = GetRoleName();
-
             var registration = await _context
                 .EventRegistrations
                 .Include(r => r.User)
@@ -1502,30 +1569,7 @@ namespace EduConnect.Web.Controllers
             if (registration == null)
                 return NotFound();
 
-            bool canAccess =
-                registration.Event.OrganizerID == userID;
-
-            if (!canAccess &&
-                (roleName == "Dean" ||
-                 roleName == "Chair Person"))
-            {
-                var userDeptTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
-                var organizerDeptTagIDs = registration
-                    .Event.Organizer.UserDepartments
-                    .Select(ud => ud.TagID)
-                    .ToList();
-
-                canAccess = userDeptTagIDs
-                    .Intersect(organizerDeptTagIDs)
-                    .Any();
-            }
-
-            if (!canAccess)
+            if (!await CanScanRegistration(registration))
                 return RedirectToAction(
                     "Details",
                     new { id = registration.EventID });
@@ -1602,11 +1646,16 @@ namespace EduConnect.Web.Controllers
                     .ThenInclude(u => u.UserDepartments)
                         .ThenInclude(ud => ud.DepartmentTag)
                 .Include(r => r.Event)
+                    .ThenInclude(e => e.Organizer)
+                        .ThenInclude(o => o.UserDepartments)
                 .FirstOrDefaultAsync(r =>
                     r.RegistrationID == id);
 
             if (registration == null)
                 return Json(new { error = "not_found" });
+
+            if (!await CanScanRegistration(registration))
+                return Json(new { error = "forbidden" });
 
             return Json(new
             {
@@ -1654,6 +1703,10 @@ namespace EduConnect.Web.Controllers
 
             var registration = await _context
                 .EventRegistrations
+                .Include(r => r.User)
+                .Include(r => r.Event)
+                    .ThenInclude(e => e.Organizer)
+                        .ThenInclude(o => o.UserDepartments)
                 .FirstOrDefaultAsync(r =>
                     r.RegistrationID == registrationID);
 
@@ -1664,11 +1717,30 @@ namespace EduConnect.Web.Controllers
                     error = "not_found"
                 });
 
+            if (!await CanScanRegistration(registration))
+                return Json(new
+                {
+                    success = false,
+                    error = "forbidden"
+                });
+
+            var studentFullName = registration.User.FirstName
+                                  + " " + registration.User.LastName;
+
+            if (registration.Status == "Cancelled")
+                return Json(new
+                {
+                    success = false,
+                    error = "cancelled",
+                    studentFullName
+                });
+
             if (registration.Status == "Attended")
                 return Json(new
                 {
                     success = true,
-                    alreadyAttended = true
+                    alreadyAttended = true,
+                    studentFullName
                 });
 
             registration.Status = "Attended";
@@ -1678,7 +1750,8 @@ namespace EduConnect.Web.Controllers
             return Json(new
             {
                 success = true,
-                alreadyAttended = false
+                alreadyAttended = false,
+                studentFullName
             });
         }
 

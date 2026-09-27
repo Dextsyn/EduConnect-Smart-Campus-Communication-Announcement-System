@@ -414,42 +414,44 @@
                 == "Open")
                 {
                     <div class="d-grid d-sm-block">
-                        <form asp-action="Register"
-                              method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden"
-                                   name="eventID"
-                                   value="@Model.EventID" />
-                            <button type="submit"
-                                    class="btn btn-primary
-                                               py-2
-                                               fw-semibold">
-                                <i class="bi bi-calendar-check
-                                               me-2"></i>
-                                Register Now
-                            </button>
-                        </form>
+                        <button type="button"
+                                class="btn btn-primary
+                                           py-2
+                                           fw-semibold"
+                                data-bs-toggle="modal"
+                                data-bs-target="#consentModal">
+                            <i class="bi bi-calendar-check
+                                           me-2"></i>
+                            Register Now
+                        </button>
+                    </div>
+                    <div id="consentDeclinedNotice"
+                         class="alert alert-danger small mt-3 mb-0 d-none">
+                        <i class="bi bi-shield-exclamation me-2"></i>
+                        You must accept the data privacy consent
+                        to join this event.
                     </div>
                 }
                 else if (Model.RegistrationStatus
                 == "Full")
                 {
                     <div class="d-grid d-sm-block">
-                        <form asp-action="Register"
-                              method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden"
-                                   name="eventID"
-                                   value="@Model.EventID" />
-                            <button type="submit"
-                                    class="btn btn-warning
-                                               py-2
-                                               fw-semibold">
-                                <i class="bi bi-list-ol me-2">
-                                </i>
-                                Join Waitlist
-                            </button>
-                        </form>
+                        <button type="button"
+                                class="btn btn-warning
+                                           py-2
+                                           fw-semibold"
+                                data-bs-toggle="modal"
+                                data-bs-target="#consentModal">
+                            <i class="bi bi-list-ol me-2">
+                            </i>
+                            Join Waitlist
+                        </button>
+                    </div>
+                    <div id="consentDeclinedNotice"
+                         class="alert alert-danger small mt-3 mb-0 d-none">
+                        <i class="bi bi-shield-exclamation me-2"></i>
+                        You must accept the data privacy consent
+                        to join this event.
                     </div>
                 }
                 else
@@ -503,6 +505,85 @@
 
     </div>
 </div>
+
+@if (roleName != "Staff" &&
+     !Model.IsRegistered &&
+     !Model.IsOnWaitlist &&
+     (Model.RegistrationStatus == "Open" ||
+      Model.RegistrationStatus == "Full"))
+{
+    <!-- Data Privacy Consent Modal -->
+    <div class="modal fade" id="consentModal"
+         tabindex="-1"
+         data-bs-backdrop="static"
+         data-bs-keyboard="false"
+         aria-labelledby="consentModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold"
+                        id="consentModalLabel">
+                        <i class="bi bi-shield-check me-2 text-primary"></i>
+                        Data Privacy Consent
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        By participating in
+                        <strong>@Model.EventTitle</strong>, you
+                        acknowledge and agree that photos and
+                        videos may be taken during the event, and
+                        that images in which you appear (including
+                        your face) may be posted on Adamson
+                        University's official pages and social
+                        media accounts for documentation and
+                        promotional purposes.
+                    </p>
+                    <p>
+                        Your personal information will be processed
+                        in accordance with the Data Privacy Act of
+                        2012 (RA 10173).
+                    </p>
+                    <p class="text-danger small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        If you do not agree, you will not be able
+                        to join this event.
+                    </p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button"
+                            id="btnConsentDecline"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        I Do Not Agree
+                    </button>
+                    <form asp-action="Register" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden"
+                               name="eventID"
+                               value="@Model.EventID" />
+                        <input type="hidden"
+                               name="consentGiven"
+                               value="true" />
+                        <button type="submit"
+                                class="btn btn-primary fw-semibold">
+                            <i class="bi bi-check2-circle me-2"></i>
+                            I Agree &amp; Join
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('btnConsentDecline')
+            .addEventListener('click', function () {
+                document.getElementById('consentDeclinedNotice')
+                    .classList.remove('d-none');
+            });
+    </script>
+}
 
 @if (isCreator)
 {
