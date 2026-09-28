@@ -1,0 +1,64 @@
+@model EduConnect.Web.ViewModels.AnnouncementFormViewModel
+@{
+    var options = Model.TargetOptions;
+    var college = options.College;
+}
+
+@if (college != null)
+{
+    <div class="mb-3" id="targetPicker">
+        @if (options.CanTargetCollege)
+        {
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="TargetCollegeIDs"
+                       value="@college.CollegeID" id="tc_@college.CollegeID"
+                       @(Model.TargetCollegeIDs.Contains(college.CollegeID) ? "checked" : "") />
+                <label class="form-check-label fw-semibold" for="tc_@college.CollegeID">
+                    Everyone in @college.Name
+                </label>
+            </div>
+        }
+        @foreach (var dept in college.Departments)
+        {
+            <div class="ms-2 mb-2">
+                @if (options.CanTargetDepartments && !dept.IsImplicit)
+                {
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="TargetDepartmentIDs"
+                               value="@dept.DepartmentID" id="td_@dept.DepartmentID"
+                               @(Model.TargetDepartmentIDs.Contains(dept.DepartmentID) ? "checked" : "") />
+                        <label class="form-check-label" for="td_@dept.DepartmentID">
+                            All of @dept.Name
+                        </label>
+                    </div>
+                }
+                else if (!dept.IsImplicit)
+                {
+                    <div class="small text-muted">@dept.Name</div>
+                }
+                @foreach (var program in dept.Programs)
+                {
+                    <div class="form-check ms-3">
+                        <input class="form-check-input" type="checkbox" name="TargetProgramIDs"
+                               value="@program.ProgramID" id="tp_@program.ProgramID"
+                               @(Model.TargetProgramIDs.Contains(program.ProgramID) ? "checked" : "") />
+                        <label class="form-check-label small" for="tp_@program.ProgramID">
+                            @program.Name
+                        </label>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+    @if (Model.AvailableTags.Any())
+    {
+        <div class="small text-muted mb-2">Or tags:</div>
+    }
+}
+else
+{
+    <p class="small text-muted mb-2">
+        You are not placed in a college yet, so you can only post to the tags below.
+        Ask your administrator to place you.
+    </p>
+}

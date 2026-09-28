@@ -15,6 +15,7 @@ namespace EduConnect.Web.Controllers
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
         private readonly IBlobStorageService _blobStorageService;
+        private readonly IAudienceService _audience;
 
         private const string PhotoContainer = "announcements";
 
@@ -24,7 +25,8 @@ namespace EduConnect.Web.Controllers
             IWebHostEnvironment environment,
             INotificationService notificationService,
             IEmailService emailService,
-            IBlobStorageService blobStorageService)
+            IBlobStorageService blobStorageService,
+            IAudienceService audience)
         {
             _context = context;
             _logger = logger;
@@ -32,6 +34,7 @@ namespace EduConnect.Web.Controllers
             _notificationService = notificationService;
             _emailService = emailService;
             _blobStorageService = blobStorageService;
+            _audience = audience;
         }
 
         // ─── CHECK LOGIN HELPER ────────────────
@@ -88,14 +91,51 @@ namespace EduConnect.Web.Controllers
                 .Select(ud => ud.TagID)
                 .ToListAsync();
 
+        // Tags that have become colleges are targeted through the hierarchy
+        // now, so they are not offered as tags.
         private async Task<List<DepartmentTag>> GetSelectableTagsAsync(int userID)
         {
             var tagIDs = await GetUserTagIDsAsync(userID);
             return await _context.DepartmentTags
                 .Include(d => d.TagType)
-                .Where(d => d.IsActive && tagIDs.Contains(d.TagID))
+                .Where(d => d.IsActive && tagIDs.Contains(d.TagID) &&
+                            !_context.Colleges.Any(c => c.LegacyTagID == d.TagID))
                 .OrderBy(d => d.TagName)
                 .ToListAsync();
+        }
+
+        private async Task PopulateAudienceAsync(AnnouncementFormViewModel model, int userID)
+        {
+            model.AvailableTags = await GetSelectableTagsAsync(userID);
+            model.TargetOptions = await _audience.GetTargetOptionsAsync(userID);
+        }
+
+        private static TargetSelection SelectionOf(AnnouncementFormViewModel model) =>
+            new(model.TargetCollegeIDs ?? new(), model.TargetDepartmentIDs ?? new(), model.TargetProgramIDs ?? new());
+
+        private void SaveTargets(Announcement announcement, AnnouncementFormViewModel model)
+        {
+            foreach (var id in (model.TargetCollegeIDs ?? new()).Distinct())
+                _context.AnnouncementTargets.Add(new AnnouncementTarget { AnnouncementID = announcement.AnnouncementID, CollegeID = id });
+            foreach (var id in (model.TargetDepartmentIDs ?? new()).Distinct())
+                _context.AnnouncementTargets.Add(new AnnouncementTarget { AnnouncementID = announcement.AnnouncementID, DepartmentID = id });
+            foreach (var id in (model.TargetProgramIDs ?? new()).Distinct())
+                _context.AnnouncementTargets.Add(new AnnouncementTarget { AnnouncementID = announcement.AnnouncementID, ProgramID = id });
+        }
+
+        // Tags and targets decide reach. IsEmergency never widens it — it
+        // only pins and badges the announcement for whoever they already
+        // reach. School Wide ("ALL") is the campus-wide lever.
+        private async Task NotifyAsync(Announcement announcement, int authorId)
+        {
+            var recipientIds = await _audience.GetRecipientIdsAsync(announcement.AnnouncementID, authorId);
+            if (recipientIds.Count > 0)
+                await _notificationService.SendToManyAsync(
+                    recipientIds,
+                    "Announcement",
+                    $"New announcement: {announcement.Title}",
+                    $"/Announcement/Details/{announcement.AnnouncementID}",
+                    announcement.AnnouncementID);
         }
 
         // ═══════════════════════════════════════
@@ -309,6 +349,10 @@ namespace EduConnect.Web.Controllers
                     .ToList()
             };
 
+            foreach (var name in await _audience.GetTargetNamesAsync(announcement.AnnouncementID))
+                if (!model.Tags.Contains(name))
+                    model.Tags.Add(name);
+
             return View(model);
         }
 
@@ -335,7 +379,7 @@ namespace EduConnect.Web.Controllers
                     .ToListAsync()
             };
 
-            model.AvailableTags = await GetSelectableTagsAsync(userID);
+            await PopulateAudienceAsync(model, userID);
 
             ViewBag.IsFaculty = IsFaculty();
             return View(model);
@@ -376,7 +420,7 @@ namespace EduConnect.Web.Controllers
             if (model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
             {
-                var allowedTagIDs = await GetUserTagIDsAsync(userID);
+                var allowedTagIDs = (await GetSelectableTagsAsync(userID)).Select(t => t.TagID).ToList();
 
                 // Check if any selected tag is NOT allowed
                 var unauthorizedTags = model.SelectedTagIDs
@@ -385,18 +429,27 @@ namespace EduConnect.Web.Controllers
 
                 if (unauthorizedTags.Any())
                 {
-                    ModelState.AddModelError("",
+                    ModelState.AddModelError("SelectedTagIDs",
                         "You can only post to your " +
                         "own department.");
                     model.Categories = await _context
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    model.AvailableTags = await GetSelectableTagsAsync(userID);
+                    await PopulateAudienceAsync(model, userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
             }
+
+            var targetCheck = await _audience.ValidateTargetsAsync(userID, SelectionOf(model));
+            if (!targetCheck.Ok)
+                ModelState.AddModelError("SelectedTagIDs", targetCheck.Error!);
+
+            if ((model.SelectedTagIDs == null || !model.SelectedTagIDs.Any()) &&
+                SelectionOf(model).IsEmpty)
+                ModelState.AddModelError("SelectedTagIDs",
+                    "Choose at least one audience: a program, department, college or tag.");
 
             if (!ModelState.IsValid)
             {
@@ -406,7 +459,7 @@ namespace EduConnect.Web.Controllers
                     .Where(c => c.IsActive)
                     .ToListAsync();
 
-                model.AvailableTags = await GetSelectableTagsAsync(userID);
+                await PopulateAudienceAsync(model, userID);
 
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
@@ -458,7 +511,7 @@ namespace EduConnect.Web.Controllers
                         "Only image files are allowed.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    model.AvailableTags = await GetSelectableTagsAsync(userID);
+                    await PopulateAudienceAsync(model, userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -469,7 +522,7 @@ namespace EduConnect.Web.Controllers
                         "File size cannot exceed 5MB.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    model.AvailableTags = await GetSelectableTagsAsync(userID);
+                    await PopulateAudienceAsync(model, userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -528,72 +581,27 @@ namespace EduConnect.Web.Controllers
                 _logger.LogError("Failed to save announcement: {Error}", ex.Message);
                 ModelState.AddModelError("", "Unable to save the announcement. Please try again.");
                 model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
-                model.AvailableTags = await GetSelectableTagsAsync(userID);
+                await PopulateAudienceAsync(model, userID);
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
             }
 
-            // Save tags
-            if (model.SelectedTagIDs != null &&
-                model.SelectedTagIDs.Any())
+            // Save tags and targets
+            foreach (var tagID in model.SelectedTagIDs ?? new List<int>())
             {
-                foreach (var tagID in model.SelectedTagIDs)
-                {
-                    _context.AnnouncementTags.Add(
-                        new AnnouncementTag
-                        {
-                            AnnouncementID =
-                                announcement.AnnouncementID,
-                            TagID = tagID,
-                            CreatedAt = DateTime.Now
-                        });
-                }
-                await _context.SaveChangesAsync();
+                _context.AnnouncementTags.Add(
+                    new AnnouncementTag
+                    {
+                        AnnouncementID = announcement.AnnouncementID,
+                        TagID = tagID,
+                        CreatedAt = DateTime.Now
+                    });
             }
+            SaveTargets(announcement, model);
+            await _context.SaveChangesAsync();
 
-            // Send real-time notifications to department members
-            if (announcement.Status == "Published" &&
-                model.SelectedTagIDs != null &&
-                model.SelectedTagIDs.Any())
-            {
-                var tags = await _context.DepartmentTags
-                    .Where(t => model.SelectedTagIDs.Contains(t.TagID))
-                    .ToListAsync();
-
-                // Department tags decide reach. IsEmergency never widens it —
-                // it only pins and badges the announcement for whoever the
-                // tags already reach. School Wide ("ALL") is the only
-                // campus-wide lever.
-                bool broadcastAll = tags.Any(t => t.ShortName == "ALL");
-
-                List<int> recipientIds;
-                if (broadcastAll)
-                {
-                    recipientIds = await _context.Users
-                        .Where(u => u.IsActive && u.UserID != userID)
-                        .Select(u => u.UserID)
-                        .ToListAsync();
-                }
-                else
-                {
-                    recipientIds = await _context.UserDepartments
-                        .Where(ud => model.SelectedTagIDs.Contains(ud.TagID))
-                        .Select(ud => ud.UserID)
-                        .Distinct()
-                        .Where(id => id != userID)
-                        .ToListAsync();
-                }
-
-                if (recipientIds.Count > 0)
-                {
-                    await _notificationService.SendToManyAsync(
-                        recipientIds,
-                        "Announcement",
-                        $"New announcement: {announcement.Title}",
-                        $"/Announcement/Details/{announcement.AnnouncementID}",
-                        announcement.AnnouncementID);
-                }
-            }
+            if (announcement.Status == "Published")
+                await NotifyAsync(announcement, userID);
 
             if (announcement.Status != "Published")
             {
@@ -667,6 +675,7 @@ namespace EduConnect.Web.Controllers
 
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
+                .Include(a => a.AnnouncementTargets)
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id);
 
@@ -706,13 +715,16 @@ namespace EduConnect.Web.Controllers
                 SelectedTagIDs = announcement.AnnouncementTags
                     .Select(at => at.TagID)
                     .ToList(),
+                TargetCollegeIDs = announcement.AnnouncementTargets.Where(t => t.CollegeID != null).Select(t => t.CollegeID!.Value).ToList(),
+                TargetDepartmentIDs = announcement.AnnouncementTargets.Where(t => t.DepartmentID != null).Select(t => t.DepartmentID!.Value).ToList(),
+                TargetProgramIDs = announcement.AnnouncementTargets.Where(t => t.ProgramID != null).Select(t => t.ProgramID!.Value).ToList(),
                 Categories = await _context
                     .AnnouncementCategories
                     .Where(c => c.IsActive)
                     .ToListAsync()
             };
 
-            model.AvailableTags = await GetSelectableTagsAsync(userID);
+            await PopulateAudienceAsync(model, userID);
 
             return View(model);
         }
@@ -733,6 +745,7 @@ namespace EduConnect.Web.Controllers
             var userID = GetUserID();
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
+                .Include(a => a.AnnouncementTargets)
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == model.AnnouncementID);
 
@@ -768,17 +781,26 @@ namespace EduConnect.Web.Controllers
             if (model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
             {
-                var allowedTagIDs = await GetUserTagIDsAsync(userID);
+                var allowedTagIDs = (await GetSelectableTagsAsync(userID)).Select(t => t.TagID).ToList();
 
                 var unauthorized = model.SelectedTagIDs
                     .Where(id => !allowedTagIDs.Contains(id))
                     .ToList();
 
                 if (unauthorized.Any())
-                    ModelState.AddModelError("",
+                    ModelState.AddModelError("SelectedTagIDs",
                         "You can only post to your " +
                         "own department.");
             }
+
+            var targetCheck = await _audience.ValidateTargetsAsync(userID, SelectionOf(model));
+            if (!targetCheck.Ok)
+                ModelState.AddModelError("SelectedTagIDs", targetCheck.Error!);
+
+            if ((model.SelectedTagIDs == null || !model.SelectedTagIDs.Any()) &&
+                SelectionOf(model).IsEmpty)
+                ModelState.AddModelError("SelectedTagIDs",
+                    "Choose at least one audience: a program, department, college or tag.");
 
             if (!ModelState.IsValid)
             {
@@ -789,7 +811,7 @@ namespace EduConnect.Web.Controllers
                     .Where(c => c.IsActive)
                     .ToListAsync();
 
-                model.AvailableTags = await GetSelectableTagsAsync(userID);
+                await PopulateAudienceAsync(model, userID);
 
                 return View(model);
             }
@@ -822,7 +844,7 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    model.AvailableTags = await GetSelectableTagsAsync(userID);
+                    await PopulateAudienceAsync(model, userID);
                     return View(model);
                 }
 
@@ -836,7 +858,7 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    model.AvailableTags = await GetSelectableTagsAsync(userID);
+                    await PopulateAudienceAsync(model, userID);
                     return View(model);
                 }
 
@@ -889,9 +911,12 @@ namespace EduConnect.Web.Controllers
             announcement.ExpiresAt = model.ExpiresAt;
             announcement.UpdatedAt = DateTime.Now;
 
-            // ─── Replace tags ──────────────────
+            // ─── Replace tags and targets ──────
             _context.AnnouncementTags
                 .RemoveRange(announcement.AnnouncementTags);
+            _context.AnnouncementTargets
+                .RemoveRange(announcement.AnnouncementTargets);
+            SaveTargets(announcement, model);
 
             if (model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
@@ -919,7 +944,7 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("", "Unable to save changes. Please try again.");
                 model.ExistingPhotoURL = announcement.AttachmentURL;
                 model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
-                model.AvailableTags = await GetSelectableTagsAsync(userID);
+                await PopulateAudienceAsync(model, userID);
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
             }
@@ -1536,8 +1561,6 @@ namespace EduConnect.Web.Controllers
             var userID = GetUserID();
 
             var announcement = await _context.Announcements
-                .Include(a => a.AnnouncementTags)
-                    .ThenInclude(at => at.DepartmentTag)
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
                     a.AuthorID == userID &&
@@ -1551,45 +1574,7 @@ namespace EduConnect.Web.Controllers
             announcement.PublishedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
-            // Notify department members
-            var tagIDs = announcement.AnnouncementTags
-                .Select(at => at.TagID)
-                .ToList();
-
-            if (tagIDs.Any())
-            {
-                // See Create: School Wide ("ALL") is the only campus-wide lever.
-                bool broadcastAll = announcement.AnnouncementTags
-                    .Any(at => at.DepartmentTag.ShortName == "ALL");
-
-                List<int> recipientIds;
-                if (broadcastAll)
-                {
-                    recipientIds = await _context.Users
-                        .Where(u => u.IsActive && u.UserID != userID)
-                        .Select(u => u.UserID)
-                        .ToListAsync();
-                }
-                else
-                {
-                    recipientIds = await _context.UserDepartments
-                        .Where(ud => tagIDs.Contains(ud.TagID))
-                        .Select(ud => ud.UserID)
-                        .Distinct()
-                        .Where(uid => uid != userID)
-                        .ToListAsync();
-                }
-
-                if (recipientIds.Count > 0)
-                {
-                    await _notificationService.SendToManyAsync(
-                        recipientIds,
-                        "Announcement",
-                        $"New announcement: {announcement.Title}",
-                        $"/Announcement/Details/{announcement.AnnouncementID}",
-                        announcement.AnnouncementID);
-                }
-            }
+            await NotifyAsync(announcement, userID);
 
             TempData["Success"] =
                 "Announcement published successfully!";

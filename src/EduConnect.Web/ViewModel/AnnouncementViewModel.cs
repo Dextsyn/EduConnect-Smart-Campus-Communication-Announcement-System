@@ -21,12 +21,18 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Priority is required")]
         public byte Priority { get; set; } = 1;
 
-        // An untagged announcement matches no feed filter, so it would
-        // publish to nobody and notify nobody.
-        [MinLength(1, ErrorMessage =
-            "Please add at least one department tag before submitting.")]
+        // Tags (School Wide, offices) and hierarchy targets together make
+        // the audience; the controller requires at least one of either.
         public List<int> SelectedTagIDs { get; set; }
             = new List<int>();
+
+        // Hierarchy targets (IAudienceService validates them)
+        public List<int> TargetCollegeIDs { get; set; } = new();
+        public List<int> TargetDepartmentIDs { get; set; } = new();
+        public List<int> TargetProgramIDs { get; set; } = new();
+
+        [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+        public EduConnect.Web.Services.TargetOptions TargetOptions { get; set; } = new();
 
         public DateTime? ExpiresAt { get; set; }
         public bool IsEmergency { get; set; } = false;
