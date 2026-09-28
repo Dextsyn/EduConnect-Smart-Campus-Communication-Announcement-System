@@ -22,6 +22,11 @@ namespace EduConnect.Web.Data
         public DbSet<UserDepartment> UserDepartments { get; set; }
         public DbSet<AnnouncementTag> AnnouncementTags { get; set; }
 
+        // ─── Academic hierarchy ────────────────────
+        public DbSet<College> Colleges { get; set; }
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<AcademicProgram> Programs { get; set; }
+
         // ─── Feature Tables ────────────────────────
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Feedback> Feedbacks { get; set; }
@@ -93,6 +98,37 @@ namespace EduConnect.Web.Data
                 entity.HasOne(e => e.TagType)
                       .WithMany(e => e.DepartmentTags)
                       .HasForeignKey(e => e.TagTypeID)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── Academic hierarchy ────────────────
+            modelBuilder.Entity<College>(entity =>
+            {
+                entity.HasKey(e => e.CollegeID);
+                entity.HasIndex(e => e.Name).IsUnique();
+                entity.HasOne(e => e.LegacyTag)
+                      .WithMany()
+                      .HasForeignKey(e => e.LegacyTagID)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Department>(entity =>
+            {
+                entity.HasKey(e => e.DepartmentID);
+                entity.HasIndex(e => new { e.CollegeID, e.Name }).IsUnique();
+                entity.HasOne(e => e.College)
+                      .WithMany(e => e.Departments)
+                      .HasForeignKey(e => e.CollegeID)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<AcademicProgram>(entity =>
+            {
+                entity.HasKey(e => e.ProgramID);
+                entity.HasIndex(e => new { e.DepartmentID, e.Name }).IsUnique();
+                entity.HasOne(e => e.Department)
+                      .WithMany(e => e.Programs)
+                      .HasForeignKey(e => e.DepartmentID)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
