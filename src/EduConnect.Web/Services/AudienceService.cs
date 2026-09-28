@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
+using EduConnect.Web.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Web.Services
@@ -116,6 +117,71 @@ namespace EduConnect.Web.Services
 
             return HierarchyResult.Success;
         }
+
+        public async Task<List<int>> GetRecipientIdsAsync(int announcementId, int excludeUserId)
+        {
+            var tags = await _context.AnnouncementTags
+                .Where(t => t.AnnouncementID == announcementId)
+                .Select(t => new { t.TagID, t.DepartmentTag.ShortName })
+                .ToListAsync();
+
+            var active = _context.Users.Where(u => u.IsActive && u.UserID != excludeUserId);
+
+            if (tags.Any(t => t.ShortName == SchoolWide))
+                return await active.Select(u => u.UserID).ToListAsync();
+
+            var targets = await _context.AnnouncementTargets
+                .Where(t => t.AnnouncementID == announcementId)
+                .ToListAsync();
+
+            var tagIds = tags.Select(t => t.TagID).ToList();
+            var collegeIds = targets.Where(t => t.CollegeID != null).Select(t => t.CollegeID).ToList();
+            var departmentIds = targets.Where(t => t.DepartmentID != null).Select(t => t.DepartmentID).ToList();
+            var programIds = targets.Where(t => t.ProgramID != null).Select(t => t.ProgramID).ToList();
+
+            return await active
+                .Where(u =>
+                    u.UserDepartments.Any(ud => tagIds.Contains(ud.TagID)) ||
+                    (u.CollegeID != null && collegeIds.Contains(u.CollegeID)) ||
+                    (u.DepartmentID != null && departmentIds.Contains(u.DepartmentID)) ||
+                    (u.ProgramID != null && programIds.Contains(u.ProgramID)))
+                .Select(u => u.UserID)
+                .ToListAsync();
+        }
+
+        public async Task AddTargetLabelsAsync(IEnumerable<AnnouncementTableViewModel> rows)
+        {
+            var list = rows.ToList();
+            var ids = list.Select(r => r.AnnouncementID).ToList();
+            if (ids.Count == 0)
+                return;
+
+            var labels = await _context.AnnouncementTargets
+                .Where(t => ids.Contains(t.AnnouncementID))
+                .Select(t => new
+                {
+                    t.AnnouncementID,
+                    Label = t.ProgramID != null
+                        ? (t.AcademicProgram!.ShortName ?? t.AcademicProgram.Name)
+                        : t.DepartmentID != null
+                            ? (t.Department!.ShortName ?? t.Department.Name)
+                            : (t.College!.ShortName ?? t.College.Name)
+                })
+                .ToListAsync();
+
+            foreach (var row in list)
+                foreach (var label in labels.Where(l => l.AnnouncementID == row.AnnouncementID))
+                    if (!row.Tags.Contains(label.Label))
+                        row.Tags.Add(label.Label);
+        }
+
+        public Task<List<string>> GetTargetNamesAsync(int announcementId) =>
+            _context.AnnouncementTargets
+                .Where(t => t.AnnouncementID == announcementId)
+                .Select(t => t.ProgramID != null ? t.AcademicProgram!.Name
+                    : t.DepartmentID != null ? t.Department!.Name
+                    : t.College!.Name)
+                .ToListAsync();
 
         public static Expression<Func<Announcement, bool>> Not(
             Expression<Func<Announcement, bool>> expression) =>

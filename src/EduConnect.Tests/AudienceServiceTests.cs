@@ -1,6 +1,7 @@
 using EduConnect.Web;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Tests
@@ -211,6 +212,77 @@ namespace EduConnect.Tests
         [Fact]
         public async Task Validate_EmptySelection_Ok() =>
             Assert.True((await Service.ValidateTargetsAsync(_faculty.UserID, Sel())).Ok);
+
+        private async Task<int[]> RecipientsOf(string title, int exclude = 0)
+        {
+            var id = await _db.NewContext().Announcements.Where(a => a.Title == title).Select(a => a.AnnouncementID).SingleAsync();
+            return (await Service.GetRecipientIdsAsync(id, exclude)).OrderBy(x => x).ToArray();
+        }
+
+        private static int[] Ids(params User[] users) => users.Select(u => u.UserID).OrderBy(x => x).ToArray();
+
+        [Fact]
+        public async Task Recipients_ProgramTarget_OnlyItsStudents() =>
+            Assert.Equal(Ids(_studentBsit), await RecipientsOf("P-BSIT"));
+
+        [Fact]
+        public async Task Recipients_DepartmentTarget_StudentsFacultyAndChair() =>
+            Assert.Equal(Ids(_studentBsit, _faculty, _chair), await RecipientsOf("D-ITIS"));
+
+        [Fact]
+        public async Task Recipients_CollegeTarget_EveryonePlacedInIt() =>
+            Assert.Equal(Ids(_studentBsit, _faculty, _chair, _dean), await RecipientsOf("C-CCIT"));
+
+        [Fact]
+        public async Task Recipients_OfficeTag_TaggedUsers() =>
+            Assert.Equal(Ids(_staff), await RecipientsOf("OFFICE"));
+
+        [Fact]
+        public async Task Recipients_SchoolWide_AllActiveUsersButTheAuthor()
+        {
+            var all = await RecipientsOf("ALL", exclude: _dean.UserID);
+
+            Assert.DoesNotContain(_dean.UserID, all);
+            Assert.Contains(_studentBio.UserID, all);
+            Assert.Contains(_staff.UserID, all);
+        }
+
+        [Fact]
+        public async Task Recipients_SkipInactiveUsersAndAuthor()
+        {
+            var pending = _db.AddUser(RoleNames.StudentPending, _ccit.CollegeID, _itis.DepartmentID, _bsit.ProgramID, isActive: false);
+
+            var ids = await RecipientsOf("P-BSIT", exclude: _studentBsit.UserID);
+
+            Assert.DoesNotContain(pending.UserID, ids);
+            Assert.DoesNotContain(_studentBsit.UserID, ids);
+        }
+
+        [Fact]
+        public async Task Labels_AppendShortNamesWithoutDuplicates()
+        {
+            _bsit.ShortName = "BSIT";
+            _ccit.ShortName = "CCIT";
+            _db.Context.SaveChanges();
+            var ids = await _db.NewContext().Announcements
+                .Where(a => a.Title == "P-BSIT" || a.Title == "C-CCIT")
+                .OrderBy(a => a.Title)
+                .Select(a => a.AnnouncementID).ToListAsync();
+            var rows = ids.Select(id => new AnnouncementTableViewModel { AnnouncementID = id, Tags = new List<string> { "CCIT" } }).ToList();
+
+            await Service.AddTargetLabelsAsync(rows);
+
+            Assert.Equal(new[] { "CCIT" }, rows[0].Tags);          // C-CCIT: already had its college tag
+            Assert.Equal(new[] { "CCIT", "BSIT" }, rows[1].Tags);  // P-BSIT
+        }
+
+        [Fact]
+        public async Task TargetNames_FullNames()
+        {
+            var id = await _db.NewContext().Announcements.Where(a => a.Title == "D-ITIS").Select(a => a.AnnouncementID).SingleAsync();
+
+            Assert.Equal(new[] { "IT&IS" }, await Service.GetTargetNamesAsync(id));
+        }
 
         [Fact]
         public async Task Not_InvertsVisibleTo()

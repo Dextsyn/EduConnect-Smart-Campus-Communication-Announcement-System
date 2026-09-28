@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using EduConnect.Web.Models;
+using EduConnect.Web.ViewModels;
 
 namespace EduConnect.Web.Services
 {
@@ -49,5 +50,15 @@ namespace EduConnect.Web.Services
 
         // Refuses any posted target outside GetTargetOptionsAsync.
         Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection);
+
+        // Active users an announcement reaches, never including
+        // excludeUserId (the author).
+        Task<List<int>> GetRecipientIdsAsync(int announcementId, int excludeUserId);
+
+        // Appends each row's target short labels to its Tags.
+        Task AddTargetLabelsAsync(IEnumerable<AnnouncementTableViewModel> rows);
+
+        // Full names of an announcement's targets, for the details page.
+        Task<List<string>> GetTargetNamesAsync(int announcementId);
     }
 }
