@@ -79,6 +79,25 @@ namespace EduConnect.Web.Controllers
                    role == RoleNames.Faculty;
         }
 
+        // Tags a user may target: their own UserDepartments rows. Admins
+        // do not author announcements (CanCreate excludes them), so there
+        // is no "all tags" case.
+        private Task<List<int>> GetUserTagIDsAsync(int userID) =>
+            _context.UserDepartments
+                .Where(ud => ud.UserID == userID)
+                .Select(ud => ud.TagID)
+                .ToListAsync();
+
+        private async Task<List<DepartmentTag>> GetSelectableTagsAsync(int userID)
+        {
+            var tagIDs = await GetUserTagIDsAsync(userID);
+            return await _context.DepartmentTags
+                .Include(d => d.TagType)
+                .Where(d => d.IsActive && tagIDs.Contains(d.TagID))
+                .OrderBy(d => d.TagName)
+                .ToListAsync();
+        }
+
         // ═══════════════════════════════════════
         //  GET: /Announcement
         //  List all announcements
@@ -305,7 +324,6 @@ namespace EduConnect.Web.Controllers
             if (!CanCreate())
                 return RedirectToAction("Index");
 
-            var roleName = GetRoleName();
             var userID = GetUserID();
 
             var model = new AnnouncementFormViewModel
@@ -317,37 +335,7 @@ namespace EduConnect.Web.Controllers
                     .ToListAsync()
             };
 
-            // Faculty sees only Academic tags
-            // Staff sees only NonAcademic tags
-            // Admin sees all tags
-            if (roleName == RoleNames.Administrator)
-            {
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive)
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
-            }
-            else
-            {
-                // Faculty/Dean/Staff sees ONLY
-                // their own department tags
-                var userTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           userTagIDs.Contains(d.TagID))
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
-
-            }
+            model.AvailableTags = await GetSelectableTagsAsync(userID);
 
             ViewBag.IsFaculty = IsFaculty();
             return View(model);
@@ -372,7 +360,6 @@ namespace EduConnect.Web.Controllers
             if (!CanCreate())
                 return RedirectToAction("Index");
 
-            var roleName = GetRoleName();
             var userID = GetUserID();
 
             // The form only renders this toggle for roles that may set it,
@@ -386,16 +373,10 @@ namespace EduConnect.Web.Controllers
             // ─── SECURITY: Validate tags ───────────
             // Make sure faculty didn't tamper with
             // the form to post to other departments
-            if (roleName != RoleNames.Administrator &&
-                model.SelectedTagIDs != null &&
+            if (model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
             {
-                // Get faculty's allowed tag IDs
-                var allowedTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
+                var allowedTagIDs = await GetUserTagIDsAsync(userID);
 
                 // Check if any selected tag is NOT allowed
                 var unauthorizedTags = model.SelectedTagIDs
@@ -411,11 +392,7 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    model.AvailableTags = await _context
-                        .DepartmentTags
-                        .Where(d => d.IsActive &&
-                               allowedTagIDs.Contains(d.TagID))
-                        .ToListAsync();
+                    model.AvailableTags = await GetSelectableTagsAsync(userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -429,21 +406,7 @@ namespace EduConnect.Web.Controllers
                     .Where(c => c.IsActive)
                     .ToListAsync();
 
-                var allowedIDs = roleName == RoleNames.Administrator
-                    ? await _context.DepartmentTags
-                        .Where(d => d.IsActive)
-                        .Select(d => d.TagID)
-                        .ToListAsync()
-                    : await _context.UserDepartments
-                        .Where(ud => ud.UserID == userID)
-                        .Select(ud => ud.TagID)
-                        .ToListAsync();
-
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Where(d => d.IsActive &&
-                           allowedIDs.Contains(d.TagID))
-                    .ToListAsync();
+                model.AvailableTags = await GetSelectableTagsAsync(userID);
 
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
@@ -495,11 +458,7 @@ namespace EduConnect.Web.Controllers
                         "Only image files are allowed.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    var photoErrIDs = roleName == RoleNames.Administrator
-                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                    model.AvailableTags = await _context.DepartmentTags
-                        .Where(d => d.IsActive && photoErrIDs.Contains(d.TagID)).ToListAsync();
+                    model.AvailableTags = await GetSelectableTagsAsync(userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -510,11 +469,7 @@ namespace EduConnect.Web.Controllers
                         "File size cannot exceed 5MB.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    var photoSizeIDs = roleName == RoleNames.Administrator
-                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                    model.AvailableTags = await _context.DepartmentTags
-                        .Where(d => d.IsActive && photoSizeIDs.Contains(d.TagID)).ToListAsync();
+                    model.AvailableTags = await GetSelectableTagsAsync(userID);
                     ViewBag.IsFaculty = IsFaculty();
                     return View(model);
                 }
@@ -573,10 +528,7 @@ namespace EduConnect.Web.Controllers
                 _logger.LogError("Failed to save announcement: {Error}", ex.Message);
                 ModelState.AddModelError("", "Unable to save the announcement. Please try again.");
                 model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
-                var dbErrIDs = roleName == RoleNames.Administrator
-                    ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                    : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                model.AvailableTags = await _context.DepartmentTags.Where(d => d.IsActive && dbErrIDs.Contains(d.TagID)).ToListAsync();
+                model.AvailableTags = await GetSelectableTagsAsync(userID);
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
             }
@@ -712,7 +664,6 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var userID = GetUserID();
-            var roleName = GetRoleName();
 
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
@@ -754,31 +705,7 @@ namespace EduConnect.Web.Controllers
                     .ToListAsync()
             };
 
-            if (roleName == RoleNames.Administrator)
-            {
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive)
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
-            }
-            else
-            {
-                var userTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           userTagIDs.Contains(d.TagID))
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
-            }
+            model.AvailableTags = await GetSelectableTagsAsync(userID);
 
             return View(model);
         }
@@ -797,9 +724,6 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var userID = GetUserID();
-            var roleName = GetRoleName();
-            bool isAdmin = roleName == RoleNames.Administrator;
-
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
                 .FirstOrDefaultAsync(a =>
@@ -829,16 +753,11 @@ namespace EduConnect.Web.Controllers
             if (!model.CanSetEmergency)
                 model.IsEmergency = false;
 
-            // Tag security for non-admins
-            if (!isAdmin &&
-                model.SelectedTagIDs != null &&
+            // Tag security: authors may only target their own tags
+            if (model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
             {
-                var allowedTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
+                var allowedTagIDs = await GetUserTagIDsAsync(userID);
 
                 var unauthorized = model.SelectedTagIDs
                     .Where(id => !allowedTagIDs.Contains(id))
@@ -859,23 +778,7 @@ namespace EduConnect.Web.Controllers
                     .Where(c => c.IsActive)
                     .ToListAsync();
 
-                var allowedIDs = isAdmin
-                    ? await _context.DepartmentTags
-                        .Where(d => d.IsActive)
-                        .Select(d => d.TagID)
-                        .ToListAsync()
-                    : await _context.UserDepartments
-                        .Where(ud => ud.UserID == userID)
-                        .Select(ud => ud.TagID)
-                        .ToListAsync();
-
-                model.AvailableTags = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           allowedIDs.Contains(d.TagID))
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
+                model.AvailableTags = await GetSelectableTagsAsync(userID);
 
                 return View(model);
             }
@@ -908,14 +811,7 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    var extErrIDs = isAdmin
-                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                    model.AvailableTags = await _context.DepartmentTags
-                        .Include(d => d.TagType)
-                        .Where(d => d.IsActive && extErrIDs.Contains(d.TagID))
-                        .OrderBy(d => d.TagName)
-                        .ToListAsync();
+                    model.AvailableTags = await GetSelectableTagsAsync(userID);
                     return View(model);
                 }
 
@@ -929,14 +825,7 @@ namespace EduConnect.Web.Controllers
                         .AnnouncementCategories
                         .Where(c => c.IsActive)
                         .ToListAsync();
-                    var sizeErrIDs = isAdmin
-                        ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                        : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                    model.AvailableTags = await _context.DepartmentTags
-                        .Include(d => d.TagType)
-                        .Where(d => d.IsActive && sizeErrIDs.Contains(d.TagID))
-                        .OrderBy(d => d.TagName)
-                        .ToListAsync();
+                    model.AvailableTags = await GetSelectableTagsAsync(userID);
                     return View(model);
                 }
 
@@ -1019,11 +908,7 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("", "Unable to save changes. Please try again.");
                 model.ExistingPhotoURL = announcement.AttachmentURL;
                 model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
-                var errAllowedIDs = isAdmin
-                    ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
-                    : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
-                model.AvailableTags = await _context.DepartmentTags.Include(d => d.TagType)
-                    .Where(d => d.IsActive && errAllowedIDs.Contains(d.TagID)).OrderBy(d => d.TagName).ToListAsync();
+                model.AvailableTags = await GetSelectableTagsAsync(userID);
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
             }

@@ -121,7 +121,7 @@
                         <input type="hidden" id="CategoryID" name="CategoryID" value="" />
                         <div class="cat-grid">
                             @foreach (var cat in Model.Categories.Where(c =>
-                                c.CategoryName != "Emergency" || roleName == RoleNames.Administrator))
+                                c.CategoryName != "Emergency"))
                             {
                                 <div class="cat-card"
                                      data-cat-id="@cat.CategoryID"
