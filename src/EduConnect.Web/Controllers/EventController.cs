@@ -68,7 +68,7 @@ namespace EduConnect.Web.Controllers
                    role == RoleNames.Chairperson;
         }
 
-        // Organizer, or a Dean / Chair Person sharing a
+        // Organizer, or a Dean / Chairperson sharing a
         // department with the organizer. Requires
         // Event.Organizer.UserDepartments to be loaded.
         private async Task<bool> CanScanRegistration(

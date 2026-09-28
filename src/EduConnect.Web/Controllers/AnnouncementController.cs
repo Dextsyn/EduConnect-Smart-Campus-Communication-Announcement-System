@@ -449,7 +449,7 @@ namespace EduConnect.Web.Controllers
                 return View(model);
             }
 
-            // Faculty always drafts for review. Dean / Chair Person need no
+            // Faculty always drafts for review. Dean / Chairperson need no
             // review, so they pick: publish straight away, or park it as a
             // draft that's already "Approved" and simply not out yet.
             string approvalStatus;
@@ -1166,7 +1166,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("MyAnnouncements");
             }
 
-            // Find Chair Person in same department
+            // Find Chairperson in same department
             var reviewer = await _context.UserDepartments
                 .Include(ud => ud.User)
                     .ThenInclude(u => u.Role)
@@ -1199,7 +1199,7 @@ namespace EduConnect.Web.Controllers
                 if (reviewer == null)
                 {
                     TempData["Error"] =
-                        "No Chair Person or Dean found for your " +
+                        "No Chairperson or Dean found for your " +
                         "department. Contact an administrator.";
                     return RedirectToAction("MyAnnouncements");
                 }
@@ -1246,7 +1246,7 @@ namespace EduConnect.Web.Controllers
 
         // ═══════════════════════════════════════
         //  GET: /Announcement/ReviewQueue
-        //  Chair Person / Dean pending review list
+        //  Chairperson / Dean pending review list
         // ═══════════════════════════════════════
         public async Task<IActionResult> ReviewQueue()
         {
@@ -1376,7 +1376,7 @@ namespace EduConnect.Web.Controllers
 
         // ═══════════════════════════════════════
         //  POST: /Announcement/Approve/{id}
-        //  Chair Person or Dean approves
+        //  Chairperson or Dean approves
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1450,7 +1450,7 @@ namespace EduConnect.Web.Controllers
                         $"{dean.FirstName} {dean.LastName}",
                         "EduConnect: Announcement Pending Your Approval",
                         $"<p>Hello {dean.FirstName},</p>" +
-                        $"<p>An announcement approved by the Chair Person now requires " +
+                        $"<p>An announcement approved by the Chairperson now requires " +
                         $"your review: <strong>{announcement.Title}</strong></p>" +
                         $"<p><a href='https://localhost:7135/Announcement/Review/" +
                         $"{announcement.AnnouncementID}'>Click here to review</a></p>");
@@ -1460,7 +1460,7 @@ namespace EduConnect.Web.Controllers
                 }
                 else
                 {
-                    // No Dean in department — Chair Person gives final approval
+                    // No Dean in department — Chairperson gives final approval
                     announcement.ApprovalStatus = "Approved";
                     announcement.ApprovedByID = userID;
                     announcement.ApprovedAt = DateTime.Now;
@@ -1484,7 +1484,7 @@ namespace EduConnect.Web.Controllers
                             "EduConnect: Announcement Approved",
                             $"<p>Hello {author.FirstName},</p>" +
                             $"<p>Your announcement <strong>{announcement.Title}</strong> " +
-                            $"has been approved by the Chair Person. You can now publish it.</p>" +
+                            $"has been approved by the Chairperson. You can now publish it.</p>" +
                             $"<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
                             $"Go to My Announcements</a></p>");
                     }
@@ -1532,7 +1532,7 @@ namespace EduConnect.Web.Controllers
 
         // ═══════════════════════════════════════
         //  POST: /Announcement/Reject/{id}
-        //  Chair Person or Dean rejects
+        //  Chairperson or Dean rejects
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1592,7 +1592,7 @@ namespace EduConnect.Web.Controllers
             var author = await _context.Users
                 .FindAsync(announcement.AuthorID);
             var rejectedBy = roleName == RoleNames.Chairperson
-                ? "the Chair Person"
+                ? "the Chairperson"
                 : "the Dean";
 
             _ = _notificationService.SendAsync(

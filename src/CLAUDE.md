@@ -47,7 +47,7 @@ Roles stored in the `Roles` table. Key flow:
 2. Admin approves → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`
 3. Admin can reject with a reason, or toggle `IsActive` at any time
 
-Named roles: `Administrator`, `Dean`, `Chair Person`, `Faculty`, `Staff`, `Student`, `Student Pending`
+Named roles (constants in `RoleNames.cs` — never compare a literal): `Administrator`, `Dean`, `Chairperson`, `Faculty`, `Staff`, `Student`, `Student Pending`
 
 ### Key Domain Concepts
 

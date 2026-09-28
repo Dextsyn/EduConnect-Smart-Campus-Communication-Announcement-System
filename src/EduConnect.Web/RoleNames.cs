@@ -7,7 +7,7 @@ namespace EduConnect.Web
     {
         public const string Administrator = "Administrator";
         public const string Dean = "Dean";
-        public const string Chairperson = "Chair Person";
+        public const string Chairperson = "Chairperson";
         public const string Faculty = "Faculty";
         public const string Staff = "Staff";
         public const string Student = "Student";
@@ -16,6 +16,6 @@ namespace EduConnect.Web
         // Role names that no longer exist. A session still carrying one
         // is cleared so the user logs in again and picks up the new name.
         public static readonly IReadOnlySet<string> Legacy =
-            new HashSet<string>();
+            new HashSet<string> { "Chair Person" };
     }
 }

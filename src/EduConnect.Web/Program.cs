@@ -152,6 +152,18 @@ app.Use(async (context, next) =>
         return;
     }
 
+    // A role renamed or removed since this session logged in: the stored
+    // RoleName now matches no check, so the user would silently fall
+    // through to the student feed. Make them log in again instead.
+    var sessionRole = context.Session.GetString("RoleName");
+    if (sessionRole != null &&
+        EduConnect.Web.RoleNames.Legacy.Contains(sessionRole))
+    {
+        context.Session.Clear();
+        context.Response.Redirect("/Account/Login");
+        return;
+    }
+
     await next();
 });
 
