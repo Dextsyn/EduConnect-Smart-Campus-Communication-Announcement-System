@@ -120,6 +120,98 @@ namespace EduConnect.Tests
         public async Task AddressedTo_ExcludesSchoolWide() =>
             Assert.Equal(new[] { "C-CCIT", "D-ITIS", "P-BSIT" }, await Addressed(_studentBsit));
 
+        private static TargetSelection Sel(int[]? c = null, int[]? d = null, int[]? p = null) =>
+            new(c ?? Array.Empty<int>(), d ?? Array.Empty<int>(), p ?? Array.Empty<int>());
+
+        [Fact]
+        public async Task Options_Dean_WholeCollege()
+        {
+            var o = await Service.GetTargetOptionsAsync(_dean.UserID);
+
+            Assert.True(o.CanTargetCollege);
+            Assert.True(o.CanTargetDepartments);
+            Assert.Equal(_ccit.CollegeID, o.College!.CollegeID);
+            Assert.Equal(new[] { "CS", "IT&IS" }, o.College.Departments.Select(d => d.Name).OrderBy(n => n));
+            Assert.Equal(3, o.College.Departments.SelectMany(d => d.Programs).Count());
+        }
+
+        [Fact]
+        public async Task Options_Chairperson_OwnDepartmentOnly()
+        {
+            var o = await Service.GetTargetOptionsAsync(_chair.UserID);
+
+            Assert.False(o.CanTargetCollege);
+            Assert.True(o.CanTargetDepartments);
+            var dept = Assert.Single(o.College!.Departments);
+            Assert.Equal("IT&IS", dept.Name);
+            Assert.Equal(new[] { "BSIS", "BSIT" }, dept.Programs.Select(p => p.Name).OrderBy(n => n));
+        }
+
+        [Fact]
+        public async Task Options_Faculty_ProgramsOnly()
+        {
+            var o = await Service.GetTargetOptionsAsync(_faculty.UserID);
+
+            Assert.False(o.CanTargetCollege);
+            Assert.False(o.CanTargetDepartments);
+            Assert.Equal(new[] { "BSIS", "BSIT" }, o.College!.Departments.Single().Programs.Select(p => p.Name).OrderBy(n => n));
+        }
+
+        [Fact]
+        public async Task Options_RetiredProgram_NotOffered()
+        {
+            _bsis.IsActive = false;
+            _db.Context.SaveChanges();
+
+            var o = await Service.GetTargetOptionsAsync(_faculty.UserID);
+
+            Assert.Equal("BSIT", o.College!.Departments.Single().Programs.Single().Name);
+        }
+
+        [Fact]
+        public async Task Options_UnplacedFaculty_None()
+        {
+            var unplaced = _db.AddUser(RoleNames.Faculty);
+
+            Assert.Null((await Service.GetTargetOptionsAsync(unplaced.UserID)).College);
+        }
+
+        [Fact]
+        public async Task Validate_FacultyOwnProgram_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(p: new[] { _bsit.ProgramID }))).Ok);
+
+        [Fact]
+        public async Task Validate_FacultyOtherDepartmentsProgram_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(p: new[] { _bscs.ProgramID }))).Ok);
+
+        [Fact]
+        public async Task Validate_FacultyDepartment_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(d: new[] { _itis.DepartmentID }))).Ok);
+
+        [Fact]
+        public async Task Validate_FacultyCollege_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task Validate_ChairpersonOwnDepartment_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_chair.UserID, Sel(d: new[] { _itis.DepartmentID }))).Ok);
+
+        [Fact]
+        public async Task Validate_ChairpersonCollege_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_chair.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task Validate_DeanCollegeAndOtherDepartmentsProgram_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_dean.UserID, Sel(c: new[] { _ccit.CollegeID }, p: new[] { _bscs.ProgramID }))).Ok);
+
+        [Fact]
+        public async Task Validate_DeanOtherCollegesProgram_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_dean.UserID, Sel(p: new[] { _bsbio.ProgramID }))).Ok);
+
+        [Fact]
+        public async Task Validate_EmptySelection_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_faculty.UserID, Sel())).Ok);
+
         [Fact]
         public async Task Not_InvertsVisibleTo()
         {

@@ -13,6 +13,24 @@ namespace EduConnect.Web.Services
         int? ProgramID,
         IReadOnlyList<int> TagIDs);
 
+    // The part of the hierarchy an author may pick from. College holds only
+    // the departments and programs they may target.
+    public class TargetOptions
+    {
+        public College? College { get; set; }
+        public bool CanTargetCollege { get; set; }
+        public bool CanTargetDepartments { get; set; }
+    }
+
+    public record TargetSelection(
+        IReadOnlyList<int> CollegeIDs,
+        IReadOnlyList<int> DepartmentIDs,
+        IReadOnlyList<int> ProgramIDs)
+    {
+        public bool IsEmpty =>
+            CollegeIDs.Count == 0 && DepartmentIDs.Count == 0 && ProgramIDs.Count == 0;
+    }
+
     public interface IAudienceService
     {
         Task<Viewer> GetViewerAsync(int userId);
@@ -24,5 +42,12 @@ namespace EduConnect.Web.Services
         // VisibleTo without School Wide or authorship: what is specifically
         // for the viewer's program/department/college or tags.
         Expression<Func<Announcement, bool>> AddressedTo(Viewer viewer);
+
+        // Dean: own college; Chairperson: own department; Faculty: own
+        // department's programs only. Unplaced authors: none.
+        Task<TargetOptions> GetTargetOptionsAsync(int authorId);
+
+        // Refuses any posted target outside GetTargetOptionsAsync.
+        Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection);
     }
 }

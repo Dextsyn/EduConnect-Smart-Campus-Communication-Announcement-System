@@ -48,6 +48,75 @@ namespace EduConnect.Web.Services
         public Expression<Func<Announcement, bool>> AddressedTo(Viewer viewer) =>
             Build(viewer, includeSchoolWideAndOwn: false);
 
+        public async Task<TargetOptions> GetTargetOptionsAsync(int authorId)
+        {
+            var author = await _context.Users
+                .Where(u => u.UserID == authorId)
+                .Select(u => new { Role = u.Role.RoleName, u.CollegeID, u.DepartmentID })
+                .FirstOrDefaultAsync();
+
+            var options = new TargetOptions();
+            if (author?.CollegeID == null)
+                return options;
+
+            var isDean = author.Role == RoleNames.Dean;
+            var isStaff = author.Role is RoleNames.Chairperson or RoleNames.Faculty;
+            if (!isDean && !(isStaff && author.DepartmentID != null))
+                return options;
+
+            var college = await _context.Colleges
+                .Include(c => c.Departments)
+                    .ThenInclude(d => d.Programs)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.CollegeID == author.CollegeID && c.IsActive);
+            if (college == null)
+                return options;
+
+            college.Departments = college.Departments
+                .Where(d => d.IsActive && (isDean || d.DepartmentID == author.DepartmentID))
+                .OrderBy(d => d.Name)
+                .ToList();
+            foreach (var dept in college.Departments)
+                dept.Programs = dept.Programs
+                    .Where(p => p.IsActive)
+                    .OrderBy(p => p.Name)
+                    .ToList();
+
+            options.College = college;
+            options.CanTargetCollege = isDean;
+            options.CanTargetDepartments = isDean || author.Role == RoleNames.Chairperson;
+            return options;
+        }
+
+        public async Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection)
+        {
+            if (selection.IsEmpty)
+                return HierarchyResult.Success;
+
+            var options = await GetTargetOptionsAsync(authorId);
+            var college = options.College;
+
+            var colleges = options.CanTargetCollege && college != null
+                ? new HashSet<int> { college.CollegeID }
+                : new HashSet<int>();
+            var departments = options.CanTargetDepartments && college != null
+                ? college.Departments.Where(d => !d.IsImplicit).Select(d => d.DepartmentID).ToHashSet()
+                : new HashSet<int>();
+            var programs = college?.Departments.SelectMany(d => d.Programs).Select(p => p.ProgramID).ToHashSet()
+                ?? new HashSet<int>();
+
+            if (selection.CollegeIDs.Any(id => !colleges.Contains(id)) ||
+                selection.DepartmentIDs.Any(id => !departments.Contains(id)) ||
+                selection.ProgramIDs.Any(id => !programs.Contains(id)))
+                return HierarchyResult.Fail(
+                    "You can only post to your own " +
+                    (options.CanTargetCollege ? "college." :
+                     options.CanTargetDepartments ? "department and its programs." :
+                     "department's programs."));
+
+            return HierarchyResult.Success;
+        }
+
         public static Expression<Func<Announcement, bool>> Not(
             Expression<Func<Announcement, bool>> expression) =>
             Expression.Lambda<Func<Announcement, bool>>(
