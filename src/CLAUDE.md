@@ -19,9 +19,10 @@ dotnet ef database update --project EduConnect.Web
 
 # Roll back to a specific migration
 dotnet ef database update <MigrationName> --project EduConnect.Web
-```
 
-There are no automated tests in this project.
+# Run the tests (xUnit, in-memory SQLite — no SQL Server needed)
+dotnet test EduConnect.Tests
+```
 
 ## Architecture
 

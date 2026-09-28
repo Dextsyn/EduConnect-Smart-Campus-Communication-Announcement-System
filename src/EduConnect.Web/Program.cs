@@ -13,6 +13,7 @@ builder.Services.AddTransient<EduConnect.Web.Services.IEmailService, EduConnect.
 builder.Services.AddScoped<EduConnect.Web.Services.IFeedRankingService, EduConnect.Web.Services.FeedRankingService>();
 builder.Services.AddScoped<EduConnect.Web.Services.INotificationService, EduConnect.Web.Services.NotificationService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IBlobStorageService, EduConnect.Web.Services.BlobStorageService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IHierarchyService, EduConnect.Web.Services.HierarchyService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
