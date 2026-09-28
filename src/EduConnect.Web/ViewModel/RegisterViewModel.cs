@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EduConnect.Web.ViewModels
 {
-    public class RegisterViewModel
+    public class RegisterViewModel : IPlacementForm
     {
         [Required(ErrorMessage = "First name is required")]
         [MaxLength(100)]
@@ -33,11 +33,13 @@ namespace EduConnect.Web.ViewModels
         [MaxLength(50)]
         public string StudentID { get; set; }
 
-        [Required(ErrorMessage = "Please select your department")]
-        public int? DepartmentTagID { get; set; }
+        // College and department are derived from the program by
+        // IPlacementService; only ProgramID is required.
+        public int? CollegeID { get; set; }
+        public int? DepartmentID { get; set; }
+        public int? ProgramID { get; set; }
 
-        // Only departments — no roles
-        public List<DepartmentTag> Departments { get; set; }
-            = new List<DepartmentTag>();
+        [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+        public List<College> Hierarchy { get; set; } = new();
     }
 }

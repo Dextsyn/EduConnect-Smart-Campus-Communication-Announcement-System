@@ -44,7 +44,7 @@ private bool IsAdmin() =>
 ### Roles & User Lifecycle
 
 Roles stored in the `Roles` table. Key flow:
-1. Student registers → `VerificationStatus = "Pending"`, `RoleID = "Student Pending"`, `IsActive = false`
+1. Student registers (choosing college → department → program; program required) → `VerificationStatus = "Pending"`, `RoleID = "Student Pending"`, `IsActive = false`
 2. Admin approves → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`
 3. Admin can reject with a reason, or toggle `IsActive` at any time
 

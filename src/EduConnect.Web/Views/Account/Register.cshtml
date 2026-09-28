@@ -158,31 +158,9 @@
                                   class="text-danger small"></span>
                         </div>
 
-                        <!-- Department -->
-                        <div class="mb-3">
-                            <label asp-for="DepartmentTagID"
-                                   class="form-label fw-semibold">
-                                College / Department
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="bi bi-building"></i>
-                                </span>
-                                <select asp-for="DepartmentTagID"
-                                        class="form-select">
-                                    <option value="">
-                                        — Select your college —
-                                    </option>
-                                    @foreach (var dept in Model.Departments)
-                                    {
-                                        <option value="@dept.TagID">
-                                            @dept.TagName
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-                            <span asp-validation-for="DepartmentTagID"
-                                  class="text-danger small"></span>
+                        <!-- Program -->
+                        <div class="mb-3 row g-0">
+                            @await Html.PartialAsync("_PlacementFields", Model)
                         </div>
 
                         <!-- Password -->

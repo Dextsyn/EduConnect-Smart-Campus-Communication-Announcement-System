@@ -18,6 +18,8 @@ namespace EduConnect.Web.Controllers
         private readonly INotificationService _notificationService;
         private readonly IConfiguration _configuration;
         private readonly IBlobStorageService _blobStorageService;
+        private readonly IHierarchyService _hierarchy;
+        private readonly IPlacementService _placement;
 
         public AccountController(
             ApplicationDbContext context,
@@ -26,7 +28,9 @@ namespace EduConnect.Web.Controllers
             IEmailService emailService,
             INotificationService notificationService,
             IConfiguration configuration,
-            IBlobStorageService blobStorageService)
+            IBlobStorageService blobStorageService,
+            IHierarchyService hierarchy,
+            IPlacementService placement)
         {
             _context = context;
             _logger = logger;
@@ -35,6 +39,8 @@ namespace EduConnect.Web.Controllers
             _notificationService = notificationService;
             _configuration = configuration;
             _blobStorageService = blobStorageService;
+            _hierarchy = hierarchy;
+            _placement = placement;
         }
 
         // ─── GET: /Account/Login ───────────────
@@ -149,12 +155,7 @@ namespace EduConnect.Web.Controllers
         {
             var model = new RegisterViewModel
             {
-                Departments = await _context.DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           d.TagType.TypeName == "Academic")
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync()
+                Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false)
             };
 
             return View(model);
@@ -169,13 +170,7 @@ namespace EduConnect.Web.Controllers
         {
             if (!ModelState.IsValid)
             {
-                model.Departments = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           d.TagType.TypeName == "Academic")
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
                 return View(model);
             }
 
@@ -188,13 +183,7 @@ namespace EduConnect.Web.Controllers
             {
                 ModelState.AddModelError("Email",
                     "Email is already registered.");
-                model.Departments = await _context
-                    .DepartmentTags
-                    .Include(d => d.TagType)
-                    .Where(d => d.IsActive &&
-                           d.TagType.TypeName == "Academic")
-                    .OrderBy(d => d.TagName)
-                    .ToListAsync();
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
                 return View(model);
             }
 
@@ -237,6 +226,7 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("",
                     "Registration is currently " +
                     "unavailable. Please try again later.");
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
                 return View(model);
             }
 
@@ -259,22 +249,23 @@ namespace EduConnect.Web.Controllers
                 CreatedAt = DateTime.Now
             };
 
+            var placement = await _placement.ApplyAsync(
+                user, RoleNames.StudentPending,
+                model.CollegeID, model.DepartmentID, model.ProgramID);
+            if (!placement.Ok)
+            {
+                ModelState.AddModelError("Placement", placement.Error!);
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+                return View(model);
+            }
+
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Assign department
-            if (model.DepartmentTagID.HasValue)
-            {
-                var userDept = new UserDepartment
-                {
-                    UserID = user.UserID,
-                    TagID = model.DepartmentTagID.Value,
-                    IsPrimary = true,
-                    CreatedAt = DateTime.Now
-                };
-                _context.UserDepartments.Add(userDept);
-                await _context.SaveChangesAsync();
-            }
+            // The feed still reads tags (until Plan 4): give the new student
+            // their college's tag.
+            await _placement.SyncFeedTagAsync(user);
+            await _context.SaveChangesAsync();
 
             _logger.LogInformation(
                 "New registration pending: {Email}",
