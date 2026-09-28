@@ -361,8 +361,13 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(u =>
                     u.UserID == int.Parse(userIdStr));
 
+            // Account deleted while logged in: end the session, or Login
+            // would bounce it to the dashboard and back here forever.
             if (user == null)
+            {
+                HttpContext.Session.Clear();
                 return RedirectToAction("Login");
+            }
 
             var model = new ProfileViewModel
             {
@@ -406,10 +411,35 @@ namespace EduConnect.Web.Controllers
                     u.UserID == int.Parse(userIdStr));
 
             if (user == null)
+            {
+                HttpContext.Session.Clear();
                 return RedirectToAction("Login");
+            }
+
+            // ─── Suffix allow-list validation ─────
+            var allowedSuffixes = new[] { "", "Jr.", "Sr.", "II", "III", "IV", "V" };
+            if (model.Suffix != null && !allowedSuffixes.Contains(model.Suffix))
+            {
+                ModelState.AddModelError("Suffix", "Invalid suffix value.");
+            }
+
+            // Students choose their own program; changes apply at once.
+            if (user.Role.RoleName == RoleNames.Student)
+            {
+                var placement = await _placement.ApplyAsync(
+                    user, RoleNames.Student,
+                    model.CollegeID, model.DepartmentID, model.ProgramID);
+                if (!placement.Ok)
+                    ModelState.AddModelError("Placement", placement.Error!);
+                else
+                    await _placement.SyncFeedTagAsync(user);
+            }
 
             // ─── Handle profile picture upload ────
-            if (model.NewProfilePicture != null &&
+            // Only once everything else is valid: the upload replaces and
+            // deletes the old avatar, which a failed save must not do.
+            if (ModelState.IsValid &&
+                model.NewProfilePicture != null &&
                 model.NewProfilePicture.Length > 0)
             {
                 var allowedExtensions = new[]
@@ -481,25 +511,6 @@ namespace EduConnect.Web.Controllers
                         }
                     }
                 }
-            }
-
-            // ─── Suffix allow-list validation ─────
-            var allowedSuffixes = new[] { "", "Jr.", "Sr.", "II", "III", "IV", "V" };
-            if (model.Suffix != null && !allowedSuffixes.Contains(model.Suffix))
-            {
-                ModelState.AddModelError("Suffix", "Invalid suffix value.");
-            }
-
-            // Students choose their own program; changes apply at once.
-            if (user.Role.RoleName == RoleNames.Student)
-            {
-                var placement = await _placement.ApplyAsync(
-                    user, RoleNames.Student,
-                    model.CollegeID, model.DepartmentID, model.ProgramID);
-                if (!placement.Ok)
-                    ModelState.AddModelError("Placement", placement.Error!);
-                else
-                    await _placement.SyncFeedTagAsync(user);
             }
 
             if (!ModelState.IsValid)

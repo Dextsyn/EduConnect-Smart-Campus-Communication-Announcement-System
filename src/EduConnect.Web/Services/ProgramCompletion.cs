@@ -14,7 +14,10 @@ namespace EduConnect.Web.Services
             "/Account/Profile",
             "/Account/ChangePassword",
             "/Account/Logout",
-            "/Account/Login"
+            "/Account/Login",
+            // The exception handler re-runs failed requests here; redirecting
+            // it would turn an error on Profile into a redirect loop.
+            "/Home/Error"
         };
 
         public static bool NeedsProgram(string? roleName, int? programId) =>

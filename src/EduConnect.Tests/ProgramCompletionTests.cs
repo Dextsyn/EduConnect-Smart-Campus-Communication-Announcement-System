@@ -45,6 +45,7 @@ namespace EduConnect.Tests
         [InlineData("/Account/ChangePassword")]
         [InlineData("/Account/Logout")]
         [InlineData("/Account/Login")]
+        [InlineData("/Home/Error")]
         public void ShouldRedirect_AllowedPages_False(string path) =>
             Assert.False(ProgramCompletion.ShouldRedirect("1", "GET", path, Html));
     }

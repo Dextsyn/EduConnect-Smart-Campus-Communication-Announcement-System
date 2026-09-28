@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EduConnect.Web\EduConnect.Web.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>
