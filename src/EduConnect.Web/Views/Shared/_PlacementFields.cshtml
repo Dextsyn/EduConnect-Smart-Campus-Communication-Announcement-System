@@ -1,4 +1,4 @@
-@model EduConnect.Web.ViewModels.AdminUserFormViewModel
+@model EduConnect.Web.ViewModels.IPlacementForm
 
 <div class="col-12" id="placementFields">
     <label class="form-label fw-semibold mb-1">Placement</label>
@@ -63,7 +63,10 @@
         const hint = document.getElementById('placementHint');
         const box = level => document.querySelector('#placementFields [data-level="' + level + '"]');
 
+        // Registration and the student profile have no role select:
+        // the picker is then always for a student.
         function roleName() {
+            if (!roleSelect) return roles.student;
             const opt = roleSelect.options[roleSelect.selectedIndex];
             return opt ? opt.text.trim() : '';
         }
@@ -91,7 +94,7 @@
             box('department').hidden = !((isStudent || isStaff) && !flat);
             box('program').hidden = !isStudent;
 
-            if (!roleSelect.value) {
+            if (roleSelect && !roleSelect.value) {
                 hint.textContent = 'Choose a role first.';
             } else if (!(isStudent || isStaff || isDean)) {
                 hint.textContent = 'Administrators and Staff are not placed in a college.';
@@ -102,7 +105,7 @@
             } else if (isStaff) {
                 hint.textContent = flat ? 'Placed in the college as a whole.' : 'Choose the department.';
             } else {
-                hint.textContent = 'Choose the student\'s program.';
+                hint.textContent = roleSelect ? 'Choose the student\'s program.' : 'Choose your college, department and program.';
             }
 
             filter(dept, o => o.dataset.college === college.value);
@@ -111,7 +114,7 @@
                 (flat || !dept.value || o.dataset.department === dept.value));
         }
 
-        roleSelect.addEventListener('change', refresh);
+        if (roleSelect) roleSelect.addEventListener('change', refresh);
         college.addEventListener('change', refresh);
         dept.addEventListener('change', refresh);
         refresh();

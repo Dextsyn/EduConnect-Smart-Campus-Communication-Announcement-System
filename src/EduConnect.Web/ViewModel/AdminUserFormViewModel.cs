@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace EduConnect.Web.ViewModels
 {
-    public class AdminUserFormViewModel
+    public class AdminUserFormViewModel : IPlacementForm
     {
         public int UserID { get; set; }
 
