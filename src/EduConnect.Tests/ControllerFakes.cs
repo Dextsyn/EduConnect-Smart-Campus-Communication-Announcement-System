@@ -1,6 +1,7 @@
 using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Session;
 
 namespace EduConnect.Tests
@@ -27,6 +28,13 @@ namespace EduConnect.Tests
             context.Features.Set<ISessionFeature>(new SessionFeature { Session = session });
             return context;
         }
+    }
+
+    // TempData that keeps nothing between requests.
+    public sealed class NullTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
     }
 
     // Records blob calls instead of talking to Azure.

@@ -329,7 +329,10 @@ namespace EduConnect.Web.Controllers
         // students, who are the only ones who edit it here.
         private async Task FillPlacementAsync(ProfileViewModel model, User user)
         {
-            model.CanEditProgram = user.Role.RoleName == RoleNames.Student;
+            // A student picks a program once (registration or first login);
+            // after that only the admin moves them.
+            model.CanEditProgram =
+                user.Role.RoleName == RoleNames.Student && user.ProgramID == null;
 
             var parts = await _context.Users
                 .Where(u => u.UserID == user.UserID)
@@ -423,8 +426,9 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("Suffix", "Invalid suffix value.");
             }
 
-            // Students choose their own program; changes apply at once.
-            if (user.Role.RoleName == RoleNames.Student)
+            // A student without a program chooses one here; once chosen it
+            // is locked and only the admin changes it.
+            if (user.Role.RoleName == RoleNames.Student && user.ProgramID == null)
             {
                 var placement = await _placement.ApplyAsync(
                     user, RoleNames.Student,

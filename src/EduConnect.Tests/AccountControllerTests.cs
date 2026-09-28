@@ -4,6 +4,7 @@ using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -32,6 +33,8 @@ namespace EduConnect.Tests
             {
                 HttpContext = FakeSession.HttpContextWith(_session)
             };
+            controller.TempData = new TempDataDictionary(
+                controller.ControllerContext.HttpContext, new NullTempDataProvider());
             return controller;
         }
 
@@ -50,14 +53,13 @@ namespace EduConnect.Tests
         public async Task ProfilePost_PlacementFails_KeepsTheOldPictureAndUploadsNothing()
         {
             var college = _db.AddCollege("CCIT");
-            var dept = _db.AddDepartment(college, "IT&IS");
-            var program = _db.AddProgram(dept, "BSIT");
-            var student = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, program.ProgramID);
+            // An unplaced student must choose a program; submitting a new
+            // picture without one fails the placement check.
+            var student = _db.AddUser(RoleNames.Student);
             student.ProfilePicture = OldAvatar;
             _db.Context.SaveChanges();
             _session.SetString("UserID", student.UserID.ToString());
 
-            // Changed college, program cleared by the picker: placement fails.
             var result = await Controller().Profile(new ProfileViewModel
             {
                 NewProfilePicture = Png(),
@@ -69,6 +71,51 @@ namespace EduConnect.Tests
             Assert.Empty(_blobs.Uploaded);
             Assert.Empty(_blobs.Deleted);
             Assert.Equal(OldAvatar, (await _db.NewContext().Users.SingleAsync()).ProfilePicture);
+        }
+
+        [Fact]
+        public async Task ProfilePost_StudentWithProgram_CannotChangeIt()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dept = _db.AddDepartment(college, "IT&IS");
+            var bsit = _db.AddProgram(dept, "BSIT");
+            var bsis = _db.AddProgram(dept, "BSIS");
+            var student = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, bsit.ProgramID);
+            _session.SetString("UserID", student.UserID.ToString());
+
+            await Controller().Profile(new ProfileViewModel { ProgramID = bsis.ProgramID });
+
+            Assert.Equal(bsit.ProgramID, (await _db.NewContext().Users.SingleAsync()).ProgramID);
+        }
+
+        [Fact]
+        public async Task ProfilePost_StudentWithoutProgram_CanChooseOne()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dept = _db.AddDepartment(college, "IT&IS");
+            var bsit = _db.AddProgram(dept, "BSIT");
+            var student = _db.AddUser(RoleNames.Student);
+            _session.SetString("UserID", student.UserID.ToString());
+
+            await Controller().Profile(new ProfileViewModel { ProgramID = bsit.ProgramID });
+
+            Assert.Equal(bsit.ProgramID, (await _db.NewContext().Users.SingleAsync()).ProgramID);
+        }
+
+        [Fact]
+        public async Task ProfileGet_StudentWithProgram_IsReadOnly()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dept = _db.AddDepartment(college, "IT&IS");
+            var bsit = _db.AddProgram(dept, "BSIT");
+            var student = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, bsit.ProgramID);
+            _session.SetString("UserID", student.UserID.ToString());
+
+            var result = Assert.IsType<ViewResult>(await Controller().Profile());
+
+            var model = Assert.IsType<ProfileViewModel>(result.Model);
+            Assert.False(model.CanEditProgram);
+            Assert.Equal("BSIT · IT&IS · CCIT", model.PlacementText);
         }
 
         [Fact]

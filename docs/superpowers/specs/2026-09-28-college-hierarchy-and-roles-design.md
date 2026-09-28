@@ -19,7 +19,7 @@ Department of Computer Science" or "only BS Information Technology students".
 | 2 | Colleges with no departments (Architecture, Law, Nursing, Pharmacy) | Each gets one **implicit** department (`IsImplicit = 1`, same name as the college) that the UI never shows. Programs always hang off a department. |
 | 3 | Role name | `Chair Person` → **`Chairperson`**. |
 | 4 | Faculty targeting | Faculty may only target programs of their own assigned department. Applies to every department (IT&IS is the motivating example). |
-| 5 | Existing students | Every existing student must be placed in their real program (department and college derive from it). |
+| 5 | Existing students | Every existing student must be placed in their real program (department and college derive from it). A student chooses their program once (registration, or first login if missing); after that it is locked and only the admin changes it. |
 | 6 | In-flight approvals at switch-over | Anything `PendingChair` / `PendingDean` when the new flow ships is reset to `Draft` and the author is notified to resubmit. |
 | 7 | Multiple roles / departments | One role per user, one placement per user. "Organization Adviser" is removed as a role; an adviser is a Faculty user with `OrgMembers.OrgRole = 'Adviser'`. |
 | 8 | Legacy tags CLAS, COED, PE | Deleted. |
@@ -99,8 +99,8 @@ any target, or to everyone for `ALL`. Feed visibility:
 
 **Registration and profile**
 - Registration: college → department → program cascade; program required.
-- Student profile: can change program (applies immediately, no re-verification — assumption,
-  see Open items).
+- Student profile: a student without a program chooses it there; once set it is shown
+  read-only and only the admin changes it (decided 2026-09-28).
 - A verified Student or Student Pending with no `ProgramID` is redirected to Profile with a
   "choose your program" notice on every page except Profile and Logout.
 
@@ -134,7 +134,6 @@ Each later plan is written when the previous one is merged, against the code as 
 
 ## Open items (assumptions — say if wrong)
 
-- Students changing program apply immediately without admin re-verification.
 - Multiple Deans per college / Chairpersons per department are allowed; routing notifies all.
 - The orphan local tables `Members` / `Orders` (migrations `AddMembers`, `AddOrders`, in no
   branch) and the orphan `ConvertAdvisersToNewRole` history row are left alone.
