@@ -18,6 +18,7 @@ namespace EduConnect.Web.Services
         private readonly ILogger<ChatbotService> _logger;
         private readonly IWebHostEnvironment _env;
         private readonly Client _geminiClient;
+        private readonly IAudienceService _audience;
 
         // AISummary is NVARCHAR(255) — keep generated summaries safely inside that.
         private const int MaxSummaryLength = 250;
@@ -28,7 +29,8 @@ namespace EduConnect.Web.Services
             IMemoryCache cache,
             ILogger<ChatbotService> logger,
             IWebHostEnvironment env,
-            Client geminiClient)
+            Client geminiClient,
+            IAudienceService audience)
         {
             _context = context;
             _config = config;
@@ -36,6 +38,7 @@ namespace EduConnect.Web.Services
             _logger = logger;
             _env = env;
             _geminiClient = geminiClient;
+            _audience = audience;
         }
 
         public async Task<List<ChatbotConversation>> GetHistoryAsync(string sessionToken)
@@ -131,20 +134,30 @@ namespace EduConnect.Web.Services
         //  Data access shared by the prompt builder and summarisation
         // ────────────────────────────────────────────────────────────
 
-        private async Task<List<int>> GetUserTagIDsAsync(int userId)
-        {
-            return await _context.UserDepartments
-                .Where(ud => ud.UserID == userId)
-                .Select(ud => ud.TagID)
-                .ToListAsync();
-        }
-
         private async Task<List<string>> GetUserDepartmentNamesAsync(int userId)
         {
-            return await _context.UserDepartments
-                .Where(ud => ud.UserID == userId)
+            var placement = await _context.Users
+                .Where(u => u.UserID == userId)
+                .Select(u => new
+                {
+                    Program = u.AcademicProgram == null ? null : u.AcademicProgram.Name,
+                    Department = u.Department == null || u.Department.IsImplicit ? null : u.Department.Name,
+                    College = u.College == null ? null : u.College.Name
+                })
+                .FirstOrDefaultAsync();
+
+            // Office tags (and School Wide) still describe non-academic users.
+            var tags = await _context.UserDepartments
+                .Where(ud => ud.UserID == userId &&
+                             !_context.Colleges.Any(c => c.LegacyTagID == ud.TagID))
                 .Select(ud => ud.DepartmentTag.TagName)
                 .ToListAsync();
+
+            return new[] { placement?.Program, placement?.Department, placement?.College }
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => s!)
+                .Concat(tags)
+                .ToList();
         }
 
         /// <summary>
@@ -162,16 +175,12 @@ namespace EduConnect.Web.Services
                 .Where(a => a.Status == "Published" &&
                     (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now));
 
-            var scopeToDepartment = forceDepartmentScope ||
-                roleName is RoleNames.Student or RoleNames.StudentPending or RoleNames.Faculty or RoleNames.Staff;
-
-            if (scopeToDepartment)
+            // Same scope as the announcement list: everyone but the
+            // Administrator is limited to what reaches them.
+            if (forceDepartmentScope || roleName != RoleNames.Administrator)
             {
-                var userTagIDs = await GetUserTagIDsAsync(userId);
-
-                query = query.Where(a =>
-                    a.AnnouncementTags.Any(at => userTagIDs.Contains(at.TagID)) ||
-                    a.AnnouncementTags.Any(at => at.DepartmentTag.ShortName == "ALL"));
+                var viewer = await _audience.GetViewerAsync(userId);
+                query = query.Where(_audience.VisibleTo(viewer));
             }
 
             return query;

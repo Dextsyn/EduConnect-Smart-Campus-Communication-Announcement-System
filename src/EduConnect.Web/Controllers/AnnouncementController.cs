@@ -183,28 +183,14 @@ namespace EduConnect.Web.Controllers
                     a.Title.Contains(searchQuery) ||
                     a.Body.Contains(searchQuery));
 
-            // Fail closed: name the roles that may see every department,
-            // and scope everyone else. Listing the scoped roles instead
-            // would silently expose any role missing from the list —
-            // Student Pending did exactly that.
-            bool seesAllDepartments =
-                roleName == RoleNames.Administrator ||
-                roleName == RoleNames.Dean ||
-                roleName == RoleNames.Chairperson;
-
-            if (!seesAllDepartments)
+            // Fail closed: only the Administrator reads every announcement;
+            // everyone else — Deans and Chairpersons included — sees their
+            // own scope. Naming the scoped roles instead would silently
+            // expose any role missing from the list.
+            if (roleName != RoleNames.Administrator)
             {
-                var userTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
-                query = query.Where(a =>
-                    a.AnnouncementTags.Any(at =>
-                        userTagIDs.Contains(at.TagID)) ||
-                    a.AnnouncementTags.Any(at =>
-                        at.DepartmentTag.ShortName == "ALL"));
+                var viewer = await _audience.GetViewerAsync(userID);
+                query = query.Where(_audience.VisibleTo(viewer));
             }
 
             // Total count for pagination
@@ -239,6 +225,7 @@ namespace EduConnect.Web.Controllers
                         .ToList()
                 })
                 .ToListAsync();
+            await _audience.AddTargetLabelsAsync(announcements);
 
             // Pass data to view
             ViewBag.Announcements = announcements;

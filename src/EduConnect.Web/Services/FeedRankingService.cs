@@ -15,8 +15,7 @@ namespace EduConnect.Web.Services
     public interface IFeedRankingService
     {
         Task<PersonalizedFeed> GetPersonalizedFeedAsync(
-            int userID,
-            List<int> userTagIDs,
+            Viewer viewer,
             string? searchQuery,
             string? filterFeedType);
     }
@@ -24,18 +23,20 @@ namespace EduConnect.Web.Services
     public class FeedRankingService : IFeedRankingService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IAudienceService _audience;
 
-        public FeedRankingService(ApplicationDbContext context)
+        public FeedRankingService(ApplicationDbContext context, IAudienceService audience)
         {
             _context = context;
+            _audience = audience;
         }
 
         public async Task<PersonalizedFeed> GetPersonalizedFeedAsync(
-            int userID,
-            List<int> userTagIDs,
+            Viewer viewer,
             string? searchQuery,
             string? filterFeedType)
         {
+            var userID = viewer.UserID;
             var result = new PersonalizedFeed();
 
             // Load user's interaction history (last 90 days) for affinity
@@ -67,9 +68,8 @@ namespace EduConnect.Web.Services
                 .Include(a => a.AnnouncementTags)
                     .ThenInclude(at => at.DepartmentTag)
                 .Where(a => a.Status == "Published" &&
-                            (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now) &&
-                            (a.AnnouncementTags.Any(at => userTagIDs.Contains(at.TagID)) ||
-                             a.AnnouncementTags.Any(at => at.DepartmentTag.ShortName == "ALL")));
+                            (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now))
+                .Where(_audience.VisibleTo(viewer));
 
             if (!string.IsNullOrEmpty(searchQuery))
                 baseQuery = baseQuery.Where(a =>
@@ -81,11 +81,17 @@ namespace EduConnect.Web.Services
             var authorized = await baseQuery.ToListAsync();
 
             // ── Section 1: Your Department ────────────────────────────────
-            // Dept-specific (tagged with user's own tags, not just ALL), last 30 days
+            // Addressed to the student's program/department/college or tags
+            // (not just School Wide), last 30 days
+            var addressedIDs = (await baseQuery
+                .Where(_audience.AddressedTo(viewer))
+                .Select(a => a.AnnouncementID)
+                .ToListAsync()).ToHashSet();
+
             var deptCutoff = DateTime.Now.AddDays(-30);
             var deptAnnouncements = authorized
                 .Where(a =>
-                    a.AnnouncementTags.Any(at => userTagIDs.Contains(at.TagID)) &&
+                    addressedIDs.Contains(a.AnnouncementID) &&
                     a.PublishedAt >= deptCutoff)
                 .OrderByDescending(a => a.IsEmergency)
                 .ThenByDescending(a => a.Priority)
@@ -138,9 +144,8 @@ namespace EduConnect.Web.Services
                             // belongs to someone else's department, and the
                             // +10000 boost in ComputeScore would hand it a slot
                             // on every student's dashboard.
-                            !a.IsEmergency &&
-                            !a.AnnouncementTags.Any(at => userTagIDs.Contains(at.TagID)) &&
-                            !a.AnnouncementTags.Any(at => at.DepartmentTag.ShortName == "ALL"))
+                            !a.IsEmergency)
+                .Where(AudienceService.Not(_audience.VisibleTo(viewer)))
                 .ToListAsync();
 
             result.Explore = exploreBase
@@ -150,6 +155,9 @@ namespace EduConnect.Web.Services
                 .Take(3)
                 .Select(x => ToViewModel(x.Announcement))
                 .ToList();
+
+            await _audience.AddTargetLabelsAsync(
+                result.Department.Concat(result.ForYou).Concat(result.Explore));
 
             return result;
         }

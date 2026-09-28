@@ -12,15 +12,18 @@ namespace EduConnect.Web.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<HomeController> _logger;
         private readonly IFeedRankingService _feedRanking;
+        private readonly IAudienceService _audience;
 
         public HomeController(
             ApplicationDbContext context,
             ILogger<HomeController> logger,
-            IFeedRankingService feedRanking)
+            IFeedRankingService feedRanking,
+            IAudienceService audience)
         {
             _context = context;
             _logger = logger;
             _feedRanking = feedRanking;
+            _audience = audience;
         }
 
         public async Task<IActionResult> Index(
@@ -149,14 +152,9 @@ namespace EduConnect.Web.Controllers
             if (roleName == RoleNames.Student)
             {
                 // Personalized feed: 3 sections ranked by behavior
-                var userTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
+                var viewer = await _audience.GetViewerAsync(userID);
                 var feed = await _feedRanking.GetPersonalizedFeedAsync(
-                    userID, userTagIDs, searchQuery, filterFeedType);
+                    viewer, searchQuery, filterFeedType);
 
                 model.DepartmentAnnouncements = feed.Department;
                 model.ForYouAnnouncements = feed.ForYou;
@@ -174,17 +172,8 @@ namespace EduConnect.Web.Controllers
             // Fail closed: every named role returned above, so anything
             // still here (Student Pending, or a role added later) gets the
             // same department scope a Student would, never the full feed.
-            var scopedTagIDs = await _context
-                .UserDepartments
-                .Where(ud => ud.UserID == userID)
-                .Select(ud => ud.TagID)
-                .ToListAsync();
-
-            query = query.Where(a =>
-                a.AnnouncementTags.Any(at =>
-                    scopedTagIDs.Contains(at.TagID)) ||
-                a.AnnouncementTags.Any(at =>
-                    at.DepartmentTag.ShortName == "ALL"));
+            var scopedViewer = await _audience.GetViewerAsync(userID);
+            query = query.Where(_audience.VisibleTo(scopedViewer));
 
             model.RecentAnnouncements = await query
                 .OrderByDescending(a => a.PublishedAt)
@@ -207,6 +196,7 @@ namespace EduConnect.Web.Controllers
                         .ToList()
                 })
                 .ToListAsync();
+            await _audience.AddTargetLabelsAsync(model.RecentAnnouncements);
 
             return View(model);
 
