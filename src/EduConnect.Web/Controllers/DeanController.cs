@@ -1,4 +1,5 @@
 ﻿using EduConnect.Web.Data;
+using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,13 +9,16 @@ namespace EduConnect.Web.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DeanController> _logger;
+        private readonly IAudienceService _audience;
 
         public DeanController(
             ApplicationDbContext context,
-            ILogger<DeanController> logger)
+            ILogger<DeanController> logger,
+            IAudienceService audience)
         {
             _context = context;
             _logger = logger;
+            _audience = audience;
         }
 
         // ─── Helpers ───────────────────────────
@@ -38,53 +42,48 @@ namespace EduConnect.Web.Controllers
 
             var userID = GetUserID();
 
-            // Get dean's department
-            var deanDept = await _context
-                .UserDepartments
-                .Include(ud => ud.DepartmentTag)
-                .FirstOrDefaultAsync(ud =>
-                    ud.UserID == userID &&
-                    ud.IsPrimary);
+            var viewer = await _audience.GetViewerAsync(userID);
+            var addressed = _audience.AddressedTo(viewer);
+            var isDean = viewer.RoleName == RoleNames.Dean;
+            var collegeID = viewer.CollegeID;
+            var departmentID = viewer.DepartmentID;
 
-            ViewBag.DepartmentName =
-                deanDept?.DepartmentTag?.TagName
-                ?? "No Department";
+            // A Dean's scope is the college, a Chairperson's the department.
+            var scope = await _context.Users
+                .Where(u => u.UserID == userID)
+                .Select(u => new
+                {
+                    CollegeName = u.College == null ? null : u.College.Name,
+                    CollegeShort = u.College == null ? null : u.College.ShortName,
+                    DepartmentName = u.Department == null || u.Department.IsImplicit ? null : u.Department.Name,
+                    DepartmentShort = u.Department == null || u.Department.IsImplicit ? null : u.Department.ShortName
+                })
+                .FirstAsync();
 
-            ViewBag.DepartmentShort =
-                deanDept?.DepartmentTag?.ShortName
+            ViewBag.DepartmentName = (isDean ? scope.CollegeName : scope.DepartmentName ?? scope.CollegeName)
+                ?? "No placement";
+            ViewBag.DepartmentShort = (isDean ? scope.CollegeShort : scope.DepartmentShort ?? scope.CollegeShort)
                 ?? "—";
 
             // ─── Stat Cards ────────────────────
-            // Pending approvals from THIS department
-            var deptTagID = deanDept?.TagID;
-
-            // Total published from this department
-            ViewBag.TotalPublished = await _context
-                .Announcements
-                .Where(a =>
-                    a.Status == "Published" &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == deptTagID))
+            ViewBag.TotalPublished = await _context.Announcements
+                .Where(a => a.Status == "Published")
+                .Where(addressed)
                 .CountAsync();
 
-            // Faculty in this department
-            ViewBag.TotalFaculty = await _context
-                .UserDepartments
-                .Where(ud =>
-                    ud.TagID == deptTagID &&
-                    ud.User.Role.RoleName == RoleNames.Faculty)
+            ViewBag.TotalFaculty = await _context.Users
+                .Where(u => u.IsActive &&
+                            u.Role.RoleName == RoleNames.Faculty &&
+                            (isDean
+                                ? collegeID != null && u.CollegeID == collegeID
+                                : departmentID != null && u.DepartmentID == departmentID))
                 .CountAsync();
 
-            // Today's announcements
-            ViewBag.TodayAnnouncements = await _context
-                .Announcements
-                .Where(a =>
-                    a.Status == "Published" &&
-                    a.PublishedAt.HasValue &&
-                    a.PublishedAt.Value.Date
-                        == DateTime.Today &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == deptTagID))
+            ViewBag.TodayAnnouncements = await _context.Announcements
+                .Where(a => a.Status == "Published" &&
+                            a.PublishedAt.HasValue &&
+                            a.PublishedAt.Value.Date == DateTime.Today)
+                .Where(addressed)
                 .CountAsync();
 
             // ─── Chart Data ────────────────────
@@ -99,15 +98,14 @@ namespace EduConnect.Web.Controllers
 
             ViewBag.MonthlyCount = months
                 .Select(m => _context.Announcements
+                    .Where(addressed)
                     .Count(a =>
                         a.Status == "Published" &&
                         a.PublishedAt.HasValue &&
                         a.PublishedAt.Value.Month
                             == m.Month &&
                         a.PublishedAt.Value.Year
-                            == m.Year &&
-                        a.AnnouncementTags.Any(at =>
-                            at.TagID == deptTagID)))
+                            == m.Year))
                 .ToList();
 
             // ─── Recent Published ───────────────
@@ -115,10 +113,8 @@ namespace EduConnect.Web.Controllers
                 .Announcements
                 .Include(a => a.Author)
                 .Include(a => a.Category)
-                .Where(a =>
-                    a.Status == "Published" &&
-                    a.AnnouncementTags.Any(at =>
-                        at.TagID == deptTagID))
+                .Where(a => a.Status == "Published")
+                .Where(addressed)
                 .OrderByDescending(a => a.PublishedAt)
                 .Take(10)
                 .ToListAsync();

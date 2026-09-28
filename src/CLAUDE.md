@@ -58,7 +58,7 @@ Named roles (constants in `RoleNames.cs` — never compare a literal): `Administ
 
 **FeedType** on announcements (`Academic`, `Administrative`, etc.) controls which feed tab the announcement appears in.
 
-**DepartmentTags** are used to target announcements and filter feeds. Users are assigned to departments via the `UserDepartments` junction table (`IsPrimary` flag marks the main department). Announcements tagged with `ShortName = "ALL"` are shown to everyone.
+**Audience.** Announcements target the academic hierarchy through `AnnouncementTargets` (one of College/Department/Program per row) and non-academic audiences through `AnnouncementTags` (`ALL` = School Wide, office tags; users hold tags via `UserDepartments`). `IAudienceService` owns every audience rule: `VisibleTo`/`AddressedTo` (EF expressions used by the announcement list, the student dashboard, the chatbot and the Dean/Faculty dashboards), `GetRecipientIdsAsync` (notifications), and `GetTargetOptionsAsync`/`ValidateTargetsAsync` (Dean → own college, Chairperson → own department, Faculty → own department's programs). `Details` is deliberately unscoped; Explore shows other colleges' non-emergency announcements.
 
 **Academic hierarchy** (`Colleges` > `Departments` > `Programs`, entity `AcademicProgram`) is replacing the academic rows of `DepartmentTags`. Colleges without departments have one `IsImplicit` department that the UI hides. `Users.CollegeID/DepartmentID/ProgramID` hold a user's placement (Dean: college; Chairperson/Faculty: department; Student: program). `DepartmentTags` stays for `ALL` and non-academic offices. Design: `docs/superpowers/specs/2026-09-28-college-hierarchy-and-roles-design.md`.
 

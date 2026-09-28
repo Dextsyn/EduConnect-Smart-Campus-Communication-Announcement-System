@@ -38,21 +38,21 @@ namespace EduConnect.Web.Controllers
 
             var userID = GetUserID();
 
-            // Get faculty's department
-            var facultyDept = await _context
-                .UserDepartments
-                .Include(ud => ud.DepartmentTag)
-                .FirstOrDefaultAsync(ud =>
-                    ud.UserID == userID &&
-                    ud.IsPrimary);
+            var placement = await _context.Users
+                .Where(u => u.UserID == userID)
+                .Select(u => new
+                {
+                    Name = u.Department != null && !u.Department.IsImplicit
+                        ? u.Department.Name
+                        : u.College != null ? u.College.Name : null,
+                    Short = u.Department != null && !u.Department.IsImplicit
+                        ? u.Department.ShortName
+                        : u.College != null ? u.College.ShortName : null
+                })
+                .FirstAsync();
 
-            ViewBag.DepartmentName =
-                facultyDept?.DepartmentTag?.TagName
-                ?? "No Department";
-
-            ViewBag.DepartmentShort =
-                facultyDept?.DepartmentTag?.ShortName
-                ?? "—";
+            ViewBag.DepartmentName = placement.Name ?? "No placement";
+            ViewBag.DepartmentShort = placement.Short ?? "—";
 
             // ─── Stat Cards ────────────────────
             ViewBag.TotalEvents = await _context.Events
