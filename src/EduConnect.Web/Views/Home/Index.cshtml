@@ -74,7 +74,7 @@
     </div>
 
     <!-- Role Specific Card -->
-    @if (roleName == "Administrator")
+    @if (roleName == RoleNames.Administrator)
     {
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 ec-lift">
@@ -94,7 +94,7 @@
             </div>
         </div>
     }
-    else if (roleName == "Faculty" || roleName == "Staff")
+    else if (roleName == RoleNames.Faculty || roleName == RoleNames.Staff)
     {
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 ec-lift">
@@ -193,7 +193,7 @@
 </div>
 
 @{
-    bool isStudentFeed = roleName == "Student";
+    bool isStudentFeed = roleName == RoleNames.Student;
 }
 
 @if (isStudentFeed)

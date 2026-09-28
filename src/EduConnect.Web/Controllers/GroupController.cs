@@ -21,7 +21,7 @@ namespace EduConnect.Web.Controllers
             int.Parse(HttpContext.Session.GetString("UserID")!);
 
         private bool IsStudent() =>
-            HttpContext.Session.GetString("RoleName") == "Student";
+            HttpContext.Session.GetString("RoleName") == RoleNames.Student;
 
         private static readonly HashSet<string> _allowedCategories = new()
         {

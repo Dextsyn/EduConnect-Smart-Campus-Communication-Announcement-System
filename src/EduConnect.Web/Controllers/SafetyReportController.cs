@@ -137,7 +137,7 @@ namespace EduConnect.Web.Controllers
             {
                 var staffUsers = await _context.Users
                     .Include(u => u.Role)
-                    .Where(u => u.Role.RoleName == "Staff"
+                    .Where(u => u.Role.RoleName == RoleNames.Staff
                                 && u.IsActive)
                     .ToListAsync();
 

@@ -20,7 +20,7 @@ namespace EduConnect.Web.Controllers
         // ─── Helpers ───────────────────────────
         private bool IsDean() =>
             HttpContext.Session.GetString("RoleName")
-                is "Dean" or "Chair Person";
+                is RoleNames.Dean or RoleNames.Chairperson;
 
         private int GetUserID() =>
             int.Parse(HttpContext.Session
@@ -72,7 +72,7 @@ namespace EduConnect.Web.Controllers
                 .UserDepartments
                 .Where(ud =>
                     ud.TagID == deptTagID &&
-                    ud.User.Role.RoleName == "Faculty")
+                    ud.User.Role.RoleName == RoleNames.Faculty)
                 .CountAsync();
 
             // Today's announcements

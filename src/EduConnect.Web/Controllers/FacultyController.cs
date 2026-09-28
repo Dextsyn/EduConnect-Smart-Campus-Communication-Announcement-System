@@ -20,7 +20,7 @@ namespace EduConnect.Web.Controllers
         // ─── Helpers ───────────────────────────
         private bool IsFaculty() =>
             HttpContext.Session
-                .GetString("RoleName") == "Faculty";
+                .GetString("RoleName") == RoleNames.Faculty;
 
         private int GetUserID() =>
             int.Parse(HttpContext.Session

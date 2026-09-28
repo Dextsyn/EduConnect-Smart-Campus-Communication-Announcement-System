@@ -54,7 +54,7 @@
                     <strong>@Model.Members.Count / @Model.MaxMembers</strong> members
                 </div>
 
-                @if (role == "Student" && !isCreator && Model.Status != "Dissolved")
+                @if (role == RoleNames.Student && !isCreator && Model.Status != "Dissolved")
                 {
                     if (isMember)
                     {

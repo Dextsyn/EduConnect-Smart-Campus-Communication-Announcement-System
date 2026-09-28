@@ -27,7 +27,7 @@ namespace EduConnect.Web.Controllers
         // ─── Check if Admin ────────────────────
         private bool IsAdmin() =>
             HttpContext.Session
-                .GetString("RoleName") == "Administrator";
+                .GetString("RoleName") == RoleNames.Administrator;
 
         private string GetBaseUrl() =>
             $"{Request.Scheme}://{Request.Host}";
@@ -48,23 +48,23 @@ namespace EduConnect.Web.Controllers
                 .CountAsync();
 
             ViewBag.CountFaculty = await _context.Users
-                .Where(u => u.Role.RoleName == "Faculty" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Faculty && u.IsActive)
                 .CountAsync();
 
             ViewBag.CountDean = await _context.Users
-                .Where(u => u.Role.RoleName == "Dean" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Dean && u.IsActive)
                 .CountAsync();
 
             ViewBag.CountChairPerson = await _context.Users
-                .Where(u => u.Role.RoleName == "Chair Person" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Chairperson && u.IsActive)
                 .CountAsync();
 
             ViewBag.CountStaff = await _context.Users
-                .Where(u => u.Role.RoleName == "Staff" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Staff && u.IsActive)
                 .CountAsync();
 
             ViewBag.CountStudent = await _context.Users
-                .Where(u => u.Role.RoleName == "Student" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Student && u.IsActive)
                 .CountAsync();
 
             // ─── Chart: New Registrations Last 6 Months ──
@@ -169,7 +169,7 @@ namespace EduConnect.Web.Controllers
             // Get verified student role
             var studentRole = await _context.Roles
                 .FirstOrDefaultAsync(r =>
-                    r.RoleName == "Student");
+                    r.RoleName == RoleNames.Student);
 
             // Update user
             user.VerificationStatus = "Verified";

@@ -35,11 +35,11 @@ namespace EduConnect.Web.Controllers
             int.Parse(HttpContext.Session.GetString("UserID")!);
 
         private bool IsAdmin() =>
-            HttpContext.Session.GetString("RoleName") == "Administrator";
+            HttpContext.Session.GetString("RoleName") == RoleNames.Administrator;
 
         private async Task<bool> IsAdviserOf(int orgId)
         {
-            if (HttpContext.Session.GetString("RoleName") != "Faculty")
+            if (HttpContext.Session.GetString("RoleName") != RoleNames.Faculty)
                 return false;
             var userId = GetUserID();
             return await _context.OrgMembers.AnyAsync(m =>
@@ -419,7 +419,7 @@ namespace EduConnect.Web.Controllers
         private async Task PopulateOrgFormDropdowns(OrgFormViewModel vm)
         {
             var faculty = await _context.Users
-                .Where(u => u.Role.RoleName == "Faculty" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Faculty && u.IsActive)
                 .OrderBy(u => u.LastName)
                 .ThenBy(u => u.FirstName)
                 .ToListAsync();

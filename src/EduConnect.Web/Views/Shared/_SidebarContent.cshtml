@@ -39,7 +39,7 @@
         .GetString("RoleName");
     }
 
-    @if (currentRole == "Administrator")
+    @if (currentRole == RoleNames.Administrator)
     {
         <a href="/Admin" class="ec-side-link">
             <i class="bi bi-speedometer2"></i>
@@ -62,7 +62,7 @@
             Departments
         </a>
     }
-    else if (currentRole == "Dean")
+    else if (currentRole == RoleNames.Dean)
     {
         <a href="/Dean"
            class="ec-side-link">
@@ -110,7 +110,7 @@
             Report Safety Issue
         </a>
     }
-    else if (currentRole == "Faculty")
+    else if (currentRole == RoleNames.Faculty)
     {
         <a href="/Faculty"
            class="ec-side-link">
@@ -157,7 +157,7 @@
             Report Safety Issue
         </a>
     }
-    else if (currentRole == "Chair Person")
+    else if (currentRole == RoleNames.Chairperson)
     {
         <a href="/Dean"
            class="ec-side-link">
@@ -205,7 +205,7 @@
             Report Safety Issue
         </a>
     }
-    else if (currentRole == "Staff")
+    else if (currentRole == RoleNames.Staff)
     {
         <a href="/Staff"
            class="ec-side-link">

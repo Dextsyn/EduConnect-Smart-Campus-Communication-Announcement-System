@@ -155,7 +155,7 @@
                                value="@Model.CategoryID" />
                         <div class="cat-grid">
                             @foreach (var cat in Model.Categories.Where(c =>
-                                c.CategoryName != "Emergency" || roleName == "Administrator"))
+                                c.CategoryName != "Emergency" || roleName == RoleNames.Administrator))
                             {
                                 <div class="cat-card @(Model.CategoryID == cat.CategoryID ? "active" : "")"
                                      data-cat-id="@cat.CategoryID"

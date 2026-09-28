@@ -1,6 +1,6 @@
 ﻿@{
     var currentRole = Context.Session.GetString("RoleName");
-    var dashboardLabel = currentRole == "Chair Person" ? "Chair Person Dashboard" : "Dean Dashboard";
+    var dashboardLabel = currentRole == RoleNames.Chairperson ? "Chair Person Dashboard" : "Dean Dashboard";
     ViewData["Title"] = dashboardLabel;
     var userName = Context.Session
         .GetString("UserName");

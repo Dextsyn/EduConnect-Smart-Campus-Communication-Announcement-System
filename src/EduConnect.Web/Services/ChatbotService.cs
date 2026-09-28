@@ -163,7 +163,7 @@ namespace EduConnect.Web.Services
                     (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now));
 
             var scopeToDepartment = forceDepartmentScope ||
-                roleName is "Student" or "Student Pending" or "Faculty" or "Staff";
+                roleName is RoleNames.Student or RoleNames.StudentPending or RoleNames.Faculty or RoleNames.Staff;
 
             if (scopeToDepartment)
             {

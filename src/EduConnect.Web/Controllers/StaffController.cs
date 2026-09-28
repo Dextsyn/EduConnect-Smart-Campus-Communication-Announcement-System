@@ -17,7 +17,7 @@ namespace EduConnect.Web.Controllers
         private bool IsStaffOrAdmin()
         {
             var role = HttpContext.Session.GetString("RoleName");
-            return role == "Staff" || role == "Administrator";
+            return role == RoleNames.Staff || role == RoleNames.Administrator;
         }
 
         private int GetUserID() =>

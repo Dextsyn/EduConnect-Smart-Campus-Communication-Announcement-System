@@ -247,7 +247,7 @@ else
                                         View
                                     </a>
                                 }
-                                @if (roleName == "Administrator" ||
+                                @if (roleName == RoleNames.Administrator ||
                                      item.AuthorID == currentUserID)
                                 {
                                     <a href="/Announcement/Edit/@item.AnnouncementID"

@@ -49,22 +49,22 @@ namespace EduConnect.Web.Controllers
         private bool CanPublish()
         {
             var role = GetRoleName();
-            return role == "Dean" ||
-                   role == "Chair Person";
+            return role == RoleNames.Dean ||
+                   role == RoleNames.Chairperson;
         }
 
         private bool CanEditAnnouncement(Announcement a) =>
             a.AuthorID == GetUserID();
 
         private bool IsFaculty() =>
-            GetRoleName() == "Faculty";
+            GetRoleName() == RoleNames.Faculty;
 
         private bool CanCreate()
         {
             var role = GetRoleName();
-            return role == "Dean" ||
-                   role == "Chair Person" ||
-                   role == "Faculty";
+            return role == RoleNames.Dean ||
+                   role == RoleNames.Chairperson ||
+                   role == RoleNames.Faculty;
         }
 
         // Departments flag their own emergencies. The flag pins the
@@ -74,9 +74,9 @@ namespace EduConnect.Web.Controllers
         private bool CanSetEmergency()
         {
             var role = GetRoleName();
-            return role == "Dean" ||
-                   role == "Chair Person" ||
-                   role == "Faculty";
+            return role == RoleNames.Dean ||
+                   role == RoleNames.Chairperson ||
+                   role == RoleNames.Faculty;
         }
 
         // ═══════════════════════════════════════
@@ -129,9 +129,9 @@ namespace EduConnect.Web.Controllers
             // would silently expose any role missing from the list —
             // Student Pending did exactly that.
             bool seesAllDepartments =
-                roleName == "Administrator" ||
-                roleName == "Dean" ||
-                roleName == "Chair Person";
+                roleName == RoleNames.Administrator ||
+                roleName == RoleNames.Dean ||
+                roleName == RoleNames.Chairperson;
 
             if (!seesAllDepartments)
             {
@@ -320,7 +320,7 @@ namespace EduConnect.Web.Controllers
             // Faculty sees only Academic tags
             // Staff sees only NonAcademic tags
             // Admin sees all tags
-            if (roleName == "Administrator")
+            if (roleName == RoleNames.Administrator)
             {
                 model.AvailableTags = await _context
                     .DepartmentTags
@@ -386,7 +386,7 @@ namespace EduConnect.Web.Controllers
             // ─── SECURITY: Validate tags ───────────
             // Make sure faculty didn't tamper with
             // the form to post to other departments
-            if (roleName != "Administrator" &&
+            if (roleName != RoleNames.Administrator &&
                 model.SelectedTagIDs != null &&
                 model.SelectedTagIDs.Any())
             {
@@ -429,7 +429,7 @@ namespace EduConnect.Web.Controllers
                     .Where(c => c.IsActive)
                     .ToListAsync();
 
-                var allowedIDs = roleName == "Administrator"
+                var allowedIDs = roleName == RoleNames.Administrator
                     ? await _context.DepartmentTags
                         .Where(d => d.IsActive)
                         .Select(d => d.TagID)
@@ -495,7 +495,7 @@ namespace EduConnect.Web.Controllers
                         "Only image files are allowed.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    var photoErrIDs = roleName == "Administrator"
+                    var photoErrIDs = roleName == RoleNames.Administrator
                         ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
                         : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
                     model.AvailableTags = await _context.DepartmentTags
@@ -510,7 +510,7 @@ namespace EduConnect.Web.Controllers
                         "File size cannot exceed 5MB.");
                     model.Categories = await _context.AnnouncementCategories
                         .Where(c => c.IsActive).ToListAsync();
-                    var photoSizeIDs = roleName == "Administrator"
+                    var photoSizeIDs = roleName == RoleNames.Administrator
                         ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
                         : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
                     model.AvailableTags = await _context.DepartmentTags
@@ -573,7 +573,7 @@ namespace EduConnect.Web.Controllers
                 _logger.LogError("Failed to save announcement: {Error}", ex.Message);
                 ModelState.AddModelError("", "Unable to save the announcement. Please try again.");
                 model.Categories = await _context.AnnouncementCategories.Where(c => c.IsActive).ToListAsync();
-                var dbErrIDs = roleName == "Administrator"
+                var dbErrIDs = roleName == RoleNames.Administrator
                     ? await _context.DepartmentTags.Where(d => d.IsActive).Select(d => d.TagID).ToListAsync()
                     : await _context.UserDepartments.Where(ud => ud.UserID == userID).Select(ud => ud.TagID).ToListAsync();
                 model.AvailableTags = await _context.DepartmentTags.Where(d => d.IsActive && dbErrIDs.Contains(d.TagID)).ToListAsync();
@@ -754,7 +754,7 @@ namespace EduConnect.Web.Controllers
                     .ToListAsync()
             };
 
-            if (roleName == "Administrator")
+            if (roleName == RoleNames.Administrator)
             {
                 model.AvailableTags = await _context
                     .DepartmentTags
@@ -798,7 +798,7 @@ namespace EduConnect.Web.Controllers
 
             var userID = GetUserID();
             var roleName = GetRoleName();
-            bool isAdmin = roleName == "Administrator";
+            bool isAdmin = roleName == RoleNames.Administrator;
 
             var announcement = await _context.Announcements
                 .Include(a => a.AnnouncementTags)
@@ -1092,7 +1092,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var role = GetRoleName();
-            if (role != "Faculty" && role != "Dean" && role != "Chair Person")
+            if (role != RoleNames.Faculty && role != RoleNames.Dean && role != RoleNames.Chairperson)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1172,7 +1172,7 @@ namespace EduConnect.Web.Controllers
                     .ThenInclude(u => u.Role)
                 .Where(ud =>
                     ud.TagID == primaryDept.TagID &&
-                    ud.User.Role.RoleName == "Chair Person" &&
+                    ud.User.Role.RoleName == RoleNames.Chairperson &&
                     ud.User.IsActive)
                 .Select(ud => ud.User)
                 .FirstOrDefaultAsync();
@@ -1191,7 +1191,7 @@ namespace EduConnect.Web.Controllers
                         .ThenInclude(u => u.Role)
                     .Where(ud =>
                         ud.TagID == primaryDept.TagID &&
-                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.Role.RoleName == RoleNames.Dean &&
                         ud.User.IsActive)
                     .Select(ud => ud.User)
                     .FirstOrDefaultAsync();
@@ -1254,7 +1254,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var roleName = GetRoleName();
-            if (roleName != "Chair Person" && roleName != "Dean")
+            if (roleName != RoleNames.Chairperson && roleName != RoleNames.Dean)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1270,7 +1270,7 @@ namespace EduConnect.Web.Controllers
                 return View();
             }
 
-            var pendingStatus = roleName == "Chair Person"
+            var pendingStatus = roleName == RoleNames.Chairperson
                 ? "PendingChair"
                 : "PendingDean";
 
@@ -1322,7 +1322,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var roleName = GetRoleName();
-            if (roleName != "Chair Person" && roleName != "Dean")
+            if (roleName != RoleNames.Chairperson && roleName != RoleNames.Dean)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1334,7 +1334,7 @@ namespace EduConnect.Web.Controllers
             if (primaryDept == null)
                 return RedirectToAction("ReviewQueue");
 
-            var expectedStatus = roleName == "Chair Person"
+            var expectedStatus = roleName == RoleNames.Chairperson
                 ? "PendingChair"
                 : "PendingDean";
 
@@ -1359,14 +1359,14 @@ namespace EduConnect.Web.Controllers
 
             ViewBag.Role = roleName;
 
-            if (roleName == "Chair Person")
+            if (roleName == RoleNames.Chairperson)
             {
                 var hasDean = await _context.UserDepartments
                     .Include(ud => ud.User)
                         .ThenInclude(u => u.Role)
                     .AnyAsync(ud =>
                         ud.TagID == primaryDept.TagID &&
-                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.Role.RoleName == RoleNames.Dean &&
                         ud.User.IsActive);
                 ViewBag.HasDean = hasDean;
             }
@@ -1386,7 +1386,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var roleName = GetRoleName();
-            if (roleName != "Chair Person" && roleName != "Dean")
+            if (roleName != RoleNames.Chairperson && roleName != RoleNames.Dean)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1398,7 +1398,7 @@ namespace EduConnect.Web.Controllers
             if (primaryDept == null)
                 return RedirectToAction("ReviewQueue");
 
-            var expectedStatus = roleName == "Chair Person"
+            var expectedStatus = roleName == RoleNames.Chairperson
                 ? "PendingChair"
                 : "PendingDean";
 
@@ -1417,7 +1417,7 @@ namespace EduConnect.Web.Controllers
             if (announcement == null)
                 return RedirectToAction("ReviewQueue");
 
-            if (roleName == "Chair Person")
+            if (roleName == RoleNames.Chairperson)
             {
                 announcement.ChairApprovedByID = userID;
                 announcement.ChairApprovedAt = DateTime.Now;
@@ -1428,7 +1428,7 @@ namespace EduConnect.Web.Controllers
                         .ThenInclude(u => u.Role)
                     .Where(ud =>
                         ud.TagID == primaryDept.TagID &&
-                        ud.User.Role.RoleName == "Dean" &&
+                        ud.User.Role.RoleName == RoleNames.Dean &&
                         ud.User.IsActive)
                     .Select(ud => ud.User)
                     .FirstOrDefaultAsync();
@@ -1542,7 +1542,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var roleName = GetRoleName();
-            if (roleName != "Chair Person" && roleName != "Dean")
+            if (roleName != RoleNames.Chairperson && roleName != RoleNames.Dean)
                 return RedirectToAction("Index");
 
             if (string.IsNullOrWhiteSpace(rejectionReason))
@@ -1561,7 +1561,7 @@ namespace EduConnect.Web.Controllers
             if (primaryDept == null)
                 return RedirectToAction("ReviewQueue");
 
-            var expectedStatus = roleName == "Chair Person"
+            var expectedStatus = roleName == RoleNames.Chairperson
                 ? "PendingChair"
                 : "PendingDean";
 
@@ -1582,7 +1582,7 @@ namespace EduConnect.Web.Controllers
 
             announcement.ApprovalStatus = "Rejected";
 
-            if (roleName == "Chair Person")
+            if (roleName == RoleNames.Chairperson)
                 announcement.ChairRejectionReason = rejectionReason;
             else
                 announcement.RejectionReason = rejectionReason;
@@ -1591,7 +1591,7 @@ namespace EduConnect.Web.Controllers
 
             var author = await _context.Users
                 .FindAsync(announcement.AuthorID);
-            var rejectedBy = roleName == "Chair Person"
+            var rejectedBy = roleName == RoleNames.Chairperson
                 ? "the Chair Person"
                 : "the Dean";
 
@@ -1632,9 +1632,9 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var roleName = GetRoleName();
-            if (roleName != "Faculty" &&
-                roleName != "Dean" &&
-                roleName != "Chair Person")
+            if (roleName != RoleNames.Faculty &&
+                roleName != RoleNames.Dean &&
+                roleName != RoleNames.Chairperson)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();

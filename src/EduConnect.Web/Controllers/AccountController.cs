@@ -230,7 +230,7 @@ namespace EduConnect.Web.Controllers
             // Get Student Pending role
             var pendingRole = await _context.Roles
                 .FirstOrDefaultAsync(r =>
-                    r.RoleName == "Student Pending");
+                    r.RoleName == RoleNames.StudentPending);
 
             if (pendingRole == null)
             {
@@ -282,7 +282,7 @@ namespace EduConnect.Web.Controllers
 
             // Notify all admins of the new pending student
             var adminIds = await _context.Users
-                .Where(u => u.Role.RoleName == "Administrator" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Administrator && u.IsActive)
                 .Select(u => u.UserID)
                 .ToListAsync();
             if (adminIds.Count > 0)
@@ -316,15 +316,15 @@ namespace EduConnect.Web.Controllers
 
             return role switch
             {
-                "Administrator" => RedirectToAction(
+                RoleNames.Administrator => RedirectToAction(
                     "Index", "Admin"),
-                "Dean" => RedirectToAction(
+                RoleNames.Dean => RedirectToAction(
                     "Index", "Dean"),
-                "Chair Person" => RedirectToAction(
+                RoleNames.Chairperson => RedirectToAction(
                     "Index", "Dean"),
-                "Faculty" => RedirectToAction(
+                RoleNames.Faculty => RedirectToAction(
                     "Index", "Faculty"),
-                "Staff" => RedirectToAction(
+                RoleNames.Staff => RedirectToAction(
                     "Index", "Staff"),
                 _ => RedirectToAction(
                     "Index", "Home")
@@ -818,7 +818,7 @@ namespace EduConnect.Web.Controllers
 
             // Notify all admins of the password reset
             var adminIds = await _context.Users
-                .Where(u => u.Role.RoleName == "Administrator" && u.IsActive)
+                .Where(u => u.Role.RoleName == RoleNames.Administrator && u.IsActive)
                 .Select(u => u.UserID)
                 .ToListAsync();
             if (adminIds.Count > 0)

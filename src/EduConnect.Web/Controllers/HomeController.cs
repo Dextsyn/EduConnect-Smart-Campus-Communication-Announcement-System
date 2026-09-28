@@ -35,16 +35,16 @@ namespace EduConnect.Web.Controllers
             var userID = int.Parse(HttpContext.Session.GetString("UserID"));
             var roleName = HttpContext.Session.GetString("RoleName");
 
-            if (roleName == "Administrator")
+            if (roleName == RoleNames.Administrator)
                 return RedirectToAction("Index", "Admin");
 
-            if (roleName == "Dean" || roleName == "Chair Person")
+            if (roleName == RoleNames.Dean || roleName == RoleNames.Chairperson)
                 return RedirectToAction("Index", "Dean");
 
-            if (roleName == "Faculty")
+            if (roleName == RoleNames.Faculty)
                 return RedirectToAction("Index", "Faculty");
 
-            if (roleName == "Staff")
+            if (roleName == RoleNames.Staff)
                 return RedirectToAction("Index", "Staff");
 
             var model = new DashboardViewModel
@@ -78,7 +78,7 @@ namespace EduConnect.Web.Controllers
                 .Where(e => e.StartDateTime >= DateTime.Now)
                 .CountAsync();
 
-            if (roleName == "Administrator")
+            if (roleName == RoleNames.Administrator)
             {
                 model.TotalUsers = await _context
                     .Users
@@ -91,8 +91,8 @@ namespace EduConnect.Web.Controllers
                     .CountAsync();
             }
 
-            if (roleName == "Faculty" ||
-                roleName == "Staff")
+            if (roleName == RoleNames.Faculty ||
+                roleName == RoleNames.Staff)
             {
                 model.MyAnnouncements = await _context
                     .Announcements
@@ -146,7 +146,7 @@ namespace EduConnect.Web.Controllers
                 })
                 .ToListAsync();
 
-            if (roleName == "Student")
+            if (roleName == RoleNames.Student)
             {
                 // Personalized feed: 3 sections ranked by behavior
                 var userTagIDs = await _context
@@ -166,8 +166,8 @@ namespace EduConnect.Web.Controllers
             }
 
             // For faculty/staff — show their own
-            if (roleName == "Faculty" ||
-                roleName == "Staff")
+            if (roleName == RoleNames.Faculty ||
+                roleName == RoleNames.Staff)
                 query = query.Where(a =>
                     a.AuthorID == userID);
 

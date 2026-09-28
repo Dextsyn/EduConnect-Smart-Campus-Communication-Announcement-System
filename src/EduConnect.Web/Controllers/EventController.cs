@@ -55,17 +55,17 @@ namespace EduConnect.Web.Controllers
         private bool CanManageEvents()
         {
             var role = GetRoleName();
-            return role == "Faculty" ||
-                   role == "Dean" ||
-                   role == "Chair Person";
+            return role == RoleNames.Faculty ||
+                   role == RoleNames.Dean ||
+                   role == RoleNames.Chairperson;
         }
 
         private bool CanScan()
         {
             var role = GetRoleName();
-            return role == "Faculty" ||
-                   role == "Dean" ||
-                   role == "Chair Person";
+            return role == RoleNames.Faculty ||
+                   role == RoleNames.Dean ||
+                   role == RoleNames.Chairperson;
         }
 
         // Organizer, or a Dean / Chair Person sharing a
@@ -80,8 +80,8 @@ namespace EduConnect.Web.Controllers
             if (registration.Event.OrganizerID == userID)
                 return true;
 
-            if (roleName != "Dean" &&
-                roleName != "Chair Person")
+            if (roleName != RoleNames.Dean &&
+                roleName != RoleNames.Chairperson)
                 return false;
 
             var userDeptTagIDs = await _context
@@ -421,7 +421,7 @@ namespace EduConnect.Web.Controllers
 
             ViewBag.IsOrganizer =
                 ev.OrganizerID == userID ||
-                roleName == "Administrator";
+                roleName == RoleNames.Administrator;
 
             ViewBag.IsCreator =
                 ev.OrganizerID == userID;
@@ -961,7 +961,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction(
                     "Login", "Account");
 
-            if (GetRoleName() == "Staff")
+            if (GetRoleName() == RoleNames.Staff)
             {
                 TempData["Error"] =
                     "Staff members cannot register " +
@@ -1450,8 +1450,8 @@ namespace EduConnect.Web.Controllers
                 ev.OrganizerID == userID;
 
             if (!canAccess &&
-                (roleName == "Dean" ||
-                 roleName == "Chair Person"))
+                (roleName == RoleNames.Dean ||
+                 roleName == RoleNames.Chairperson))
             {
                 var userDeptTagIDs = await _context
                     .UserDepartments
