@@ -7,6 +7,14 @@
 }
 
 <!-- Success / Error alerts -->
+@if (ViewBag.MustChooseProgram == true)
+{
+    <div class="alert alert-warning mb-4">
+        <i class="bi bi-mortarboard me-2"></i>
+        Choose your college, department and program below to continue using EduConnect.
+    </div>
+}
+
 @if (TempData["Success"] != null)
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">

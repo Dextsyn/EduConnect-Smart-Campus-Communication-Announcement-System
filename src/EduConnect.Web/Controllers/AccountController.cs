@@ -134,6 +134,9 @@ namespace EduConnect.Web.Controllers
             HttpContext.Session.SetString("ProfilePicture",
                 user.ProfilePicture ?? "");
 
+            if (ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID))
+                HttpContext.Session.SetString(ProgramCompletion.SessionKey, "1");
+
             // Identifies this login to the browser-presence script in _Layout.
             // A fresh login gets a fresh key, so a stale presence record left
             // by an earlier login can never log this one straight back out.
@@ -375,6 +378,15 @@ namespace EduConnect.Web.Controllers
             };
             await FillPlacementAsync(model, user);
 
+            // Recomputed on every visit: the admin may have placed the
+            // student since they logged in.
+            if (ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID))
+                HttpContext.Session.SetString(ProgramCompletion.SessionKey, "1");
+            else
+                HttpContext.Session.Remove(ProgramCompletion.SessionKey);
+            ViewBag.MustChooseProgram =
+                ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID);
+
             return View(model);
         }
 
@@ -499,6 +511,8 @@ namespace EduConnect.Web.Controllers
                 model.RoleName = user.Role.RoleName;
                 model.ProfilePicturePath = user.ProfilePicture;
                 await FillPlacementAsync(model, user);
+                ViewBag.MustChooseProgram =
+                    ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID);
                 return View(model);
             }
 
@@ -507,6 +521,9 @@ namespace EduConnect.Web.Controllers
             user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
+
+            if (!ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID))
+                HttpContext.Session.Remove(ProgramCompletion.SessionKey);
 
             // Refresh session
             HttpContext.Session.SetString("ProfilePicture",

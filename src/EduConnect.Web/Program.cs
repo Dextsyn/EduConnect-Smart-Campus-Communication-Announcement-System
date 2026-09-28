@@ -169,6 +169,24 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// A verified student without a program is sent to their profile to
+// choose one (ProgramCompletion has the rules).
+app.Use(async (context, next) =>
+{
+    if (EduConnect.Web.Services.ProgramCompletion.ShouldRedirect(
+            context.Session.GetString(EduConnect.Web.Services.ProgramCompletion.SessionKey),
+            context.Request.Method,
+            context.Request.Path,
+            context.Request.Headers.Accept.ToString()))
+    {
+        context.Response.Redirect(
+            EduConnect.Web.Services.ProgramCompletion.ProfilePath + "?complete=1");
+        return;
+    }
+
+    await next();
+});
+
 // After UseSession so the chatbot policy can partition by logged-in user
 app.UseRateLimiter();
 
