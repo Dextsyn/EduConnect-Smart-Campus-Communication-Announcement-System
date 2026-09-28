@@ -78,6 +78,28 @@ namespace EduConnect.Tests
             return program;
         }
 
+        public DepartmentTag AddTag(string shortName)
+        {
+            var type = Context.TagTypes.FirstOrDefault(t => t.TypeName == "Academic");
+            if (type == null)
+            {
+                type = new TagType { TypeName = "Academic", Description = "Academic" };
+                Context.TagTypes.Add(type);
+                Context.SaveChanges();
+            }
+
+            var tag = new DepartmentTag
+            {
+                TagName = shortName + " tag",
+                ShortName = shortName,
+                TagTypeID = type.TagTypeID,
+                ColorHex = "#000000"
+            };
+            Context.DepartmentTags.Add(tag);
+            Context.SaveChanges();
+            return tag;
+        }
+
         public User AddUser(string roleName, int? collegeId = null,
             int? departmentId = null, int? programId = null, bool isActive = true)
         {

@@ -10,5 +10,11 @@ namespace EduConnect.Web.Services
         // Mutates `user` only; the caller saves.
         Task<HierarchyResult> ApplyAsync(User user, string roleName,
             int? collegeId, int? departmentId, int? programId);
+
+        // Temporary bridge until the feed reads placement (Plan 4): points
+        // the student's primary UserDepartments tag at their college's
+        // legacy tag, or removes it when the college has none. The user
+        // must already be saved; stages changes, the caller saves.
+        Task SyncFeedTagAsync(User user);
     }
 }

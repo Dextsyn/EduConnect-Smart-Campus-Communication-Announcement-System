@@ -49,7 +49,7 @@ namespace EduConnect.Web.Services
         private async Task<HierarchyResult> PlaceStudentAsync(User user, int? programId)
         {
             if (programId == null)
-                return HierarchyResult.Fail("Choose the student's program.");
+                return HierarchyResult.Fail("Choose a program.");
 
             var program = await _context.Programs
                 .Include(p => p.Department)
@@ -102,6 +102,43 @@ namespace EduConnect.Web.Services
 
             Set(user, college.CollegeID, null, null);
             return HierarchyResult.Success;
+        }
+
+        public async Task SyncFeedTagAsync(User user)
+        {
+            int? tagId = null;
+            if (user.CollegeID != null)
+                tagId = await _context.Colleges
+                    .Where(c => c.CollegeID == user.CollegeID)
+                    .Select(c => c.LegacyTagID)
+                    .FirstOrDefaultAsync();
+
+            var rows = await _context.UserDepartments
+                .Where(ud => ud.UserID == user.UserID)
+                .ToListAsync();
+
+            var primary = rows.FirstOrDefault(ud => ud.IsPrimary);
+            if (primary?.TagID == tagId)
+                return;
+
+            if (primary != null)
+                _context.UserDepartments.Remove(primary);
+
+            if (tagId == null)
+                return;
+
+            // (UserID, TagID) is unique: promote a row that already exists.
+            var existing = rows.FirstOrDefault(ud => ud.TagID == tagId && !ud.IsPrimary);
+            if (existing != null)
+                existing.IsPrimary = true;
+            else
+                _context.UserDepartments.Add(new UserDepartment
+                {
+                    UserID = user.UserID,
+                    TagID = tagId.Value,
+                    IsPrimary = true,
+                    CreatedAt = DateTime.Now
+                });
         }
 
         private static void Set(User user, int? collegeId, int? departmentId, int? programId)
