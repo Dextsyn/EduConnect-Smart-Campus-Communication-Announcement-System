@@ -755,12 +755,12 @@ namespace EduConnect.Web.Controllers
         //  DEPARTMENTS
         // ═══════════════════════════════════════
 
-        // Departments whose ShortName is matched as a literal string by the
-        // announcement feed (FeedRankingService, AnnouncementController,
-        // HomeController, ChatbotService). Renaming or retiring one of these
-        // would silently stop campus-wide announcements from reaching anyone,
-        // so their ShortName, type and active state are locked.
-        private static readonly string[] SystemShortNames = { "ALL", "EMRG" };
+        // The School Wide row, whose ShortName "ALL" is matched as a literal
+        // string by the announcement feed (FeedRankingService,
+        // AnnouncementController, HomeController, ChatbotService). Renaming
+        // or retiring it would silently stop campus-wide announcements from
+        // reaching anyone, so its ShortName, type and active state are locked.
+        private static readonly string[] SystemShortNames = { "ALL" };
 
         private static bool IsSystemDepartment(DepartmentTag dept) =>
             dept.ShortName != null &&

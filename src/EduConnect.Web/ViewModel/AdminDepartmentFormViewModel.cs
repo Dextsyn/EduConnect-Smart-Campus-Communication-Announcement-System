@@ -29,7 +29,7 @@ namespace EduConnect.Web.ViewModels
 
         public bool IsActive { get; set; } = true;
 
-        // True for the ALL / EMRG rows, whose ShortName the announcement
+        // True for the ALL row, whose ShortName the announcement
         // feed matches on literally. The view renders those fields
         // read-only and the controller re-asserts them on POST.
         public bool IsSystemDepartment { get; set; }
