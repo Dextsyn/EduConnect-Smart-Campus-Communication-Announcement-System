@@ -430,6 +430,7 @@ namespace EduConnect.Web.Controllers
                 .ToList();
 
             var depts = await _context.DepartmentTags
+                .Where(d => d.IsActive)
                 .OrderBy(d => d.TagName)
                 .ToListAsync();
 
