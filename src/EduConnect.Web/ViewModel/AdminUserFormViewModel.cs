@@ -32,13 +32,20 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Role is required")]
         public int RoleID { get; set; }
 
-        [Required(ErrorMessage = "Department is required")]
+        [Required(ErrorMessage = "Feed tag is required")]
         public int DepartmentTagID { get; set; }
+
+        // Academic placement; which levels apply depends on the role.
+        // IPlacementService validates and derives the rest.
+        public int? CollegeID { get; set; }
+        public int? DepartmentID { get; set; }
+        public int? ProgramID { get; set; }
 
         public bool IsActive { get; set; } = true;
 
         // Populated by the controller for the dropdowns
         public List<SelectListItem> Roles { get; set; } = new();
         public List<SelectListItem> Departments { get; set; } = new();
+        public List<College> Hierarchy { get; set; } = new();
     }
 }

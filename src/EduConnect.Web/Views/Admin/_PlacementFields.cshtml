@@ -1,0 +1,119 @@
+@model EduConnect.Web.ViewModels.AdminUserFormViewModel
+
+<div class="col-12" id="placementFields">
+    <label class="form-label fw-semibold mb-1">Placement</label>
+    <div class="text-muted small mb-2" id="placementHint"></div>
+    <div class="row g-2">
+        <div class="col-md-4" data-level="college">
+            <select asp-for="CollegeID" class="form-select">
+                <option value="">— College —</option>
+                @foreach (var c in Model.Hierarchy)
+                {
+                    <option value="@c.CollegeID" data-flat="@(c.Departments.Any(d => d.IsImplicit) ? "1" : "0")">@c.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4" data-level="department">
+            <select asp-for="DepartmentID" class="form-select">
+                <option value="">— Department —</option>
+                @foreach (var c in Model.Hierarchy)
+                {
+                    foreach (var d in c.Departments.Where(d => !d.IsImplicit))
+                    {
+                        <option value="@d.DepartmentID" data-college="@c.CollegeID">@d.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-4" data-level="program">
+            <select asp-for="ProgramID" class="form-select">
+                <option value="">— Program —</option>
+                @foreach (var c in Model.Hierarchy)
+                {
+                    foreach (var d in c.Departments)
+                    {
+                        foreach (var p in d.Programs)
+                        {
+                            <option value="@p.ProgramID" data-college="@c.CollegeID"
+                                    data-department="@(d.IsImplicit ? "" : d.DepartmentID.ToString())">@p.Name</option>
+                        }
+                    }
+                }
+            </select>
+        </div>
+    </div>
+    @Html.ValidationMessage("Placement", null, new { @class = "text-danger small d-block mt-1" })
+</div>
+
+<script>
+    (function () {
+        // Which levels each role uses — mirrors PlacementService.
+        const roles = @Json.Serialize(new
+        {
+            dean = RoleNames.Dean,
+            chair = RoleNames.Chairperson,
+            faculty = RoleNames.Faculty,
+            student = RoleNames.Student,
+            pending = RoleNames.StudentPending
+        });
+        const roleSelect = document.getElementById('RoleID');
+        const college = document.getElementById('CollegeID');
+        const dept = document.getElementById('DepartmentID');
+        const program = document.getElementById('ProgramID');
+        const hint = document.getElementById('placementHint');
+        const box = level => document.querySelector('#placementFields [data-level="' + level + '"]');
+
+        function roleName() {
+            const opt = roleSelect.options[roleSelect.selectedIndex];
+            return opt ? opt.text.trim() : '';
+        }
+
+        function filter(select, keep) {
+            for (const opt of select.options) {
+                if (!opt.value) continue;
+                const show = keep(opt);
+                opt.hidden = !show;
+                opt.disabled = !show;
+            }
+            const current = select.options[select.selectedIndex];
+            if (current && current.disabled) select.value = '';
+        }
+
+        function refresh() {
+            const role = roleName();
+            const isStudent = role === roles.student || role === roles.pending;
+            const isStaff = role === roles.chair || role === roles.faculty;
+            const isDean = role === roles.dean;
+            const collegeOpt = college.options[college.selectedIndex];
+            const flat = collegeOpt && collegeOpt.dataset.flat === '1';
+
+            box('college').hidden = !(isStudent || isStaff || isDean);
+            box('department').hidden = !((isStudent || isStaff) && !flat);
+            box('program').hidden = !isStudent;
+
+            if (!roleSelect.value) {
+                hint.textContent = 'Choose a role first.';
+            } else if (!(isStudent || isStaff || isDean)) {
+                hint.textContent = 'Administrators and Staff are not placed in a college.';
+            } else if (role === roles.chair && flat) {
+                hint.textContent = 'This college has no departments, so it has no Chairperson.';
+            } else if (isDean) {
+                hint.textContent = 'A Dean is placed in a college.';
+            } else if (isStaff) {
+                hint.textContent = flat ? 'Placed in the college as a whole.' : 'Choose the department.';
+            } else {
+                hint.textContent = 'Choose the student\'s program.';
+            }
+
+            filter(dept, o => o.dataset.college === college.value);
+            if (flat) dept.value = '';
+            filter(program, o => o.dataset.college === college.value &&
+                (flat || !dept.value || o.dataset.department === dept.value));
+        }
+
+        roleSelect.addEventListener('change', refresh);
+        college.addEventListener('change', refresh);
+        dept.addEventListener('change', refresh);
+        refresh();
+    })();
+</script>

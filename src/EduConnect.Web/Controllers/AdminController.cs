@@ -13,15 +13,21 @@ namespace EduConnect.Web.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IEmailService _emailService;
         private readonly ILogger<AdminController> _logger;
+        private readonly IHierarchyService _hierarchy;
+        private readonly IPlacementService _placement;
 
         public AdminController(
             ApplicationDbContext context,
             IEmailService emailService,
-            ILogger<AdminController> logger)
+            ILogger<AdminController> logger,
+            IHierarchyService hierarchy,
+            IPlacementService placement)
         {
             _context = context;
             _emailService = emailService;
             _logger = logger;
+            _hierarchy = hierarchy;
+            _placement = placement;
         }
 
         // ─── Check if Admin ────────────────────
@@ -391,6 +397,21 @@ namespace EduConnect.Web.Controllers
             return View();
         }
 
+        // Dropdown data for the Add/Edit User forms.
+        private async Task PopulateUserFormAsync(AdminUserFormViewModel model)
+        {
+            model.Roles = (await _context.Roles.ToListAsync())
+                .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
+                .ToList();
+            model.Departments = (await _context.DepartmentTags
+                .Where(d => d.IsActive)
+                .ToListAsync())
+                .Select(d => new SelectListItem(
+                    $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
+                .ToList();
+            model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+        }
+
         // ═══════════════════════════════════════
         //  GET: /Admin/AddUser
         // ═══════════════════════════════════════
@@ -399,18 +420,8 @@ namespace EduConnect.Web.Controllers
             if (!IsAdmin())
                 return RedirectToAction("Login", "Account");
 
-            var model = new AdminUserFormViewModel
-            {
-                Roles = (await _context.Roles.ToListAsync())
-                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
-                    .ToList(),
-                Departments = (await _context.DepartmentTags
-                    .Where(d => d.IsActive)
-                    .ToListAsync())
-                    .Select(d => new SelectListItem(
-                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
-                    .ToList()
-            };
+            var model = new AdminUserFormViewModel();
+            await PopulateUserFormAsync(model);
             return View(model);
         }
 
@@ -432,19 +443,12 @@ namespace EduConnect.Web.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == model.Email))
                 ModelState.AddModelError("Email", "A user with this email already exists.");
 
-            if (!ModelState.IsValid)
-            {
-                model.Roles = (await _context.Roles.ToListAsync())
-                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
-                    .ToList();
-                model.Departments = (await _context.DepartmentTags
-                    .Where(d => d.IsActive)
-                    .ToListAsync())
-                    .Select(d => new SelectListItem(
-                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
-                    .ToList();
-                return View(model);
-            }
+            var roleName = await _context.Roles
+                .Where(r => r.RoleID == model.RoleID)
+                .Select(r => r.RoleName)
+                .FirstOrDefaultAsync();
+            if (roleName == null)
+                ModelState.AddModelError("RoleID", "Choose a valid role.");
 
             var adminID = int.Parse(HttpContext.Session.GetString("UserID"));
 
@@ -453,7 +457,7 @@ namespace EduConnect.Web.Controllers
                 FirstName = model.FirstName,
                 LastName = model.LastName,
                 Email = model.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password ?? ""),
                 StudentID = model.StudentID,
                 RoleID = model.RoleID,
                 IsActive = model.IsActive,
@@ -462,6 +466,20 @@ namespace EduConnect.Web.Controllers
                 VerifiedAt = DateTime.Now,
                 CreatedAt = DateTime.Now
             };
+
+            if (roleName != null)
+            {
+                var placement = await _placement.ApplyAsync(
+                    user, roleName, model.CollegeID, model.DepartmentID, model.ProgramID);
+                if (!placement.Ok)
+                    ModelState.AddModelError("Placement", placement.Error!);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await PopulateUserFormAsync(model);
+                return View(model);
+            }
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -543,17 +561,12 @@ namespace EduConnect.Web.Controllers
                 StudentID = user.StudentID,
                 RoleID = user.RoleID,
                 DepartmentTagID = primaryDept?.TagID ?? 0,
-                IsActive = user.IsActive,
-                Roles = (await _context.Roles.ToListAsync())
-                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
-                    .ToList(),
-                Departments = (await _context.DepartmentTags
-                    .Where(d => d.IsActive)
-                    .ToListAsync())
-                    .Select(d => new SelectListItem(
-                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
-                    .ToList()
+                CollegeID = user.CollegeID,
+                DepartmentID = user.DepartmentID,
+                ProgramID = user.ProgramID,
+                IsActive = user.IsActive
             };
+            await PopulateUserFormAsync(model);
 
             return View(model);
         }
@@ -578,15 +591,7 @@ namespace EduConnect.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                model.Roles = (await _context.Roles.ToListAsync())
-                    .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
-                    .ToList();
-                model.Departments = (await _context.DepartmentTags
-                    .Where(d => d.IsActive)
-                    .ToListAsync())
-                    .Select(d => new SelectListItem(
-                        $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
-                    .ToList();
+                await PopulateUserFormAsync(model);
                 return View(model);
             }
 
@@ -598,6 +603,30 @@ namespace EduConnect.Web.Controllers
             {
                 TempData["Error"] = "User not found.";
                 return RedirectToAction("Users");
+            }
+
+            var roleName = await _context.Roles
+                .Where(r => r.RoleID == model.RoleID)
+                .Select(r => r.RoleName)
+                .FirstOrDefaultAsync();
+            if (roleName == null)
+            {
+                ModelState.AddModelError("RoleID", "Choose a valid role.");
+            }
+            else
+            {
+                var placement = await _placement.ApplyAsync(
+                    user, roleName, model.CollegeID, model.DepartmentID, model.ProgramID);
+                if (!placement.Ok)
+                    ModelState.AddModelError("Placement", placement.Error!);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                // Nothing has been saved; the tracked user is discarded
+                // with this request.
+                await PopulateUserFormAsync(model);
+                return View(model);
             }
 
             user.FirstName = model.FirstName;
