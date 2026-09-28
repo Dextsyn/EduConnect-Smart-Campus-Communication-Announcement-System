@@ -261,6 +261,70 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task RetireProgram_WithOnlyDeactivatedUserPlaced_Succeeds()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dept = _db.AddDepartment(college, "IT&IS");
+            var program = _db.AddProgram(dept, "BSIT");
+            // A graduated / deactivated student: verified, no longer active.
+            var alumnus = _db.AddUser("Student", college.CollegeID, dept.DepartmentID, program.ProgramID, isActive: false);
+            alumnus.VerificationStatus = "Verified";
+            _db.Context.SaveChanges();
+
+            var result = await Service.SetProgramActiveAsync(program.ProgramID, false);
+
+            Assert.True(result.Ok);
+            // The alumnus keeps pointing at the retired program.
+            Assert.Equal(program.ProgramID, (await _db.NewContext().Users.SingleAsync()).ProgramID);
+        }
+
+        [Fact]
+        public async Task RetireCollege_WithOnlyDeactivatedDeanPlaced_Succeeds()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dean = _db.AddUser("Dean", college.CollegeID, isActive: false);
+            dean.VerificationStatus = "Verified";
+            _db.Context.SaveChanges();
+
+            var result = await Service.SetCollegeActiveAsync(college.CollegeID, false);
+
+            Assert.True(result.Ok);
+        }
+
+        [Fact]
+        public async Task AddCollege_SameNameCommittedByAnotherRequestFirst_FailsInsteadOfThrowing()
+        {
+            _db.BeforeSave.Once = () =>
+            {
+                using var other = _db.NewContext();
+                other.Colleges.Add(new EduConnect.Web.Models.College { Name = "College of Law" });
+                other.SaveChanges();
+            };
+
+            var result = await Service.AddCollegeAsync("College of Law", null, hasDepartments: true);
+
+            Assert.False(result.Ok);
+            Assert.Contains("already", result.Error);
+        }
+
+        [Fact]
+        public async Task AddProgram_SameNameCommittedByAnotherRequestFirst_FailsInsteadOfThrowing()
+        {
+            var dept = _db.AddDepartment(_db.AddCollege("CCIT"), "IT&IS");
+            _db.BeforeSave.Once = () =>
+            {
+                using var other = _db.NewContext();
+                other.Programs.Add(new EduConnect.Web.Models.AcademicProgram { DepartmentID = dept.DepartmentID, Name = "BSIT" });
+                other.SaveChanges();
+            };
+
+            var result = await Service.AddProgramAsync(dept.DepartmentID, "BSIT", null);
+
+            Assert.False(result.Ok);
+            Assert.Contains("already", result.Error);
+        }
+
+        [Fact]
         public async Task RestoreProgram_ClearsRetiredAt()
         {
             var program = _db.AddProgram(_db.AddDepartment(_db.AddCollege("CCIT"), "IT&IS"), "BSIT");

@@ -67,8 +67,7 @@ namespace EduConnect.Web.Services
                 college.Departments.Add(new Department { Name = name, IsImplicit = true });
 
             _context.Colleges.Add(college);
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> AddDepartmentAsync(
@@ -98,8 +97,7 @@ namespace EduConnect.Web.Services
                     $"{college.Name} already has a department named \"{name}\".");
 
             college.Departments.Add(new Department { Name = name, ShortName = shortName });
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> AddProgramAsync(
@@ -129,8 +127,7 @@ namespace EduConnect.Web.Services
                     $"{DisplayName(dept)} already has a program named \"{name}\".");
 
             dept.Programs.Add(new AcademicProgram { Name = name, ShortName = shortName });
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> RenameCollegeAsync(int id, string? name, string? shortName)
@@ -162,8 +159,7 @@ namespace EduConnect.Web.Services
                 dept.UpdatedAt = DateTime.Now;
             }
 
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> RenameDepartmentAsync(int id, string? name, string? shortName)
@@ -192,8 +188,7 @@ namespace EduConnect.Web.Services
             dept.Name = name;
             dept.ShortName = shortName;
             dept.UpdatedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> RenameProgramAsync(int id, string? name, string? shortName)
@@ -221,8 +216,7 @@ namespace EduConnect.Web.Services
             program.Name = name;
             program.ShortName = shortName;
             program.UpdatedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
-            return HierarchyResult.Success;
+            return await SaveNameChangeAsync(name);
         }
 
         public async Task<HierarchyResult> SetCollegeActiveAsync(int id, bool active)
@@ -238,7 +232,7 @@ namespace EduConnect.Web.Services
 
             if (!active)
             {
-                var placed = await _context.Users.CountAsync(u => u.CollegeID == id);
+                var placed = await UsersBlockingRetire.CountAsync(u => u.CollegeID == id);
                 if (placed > 0)
                     return PlacedUsersFail(placed, college.Name, "college");
 
@@ -280,7 +274,7 @@ namespace EduConnect.Web.Services
             }
             else
             {
-                var placed = await _context.Users.CountAsync(u => u.DepartmentID == id);
+                var placed = await UsersBlockingRetire.CountAsync(u => u.DepartmentID == id);
                 if (placed > 0)
                     return PlacedUsersFail(placed, dept.Name, "department");
 
@@ -313,10 +307,7 @@ namespace EduConnect.Web.Services
             }
             else
             {
-                // Every placed user counts, pending and deactivated ones
-                // included: approval would otherwise land a student in a
-                // retired program.
-                var placed = await _context.Users.CountAsync(u => u.ProgramID == id);
+                var placed = await UsersBlockingRetire.CountAsync(u => u.ProgramID == id);
                 if (placed > 0)
                     return PlacedUsersFail(placed, program.Name, "program");
             }
@@ -327,6 +318,31 @@ namespace EduConnect.Web.Services
         }
 
         // ─── Helpers ───────────────────────────────
+
+        // Users who stop an item being retired: active ones, plus pending
+        // registrants, whose approval would otherwise land them in a
+        // retired item. Deactivated users (e.g. alumni) keep pointing at
+        // what they were placed in, retired or not.
+        private IQueryable<User> UsersBlockingRetire =>
+            _context.Users.Where(u => u.IsActive || u.VerificationStatus == "Pending");
+
+        // The duplicate-name checks run before the save, so another request
+        // committing the same name in between still trips the unique index.
+        // Report that like any other duplicate instead of an error page.
+        private async Task<HierarchyResult> SaveNameChangeAsync(string name)
+        {
+            try
+            {
+                await _context.SaveChangesAsync();
+                return HierarchyResult.Success;
+            }
+            catch (DbUpdateException)
+            {
+                _context.ChangeTracker.Clear();
+                return HierarchyResult.Fail(
+                    $"\"{name}\" was already added. Refresh the page to see it.");
+            }
+        }
 
         private static HierarchyResult PlacedUsersFail(int count, string name, string level) =>
             HierarchyResult.Fail(

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Retire = `IsActive = false` + `RetiredAt = DateTime.Now`; restore clears `RetiredAt`. Never hard-delete hierarchy rows.
-- An item cannot be retired while any user (active, pending or deactivated) is placed in it, or while it has active children. Restore is refused while its parent is retired.
+- An item cannot be retired while an active user or a pending registrant is placed in it (deactivated users do not block and keep pointing at it), or while it has active children. Restore is refused while its parent is retired.
 - Implicit departments are never shown, renamed, or retired on their own; they follow their college.
 - Names are trimmed, required, unique within their parent case-insensitively; college name ≤ 100, department/program name ≤ 150, short code ≤ 20.
 - Placement per role (spec table): Dean → College; Chairperson/Faculty → Department (+College); Student/Student Pending → Program (+Department, +College); every other role → none. The most specific ID posted wins; less specific IDs are derived, never trusted.

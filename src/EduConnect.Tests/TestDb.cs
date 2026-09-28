@@ -2,9 +2,27 @@ using EduConnect.Web.Data;
 using EduConnect.Web.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EduConnect.Tests
 {
+    // Runs an action once, just before Context's next save — used to make
+    // a race (another request committing first) happen deterministically.
+    public sealed class BeforeSaveInterceptor : SaveChangesInterceptor
+    {
+        public Action? Once { get; set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            var action = Once;
+            Once = null;
+            action?.Invoke();
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
     // One in-memory SQLite database per test: the real EF model with real
     // unique indexes and foreign keys, without needing SQL Server.
     public sealed class TestDb : IDisposable
@@ -13,11 +31,17 @@ namespace EduConnect.Tests
 
         public ApplicationDbContext Context { get; }
 
+        public BeforeSaveInterceptor BeforeSave { get; } = new();
+
         public TestDb()
         {
             _connection = new SqliteConnection("DataSource=:memory:");
             _connection.Open();
-            Context = NewContext();
+            Context = new ApplicationDbContext(
+                new DbContextOptionsBuilder<ApplicationDbContext>()
+                    .UseSqlite(_connection)
+                    .AddInterceptors(BeforeSave)
+                    .Options);
             Context.Database.EnsureCreated();
         }
 
