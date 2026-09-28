@@ -1,0 +1,209 @@
+@model List<EduConnect.Web.Models.College>
+@{
+    ViewData["Title"] = "Academic Structure";
+    var collegeUsers = ViewBag.CollegeUsers as Dictionary<int, int> ?? new();
+    var departmentUsers = ViewBag.DepartmentUsers as Dictionary<int, int> ?? new();
+    var programUsers = ViewBag.ProgramUsers as Dictionary<int, int> ?? new();
+    int Count(Dictionary<int, int> d, int id) => d.TryGetValue(id, out var n) ? n : 0;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-bank me-2 text-primary"></i>
+            Academic Structure
+        </h4>
+        <small class="text-muted">
+            @Model.Count(c => c.IsActive) colleges ·
+            @Model.SelectMany(c => c.Departments).Count(d => d.IsActive && !d.IsImplicit) departments ·
+            @Model.SelectMany(c => c.Departments).SelectMany(d => d.Programs).Count(p => p.IsActive) programs
+        </small>
+    </div>
+    <a href="/Admin" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible mb-4">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible mb-4">
+        <i class="bi bi-exclamation-triangle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- ─── ADD COLLEGE ─────────────────── -->
+<details class="card border-0 shadow-sm mb-4">
+    <summary class="card-body fw-semibold" style="cursor:pointer">
+        <i class="bi bi-plus-lg me-1"></i>Add college
+    </summary>
+    <div class="card-body pt-0">
+        <form asp-action="AddCollege" method="post" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-6">
+                <label class="form-label small">Name</label>
+                <input name="name" class="form-control" maxlength="100" required />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Short code</label>
+                <input name="shortName" class="form-control" maxlength="20" />
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="form-check mb-2">
+                    <input type="checkbox" name="hasDepartments" value="true" id="hasDepartments"
+                           class="form-check-input" checked />
+                    <input type="hidden" name="hasDepartments" value="false" />
+                    <label for="hasDepartments" class="form-check-label small">Has departments</label>
+                </div>
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Add</button>
+            </div>
+        </form>
+        <p class="text-muted small mt-2 mb-0">
+            Untick "Has departments" for a college whose programs sit directly under it
+            (like Law or Nursing). That choice cannot be changed later.
+        </p>
+    </div>
+</details>
+
+<!-- ─── COLLEGES ────────────────────── -->
+@foreach (var college in Model)
+{
+    var implicitDept = college.Departments.FirstOrDefault(d => d.IsImplicit);
+    var isFlat = implicitDept != null;
+    var visibleDepts = college.Departments.Where(d => !d.IsImplicit).ToList();
+
+    <div class="card border-0 shadow-sm mb-3 @(college.IsActive ? "" : "opacity-75")" id="college-@college.CollegeID">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <span class="fw-bold">@college.Name</span>
+                @if (!string.IsNullOrEmpty(college.ShortName))
+                {
+                    <span class="badge bg-light text-dark border ms-1">@college.ShortName</span>
+                }
+                @if (isFlat)
+                {
+                    <span class="badge bg-light text-muted border ms-1">No departments</span>
+                }
+                @if (!college.IsActive)
+                {
+                    <span class="badge bg-secondary ms-1">Retired</span>
+                }
+                <span class="text-muted small ms-2">@Count(collegeUsers, college.CollegeID) users</span>
+            </div>
+            <div class="d-flex gap-1">
+                <details class="position-relative">
+                    <summary class="btn btn-sm btn-outline-primary" title="Rename"><i class="bi bi-pencil"></i></summary>
+                    <form asp-action="RenameCollege" asp-route-id="@college.CollegeID" method="post"
+                          class="card card-body shadow position-absolute end-0 mt-1" style="z-index:5;width:320px">
+                        @Html.AntiForgeryToken()
+                        <input name="name" value="@college.Name" class="form-control form-control-sm mb-2" maxlength="100" required />
+                        <input name="shortName" value="@college.ShortName" class="form-control form-control-sm mb-2" maxlength="20" placeholder="Short code" />
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    </form>
+                </details>
+                <form asp-action="SetCollegeActive" asp-route-id="@college.CollegeID" method="post"
+                      onsubmit="return confirm(@Json.Serialize((college.IsActive ? "Retire " : "Restore ") + college.Name + "?"));">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="active" value="@((!college.IsActive).ToString().ToLower())" />
+                    @if (college.IsActive)
+                    {
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Retire"><i class="bi bi-archive"></i></button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-sm btn-outline-success" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    }
+                </form>
+            </div>
+        </div>
+
+        <div class="card-body">
+            @if (isFlat)
+            {
+                @await Html.PartialAsync("_ProgramList", (implicitDept!, college.CollegeID, programUsers))
+            }
+            else
+            {
+                @foreach (var dept in visibleDepts)
+                {
+                    <div class="border rounded p-2 mb-2 @(dept.IsActive ? "" : "opacity-75")">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                            <div>
+                                <span class="fw-semibold small">@dept.Name</span>
+                                @if (!string.IsNullOrEmpty(dept.ShortName))
+                                {
+                                    <span class="badge bg-light text-dark border ms-1">@dept.ShortName</span>
+                                }
+                                @if (!dept.IsActive)
+                                {
+                                    <span class="badge bg-secondary ms-1">Retired</span>
+                                }
+                                <span class="text-muted small ms-2">@Count(departmentUsers, dept.DepartmentID) users</span>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <details class="position-relative">
+                                    <summary class="btn btn-sm btn-outline-primary" title="Rename"><i class="bi bi-pencil"></i></summary>
+                                    <form asp-action="RenameDepartment" asp-route-id="@dept.DepartmentID" method="post"
+                                          class="card card-body shadow position-absolute end-0 mt-1" style="z-index:5;width:320px">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="collegeId" value="@college.CollegeID" />
+                                        <input name="name" value="@dept.Name" class="form-control form-control-sm mb-2" maxlength="150" required />
+                                        <input name="shortName" value="@dept.ShortName" class="form-control form-control-sm mb-2" maxlength="20" placeholder="Short code" />
+                                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                    </form>
+                                </details>
+                                <form asp-action="SetDepartmentActive" asp-route-id="@dept.DepartmentID" method="post"
+                                      onsubmit="return confirm(@Json.Serialize((dept.IsActive ? "Retire " : "Restore ") + dept.Name + "?"));">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="collegeId" value="@college.CollegeID" />
+                                    <input type="hidden" name="active" value="@((!dept.IsActive).ToString().ToLower())" />
+                                    @if (dept.IsActive)
+                                    {
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Retire"><i class="bi bi-archive"></i></button>
+                                    }
+                                    else
+                                    {
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                    }
+                                </form>
+                            </div>
+                        </div>
+                        @await Html.PartialAsync("_ProgramList", (dept, college.CollegeID, programUsers))
+                    </div>
+                }
+
+                @if (college.IsActive)
+                {
+                    <details class="mt-2">
+                        <summary class="small text-primary" style="cursor:pointer">
+                            <i class="bi bi-plus-lg me-1"></i>Add department
+                        </summary>
+                        <form asp-action="AddDepartment" method="post" class="row g-2 mt-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="collegeId" value="@college.CollegeID" />
+                            <div class="col-12 col-md-7"><input name="name" class="form-control form-control-sm" maxlength="150" placeholder="Department name" required /></div>
+                            <div class="col-6 col-md-3"><input name="shortName" class="form-control form-control-sm" maxlength="20" placeholder="Short code" /></div>
+                            <div class="col-6 col-md-2"><button type="submit" class="btn btn-sm btn-primary w-100">Add</button></div>
+                        </form>
+                    </details>
+                }
+            }
+        </div>
+    </div>
+}
+
+<p class="text-muted small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1"></i>
+    Items are retired rather than deleted, so existing users and announcements keep pointing
+    at them. Something can only be retired once nobody is placed in it and everything under
+    it is retired.
+</p>

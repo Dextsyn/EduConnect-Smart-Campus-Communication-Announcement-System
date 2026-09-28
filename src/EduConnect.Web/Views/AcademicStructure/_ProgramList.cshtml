@@ -1,0 +1,69 @@
+@model (EduConnect.Web.Models.Department Dept, int CollegeID, Dictionary<int, int> ProgramUsers)
+@{
+    var dept = Model.Dept;
+    int Count(int id) => Model.ProgramUsers.TryGetValue(id, out var n) ? n : 0;
+}
+
+<ul class="list-unstyled mb-1 ms-2">
+    @foreach (var program in dept.Programs)
+    {
+        <li class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1 border-bottom @(program.IsActive ? "" : "opacity-75")">
+            <div class="small">
+                @program.Name
+                @if (!string.IsNullOrEmpty(program.ShortName))
+                {
+                    <span class="badge bg-light text-dark border ms-1">@program.ShortName</span>
+                }
+                @if (!program.IsActive)
+                {
+                    <span class="badge bg-secondary ms-1">Retired</span>
+                }
+                <span class="text-muted ms-2">@Count(program.ProgramID) users</span>
+            </div>
+            <div class="d-flex gap-1">
+                <details class="position-relative">
+                    <summary class="btn btn-sm btn-outline-primary py-0" title="Rename"><i class="bi bi-pencil"></i></summary>
+                    <form asp-controller="AcademicStructure" asp-action="RenameProgram" asp-route-id="@program.ProgramID" method="post"
+                          class="card card-body shadow position-absolute end-0 mt-1" style="z-index:5;width:320px">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="collegeId" value="@Model.CollegeID" />
+                        <input name="name" value="@program.Name" class="form-control form-control-sm mb-2" maxlength="150" required />
+                        <input name="shortName" value="@program.ShortName" class="form-control form-control-sm mb-2" maxlength="20" placeholder="Short code" />
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    </form>
+                </details>
+                <form asp-controller="AcademicStructure" asp-action="SetProgramActive" asp-route-id="@program.ProgramID" method="post"
+                      onsubmit="return confirm(@Json.Serialize((program.IsActive ? "Retire " : "Restore ") + program.Name + "?"));">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="collegeId" value="@Model.CollegeID" />
+                    <input type="hidden" name="active" value="@((!program.IsActive).ToString().ToLower())" />
+                    @if (program.IsActive)
+                    {
+                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0" title="Retire"><i class="bi bi-archive"></i></button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    }
+                </form>
+            </div>
+        </li>
+    }
+</ul>
+
+@if (dept.IsActive && dept.College?.IsActive != false)
+{
+    <details class="ms-2">
+        <summary class="small text-primary" style="cursor:pointer">
+            <i class="bi bi-plus-lg me-1"></i>Add program
+        </summary>
+        <form asp-controller="AcademicStructure" asp-action="AddProgram" method="post" class="row g-2 mt-1">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="departmentId" value="@dept.DepartmentID" />
+            <input type="hidden" name="collegeId" value="@Model.CollegeID" />
+            <div class="col-12 col-md-7"><input name="name" class="form-control form-control-sm" maxlength="150" placeholder="Program name" required /></div>
+            <div class="col-6 col-md-3"><input name="shortName" class="form-control form-control-sm" maxlength="20" placeholder="Short code" /></div>
+            <div class="col-6 col-md-2"><button type="submit" class="btn btn-sm btn-primary w-100">Add</button></div>
+        </form>
+    </details>
+}

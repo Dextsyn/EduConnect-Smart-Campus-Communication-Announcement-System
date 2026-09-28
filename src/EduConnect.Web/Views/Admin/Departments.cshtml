@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Departments";
+    ViewData["Title"] = "Tags & Offices";
     var departments = ViewBag.Departments as
         List<EduConnect.Web.Models.DepartmentTag>
         ?? new List<EduConnect.Web.Models.DepartmentTag>();
@@ -19,13 +19,13 @@
     <div>
         <h4 class="fw-bold mb-1">
             <i class="bi bi-diagram-3 me-2 text-primary"></i>
-            Departments
+            Tags &amp; Offices
         </h4>
-        <small class="text-muted">@departments.Count departments</small>
+        <small class="text-muted">@departments.Count tags</small>
     </div>
     <div class="d-flex gap-2">
         <a href="/Admin/AddDepartment" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Add Department
+            <i class="bi bi-plus-lg me-1"></i>Add Tag
         </a>
         <a href="/Admin" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-2"></i>Back
@@ -255,7 +255,7 @@
 
 <p class="text-muted small mt-3 mb-0">
     <i class="bi bi-info-circle me-1"></i>
-    Departments are retired rather than deleted, so existing announcements
-    and user assignments stay intact. Retired departments no longer appear
-    in dropdowns.
+    Tags drive the current announcement feed: School Wide and the non-academic
+    offices. Colleges, departments and programs are managed under Academic
+    Structure. Tags are retired rather than deleted.
 </p>
