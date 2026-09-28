@@ -109,6 +109,22 @@
                                disabled />
                     </div>
 
+                    <!-- Placement -->
+                    @if (Model.CanEditProgram)
+                    {
+                        <div class="mb-3 row g-0">
+                            @await Html.PartialAsync("_PlacementFields", Model)
+                        </div>
+                    }
+                    else if (Model.PlacementText != null)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Placement</label>
+                            <input type="text" class="form-control" value="@Model.PlacementText" disabled />
+                            <div class="form-text">Your administrator manages this.</div>
+                        </div>
+                    }
+
                     <!-- Suffix (editable) -->
                     <div class="mb-4">
                         <label asp-for="Suffix"

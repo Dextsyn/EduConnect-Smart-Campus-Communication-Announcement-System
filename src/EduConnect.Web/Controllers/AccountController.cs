@@ -322,6 +322,29 @@ namespace EduConnect.Web.Controllers
             };
         }
 
+        // Placement fields for the profile page. Loads the tree only for
+        // students, who are the only ones who edit it here.
+        private async Task FillPlacementAsync(ProfileViewModel model, User user)
+        {
+            model.CanEditProgram = user.Role.RoleName == RoleNames.Student;
+
+            var parts = await _context.Users
+                .Where(u => u.UserID == user.UserID)
+                .Select(u => new
+                {
+                    Program = u.AcademicProgram == null ? null : u.AcademicProgram.Name,
+                    Department = u.Department == null || u.Department.IsImplicit ? null : u.Department.Name,
+                    College = u.College == null ? null : u.College.Name
+                })
+                .FirstAsync();
+            var text = string.Join(" · ", new[] { parts.Program, parts.Department, parts.College }
+                .Where(s => !string.IsNullOrEmpty(s)));
+            model.PlacementText = text.Length > 0 ? text : null;
+
+            if (model.CanEditProgram)
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+        }
+
         // ─── GET: /Account/Profile ────────────
         [HttpGet]
         public async Task<IActionResult> Profile()
@@ -345,8 +368,12 @@ namespace EduConnect.Web.Controllers
                 Email = user.Email,
                 RoleName = user.Role.RoleName,
                 ProfilePicturePath = user.ProfilePicture,
-                Suffix = user.Suffix
+                Suffix = user.Suffix,
+                CollegeID = user.CollegeID,
+                DepartmentID = user.DepartmentID,
+                ProgramID = user.ProgramID
             };
+            await FillPlacementAsync(model, user);
 
             return View(model);
         }
@@ -451,6 +478,18 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("Suffix", "Invalid suffix value.");
             }
 
+            // Students choose their own program; changes apply at once.
+            if (user.Role.RoleName == RoleNames.Student)
+            {
+                var placement = await _placement.ApplyAsync(
+                    user, RoleNames.Student,
+                    model.CollegeID, model.DepartmentID, model.ProgramID);
+                if (!placement.Ok)
+                    ModelState.AddModelError("Placement", placement.Error!);
+                else
+                    await _placement.SyncFeedTagAsync(user);
+            }
+
             if (!ModelState.IsValid)
             {
                 // Re-populate read-only display fields before returning
@@ -459,6 +498,7 @@ namespace EduConnect.Web.Controllers
                 model.Email = user.Email;
                 model.RoleName = user.Role.RoleName;
                 model.ProfilePicturePath = user.ProfilePicture;
+                await FillPlacementAsync(model, user);
                 return View(model);
             }
 

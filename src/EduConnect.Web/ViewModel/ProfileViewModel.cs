@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace EduConnect.Web.ViewModels
 {
-    public class ProfileViewModel
+    public class ProfileViewModel : IPlacementForm
     {
         // Read-only display fields — rendered as disabled inputs, so
         // they never come back in the POST body. ValidateNever keeps
@@ -25,5 +25,17 @@ namespace EduConnect.Web.ViewModels
 
         [DataType(DataType.Upload)]
         public IFormFile? NewProfilePicture { get; set; }
+
+        // Placement. Students edit it here; everyone else sees it read-only
+        // (the admin places staff).
+        public int? CollegeID { get; set; }
+        public int? DepartmentID { get; set; }
+        public int? ProgramID { get; set; }
+        [ValidateNever]
+        public List<EduConnect.Web.Models.College> Hierarchy { get; set; } = new();
+        [ValidateNever]
+        public bool CanEditProgram { get; set; }
+        [ValidateNever]
+        public string? PlacementText { get; set; }
     }
 }
