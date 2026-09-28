@@ -100,6 +100,55 @@ namespace EduConnect.Tests
             return tag;
         }
 
+        public Announcement AddAnnouncement(User author, string title)
+        {
+            var category = Context.AnnouncementCategories.FirstOrDefault();
+            if (category == null)
+            {
+                category = new AnnouncementCategory { CategoryName = "General", ColorHex = "#000000", FeedType = "Academic" };
+                Context.AnnouncementCategories.Add(category);
+                Context.SaveChanges();
+            }
+
+            var announcement = new Announcement
+            {
+                AuthorID = author.UserID,
+                CategoryID = category.CategoryID,
+                Title = title,
+                Body = title,
+                Status = "Published",
+                ApprovalStatus = "Approved",
+                PublishedAt = DateTime.Now
+            };
+            Context.Announcements.Add(announcement);
+            Context.SaveChanges();
+            return announcement;
+        }
+
+        public void Target(Announcement a, College? c = null, Department? d = null, AcademicProgram? p = null)
+        {
+            Context.AnnouncementTargets.Add(new AnnouncementTarget
+            {
+                AnnouncementID = a.AnnouncementID,
+                CollegeID = c?.CollegeID,
+                DepartmentID = d?.DepartmentID,
+                ProgramID = p?.ProgramID
+            });
+            Context.SaveChanges();
+        }
+
+        public void TagAnnouncement(Announcement a, DepartmentTag t)
+        {
+            Context.AnnouncementTags.Add(new AnnouncementTag { AnnouncementID = a.AnnouncementID, TagID = t.TagID });
+            Context.SaveChanges();
+        }
+
+        public void TagUser(User u, DepartmentTag t, bool primary = true)
+        {
+            Context.UserDepartments.Add(new UserDepartment { UserID = u.UserID, TagID = t.TagID, IsPrimary = primary });
+            Context.SaveChanges();
+        }
+
         public User AddUser(string roleName, int? collegeId = null,
             int? departmentId = null, int? programId = null, bool isActive = true)
         {

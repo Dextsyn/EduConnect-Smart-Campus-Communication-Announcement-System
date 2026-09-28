@@ -21,6 +21,7 @@ namespace EduConnect.Web.Data
         // ─── Junction Tables ───────────────────────
         public DbSet<UserDepartment> UserDepartments { get; set; }
         public DbSet<AnnouncementTag> AnnouncementTags { get; set; }
+        public DbSet<AnnouncementTarget> AnnouncementTargets { get; set; }
 
         // ─── Academic hierarchy ────────────────────
         public DbSet<College> Colleges { get; set; }
@@ -189,6 +190,32 @@ namespace EduConnect.Web.Data
                 entity.HasOne(e => e.DepartmentTag)
                       .WithMany(e => e.AnnouncementTags)
                       .HasForeignKey(e => e.TagID)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── AnnouncementTargets ───────────────
+            modelBuilder.Entity<AnnouncementTarget>(entity =>
+            {
+                entity.HasKey(e => e.AnnouncementTargetID);
+                entity.ToTable(t => t.HasCheckConstraint(
+                    "CK_AnnouncementTargets_OneLevel",
+                    "(CASE WHEN CollegeID IS NULL THEN 0 ELSE 1 END) + " +
+                    "(CASE WHEN DepartmentID IS NULL THEN 0 ELSE 1 END) + " +
+                    "(CASE WHEN ProgramID IS NULL THEN 0 ELSE 1 END) = 1"));
+                entity.HasOne(e => e.Announcement)
+                      .WithMany(e => e.AnnouncementTargets)
+                      .HasForeignKey(e => e.AnnouncementID);
+                entity.HasOne(e => e.College)
+                      .WithMany()
+                      .HasForeignKey(e => e.CollegeID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Department)
+                      .WithMany()
+                      .HasForeignKey(e => e.DepartmentID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.AcademicProgram)
+                      .WithMany()
+                      .HasForeignKey(e => e.ProgramID)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 

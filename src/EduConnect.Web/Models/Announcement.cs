@@ -62,6 +62,7 @@ namespace EduConnect.Web.Models
         public User? ChairApprovedBy { get; set; }
         public AnnouncementCategory Category { get; set; }
         public ICollection<AnnouncementTag> AnnouncementTags { get; set; }
+        public ICollection<AnnouncementTarget> AnnouncementTargets { get; set; } = new List<AnnouncementTarget>();
         public ICollection<Notification> Notifications { get; set; }
         public ICollection<Feedback> Feedbacks { get; set; }
         public ICollection<Event> Events { get; set; }
