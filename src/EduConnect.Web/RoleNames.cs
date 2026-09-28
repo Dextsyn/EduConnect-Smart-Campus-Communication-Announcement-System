@@ -16,6 +16,6 @@ namespace EduConnect.Web
         // Role names that no longer exist. A session still carrying one
         // is cleared so the user logs in again and picks up the new name.
         public static readonly IReadOnlySet<string> Legacy =
-            new HashSet<string> { "Chair Person" };
+            new HashSet<string> { "Chair Person", "Organization Adviser" };
     }
 }
