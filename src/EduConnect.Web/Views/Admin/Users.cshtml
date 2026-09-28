@@ -50,12 +50,23 @@
     </div>
 }
 
+@if ((int)(ViewBag.NeedsPlacementCount ?? 0) > 0 && ViewBag.FilterPlacement != "missing")
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
+        <span>
+            <i class="bi bi-diagram-3 me-2"></i>
+            @ViewBag.NeedsPlacementCount user(s) still need a college, department or program.
+        </span>
+        <a href="/Admin/Users?filterPlacement=missing" class="btn btn-sm btn-warning">Show them</a>
+    </div>
+}
+
 <!-- ─── FILTERS ──────────────────────── -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-2">
 
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
                 <div class="input-group">
                     <span class="input-group-text">
                         <i class="bi bi-search"></i>
@@ -68,7 +79,7 @@
                 </div>
             </div>
 
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-2">
                 <select name="filterRole"
                         class="form-select">
                     <option value="">All Roles</option>
@@ -82,7 +93,7 @@
                 </select>
             </div>
 
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-2">
                 <select name="filterStatus"
                         class="form-select">
                     <option value="">All Status</option>
@@ -97,6 +108,15 @@
                     <option value="Rejected"
                             selected="@(ViewBag.FilterStatus == "Rejected")">
                         Rejected
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <select name="filterPlacement" class="form-select">
+                    <option value="">Any placement</option>
+                    <option value="missing" selected="@(ViewBag.FilterPlacement == "missing")">
+                        Needs placement
                     </option>
                 </select>
             </div>
@@ -128,7 +148,7 @@
                     <tr>
                         <th class="ps-3">User</th>
                         <th>Student ID</th>
-                        <th>Department</th>
+                        <th>Placement</th>
                         <th>Role</th>
                         <th>Status</th>
                         <th>Registered</th>
@@ -186,18 +206,29 @@
                                     @(user.StudentID ?? "—")
                                 </td>
 
-                                <!-- Department -->
+                                <!-- Placement -->
                                 <td class="small">
-                                    @if (dept?.DepartmentTag != null)
+                                    @if (user.AcademicProgram != null)
                                     {
-                                        <span class="badge bg-light
-                                                                 text-dark border">
-                                            @dept.DepartmentTag.ShortName
-                                        </span>
+                                        <div>@(user.AcademicProgram.ShortName ?? user.AcademicProgram.Name)</div>
                                     }
-                                    else
+                                    else if (user.Department != null && !user.Department.IsImplicit)
+                                    {
+                                        <div>@(user.Department.ShortName ?? user.Department.Name)</div>
+                                    }
+                                    @if (user.College != null)
+                                    {
+                                        <div class="text-muted" style="font-size:11px">@(user.College.ShortName ?? user.College.Name)</div>
+                                    }
+                                    else if (user.AcademicProgram == null && user.Department == null)
                                     {
                                         <span class="text-muted">—</span>
+                                    }
+                                    @if (dept?.DepartmentTag != null)
+                                    {
+                                        <span class="badge bg-light text-dark border mt-1" title="Feed tag">
+                                            @dept.DepartmentTag.ShortName
+                                        </span>
                                     }
                                 </td>
 

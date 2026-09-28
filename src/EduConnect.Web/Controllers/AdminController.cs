@@ -356,7 +356,8 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Users(
             string? searchQuery,
             string? filterRole,
-            string? filterStatus)
+            string? filterStatus,
+            string? filterPlacement)
         {
             if (!IsAdmin())
                 return RedirectToAction(
@@ -366,6 +367,9 @@ namespace EduConnect.Web.Controllers
                 .Include(u => u.Role)
                 .Include(u => u.UserDepartments)
                     .ThenInclude(ud => ud.DepartmentTag)
+                .Include(u => u.College)
+                .Include(u => u.Department)
+                .Include(u => u.AcademicProgram)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(searchQuery))
@@ -383,6 +387,9 @@ namespace EduConnect.Web.Controllers
                 query = query.Where(u =>
                     u.VerificationStatus == filterStatus);
 
+            if (filterPlacement == "missing")
+                query = query.Where(PlacementService.NeedsPlacement);
+
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
                 .ToListAsync();
@@ -393,6 +400,10 @@ namespace EduConnect.Web.Controllers
             ViewBag.FilterStatus = filterStatus;
             ViewBag.Roles = await _context
                 .Roles.ToListAsync();
+            ViewBag.FilterPlacement = filterPlacement;
+            ViewBag.NeedsPlacementCount = await _context.Users
+                .Where(PlacementService.NeedsPlacement)
+                .CountAsync();
 
             return View();
         }
