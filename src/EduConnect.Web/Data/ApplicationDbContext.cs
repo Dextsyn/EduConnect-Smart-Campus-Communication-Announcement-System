@@ -281,6 +281,18 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.VerifiedByID)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.College)
+                      .WithMany()
+                      .HasForeignKey(e => e.CollegeID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Department)
+                      .WithMany()
+                      .HasForeignKey(e => e.DepartmentID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.AcademicProgram)
+                      .WithMany()
+                      .HasForeignKey(e => e.ProgramID)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Announcement approvedby relationship

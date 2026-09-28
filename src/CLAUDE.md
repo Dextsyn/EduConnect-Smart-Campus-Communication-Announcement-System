@@ -59,6 +59,8 @@ Named roles (constants in `RoleNames.cs` — never compare a literal): `Administ
 
 **DepartmentTags** are used to target announcements and filter feeds. Users are assigned to departments via the `UserDepartments` junction table (`IsPrimary` flag marks the main department). Announcements tagged with `ShortName = "ALL"` are shown to everyone.
 
+**Academic hierarchy** (`Colleges` > `Departments` > `Programs`, entity `AcademicProgram`) is replacing the academic rows of `DepartmentTags`. Colleges without departments have one `IsImplicit` department that the UI hides. `Users.CollegeID/DepartmentID/ProgramID` hold a user's placement (Dean: college; Chairperson/Faculty: department; Student: program). `DepartmentTags` stays for `ALL` and non-academic offices. Design: `docs/superpowers/specs/2026-09-28-college-hierarchy-and-roles-design.md`.
+
 **Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and uploaded to the Azure Blob Storage container `qrcodes` (see `IBlobStorageService`); `EventRegistration.QRCode` stores the resulting public blob URL, which views render directly in `<img src>`.
 
 ### Services

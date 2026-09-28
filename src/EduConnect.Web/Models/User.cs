@@ -39,6 +39,16 @@ namespace EduConnect.Web.Models
 
         [MaxLength(10)]
         public string? Suffix { get; set; }
+
+        // Placement in the academic hierarchy. Stored at every level so
+        // feed and routing queries filter on one column; Plan 2's
+        // placement service is the only writer and keeps them consistent.
+        // Dean: College. Chairperson/Faculty: Department (+College).
+        // Student: Program (+Department, +College). Others: none.
+        public int? CollegeID { get; set; }
+        public int? DepartmentID { get; set; }
+        public int? ProgramID { get; set; }
+
         public int? VerifiedByID { get; set; }
         public DateTime? VerifiedAt { get; set; }
         public string? VerificationRejectionReason { get; set; }
@@ -48,6 +58,9 @@ namespace EduConnect.Web.Models
 
         public Role Role { get; set; }
         public User? VerifiedBy { get; set; }
+        public College? College { get; set; }
+        public Department? Department { get; set; }
+        public AcademicProgram? AcademicProgram { get; set; }
         public ICollection<UserDepartment> UserDepartments { get; set; }    
         public ICollection<Announcement> Announcements { get; set; }
         public ICollection<Notification> Notifications { get; set; }
