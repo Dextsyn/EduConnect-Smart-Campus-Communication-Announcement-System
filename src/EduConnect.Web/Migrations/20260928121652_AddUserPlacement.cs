@@ -71,11 +71,14 @@ namespace EduConnect.Web.Migrations
             // level. Carry that over; department/program placement is
             // manual (the admin assigns it, or the student picks it).
             // Users whose primary tag is not a college (ALL, offices) or who
-            // have no tag keep NULL.
+            // have no tag keep NULL, and so do roles that are never placed
+            // (Administrator, Staff) even if they carry a college tag.
             migrationBuilder.Sql(@"
                 UPDATE u
                 SET CollegeID = c.CollegeID
                 FROM Users u
+                JOIN Roles r ON r.RoleID = u.RoleID
+                    AND r.RoleName IN ('Dean', 'Chairperson', 'Faculty', 'Student', 'Student Pending')
                 JOIN UserDepartments ud ON ud.UserID = u.UserID AND ud.IsPrimary = 1
                 JOIN Colleges c ON c.LegacyTagID = ud.TagID
                 WHERE u.CollegeID IS NULL;

@@ -676,6 +676,13 @@ namespace EduConnect.Web.Controllers
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
 
+            // Administrators may have authored announcements before they
+            // lost the ability to announce; they can still archive those,
+            // but editing needs a tag picker only authoring roles have, so
+            // the views offer no Edit link and a typed URL lands on Details.
+            if (!CanCreate())
+                return RedirectToAction("Details", new { id });
+
             if (IsFaculty() &&
                 announcement.ApprovalStatus != "Draft" &&
                 announcement.ApprovalStatus != "Rejected")
@@ -735,6 +742,10 @@ namespace EduConnect.Web.Controllers
             // Re-check ownership server-side
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
+
+            if (!CanCreate())
+                return RedirectToAction("Details",
+                    new { id = model.AnnouncementID });
 
             if (IsFaculty() &&
                 announcement.ApprovalStatus != "Draft" &&

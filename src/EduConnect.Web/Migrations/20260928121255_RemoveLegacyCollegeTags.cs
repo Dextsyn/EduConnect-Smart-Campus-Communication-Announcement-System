@@ -15,9 +15,14 @@ namespace EduConnect.Web.Migrations
             // hierarchy; PE becomes a department. Every FK into
             // DepartmentTags is Restrict, so if anything still references
             // one of these rows this fails loudly instead of guessing.
-            // Keyed on ShortName; TagID differs between databases.
-            migrationBuilder.Sql(
-                "DELETE FROM DepartmentTags WHERE ShortName IN ('CLAS', 'COED', 'PE');");
+            // Keyed on ShortName; TagID differs between databases. Limited
+            // to Academic tags: ShortNames are admin-editable, so an office
+            // tag may since have been given one of these codes.
+            migrationBuilder.Sql(@"
+                DELETE FROM DepartmentTags
+                WHERE ShortName IN ('CLAS', 'COED', 'PE')
+                  AND TagTypeID = (SELECT TagTypeID FROM TagTypes WHERE TypeName = 'Academic');
+            ");
         }
 
         /// <inheritdoc />

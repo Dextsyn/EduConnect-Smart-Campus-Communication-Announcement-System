@@ -250,11 +250,14 @@ else
                                 @if (roleName == RoleNames.Administrator ||
                                      item.AuthorID == currentUserID)
                                 {
-                                    <a href="/Announcement/Edit/@item.AnnouncementID"
-                                       class="btn btn-outline-secondary btn-sm"
-                                       title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
+                                    @if (roleName != RoleNames.Administrator)
+                                    {
+                                        <a href="/Announcement/Edit/@item.AnnouncementID"
+                                           class="btn btn-outline-secondary btn-sm"
+                                           title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    }
                                     <button type="button"
                                             class="btn btn-outline-danger btn-sm"
                                             title="Archive"
