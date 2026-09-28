@@ -89,7 +89,8 @@ namespace EduConnect.Web.Services
             return options;
         }
 
-        public async Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection)
+        public async Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection,
+            TargetSelection? keep = null)
         {
             if (selection.IsEmpty)
                 return HierarchyResult.Success;
@@ -105,6 +106,13 @@ namespace EduConnect.Web.Services
                 : new HashSet<int>();
             var programs = college?.Departments.SelectMany(d => d.Programs).Select(p => p.ProgramID).ToHashSet()
                 ?? new HashSet<int>();
+
+            if (keep != null)
+            {
+                colleges.UnionWith(keep.CollegeIDs);
+                departments.UnionWith(keep.DepartmentIDs);
+                programs.UnionWith(keep.ProgramIDs);
+            }
 
             if (selection.CollegeIDs.Any(id => !colleges.Contains(id)) ||
                 selection.DepartmentIDs.Any(id => !departments.Contains(id)) ||
@@ -173,6 +181,62 @@ namespace EduConnect.Web.Services
                 foreach (var label in labels.Where(l => l.AnnouncementID == row.AnnouncementID))
                     if (!row.Tags.Contains(label.Label))
                         row.Tags.Add(label.Label);
+        }
+
+        public async Task<List<TargetChoice>> GetOutOfScopeTargetsAsync(int authorId, int announcementId)
+        {
+            var options = await GetTargetOptionsAsync(authorId);
+            var college = options.College;
+            var colleges = options.CanTargetCollege && college != null
+                ? new HashSet<int> { college.CollegeID } : new HashSet<int>();
+            var departments = options.CanTargetDepartments && college != null
+                ? college.Departments.Where(d => !d.IsImplicit).Select(d => d.DepartmentID).ToHashSet()
+                : new HashSet<int>();
+            var programs = college?.Departments.SelectMany(d => d.Programs).Select(p => p.ProgramID).ToHashSet()
+                ?? new HashSet<int>();
+
+            var targets = await _context.AnnouncementTargets
+                .Where(t => t.AnnouncementID == announcementId)
+                .Select(t => new
+                {
+                    t.CollegeID,
+                    t.DepartmentID,
+                    t.ProgramID,
+                    Name = t.ProgramID != null ? t.AcademicProgram!.Name
+                        : t.DepartmentID != null ? t.Department!.Name
+                        : t.College!.Name
+                })
+                .ToListAsync();
+
+            var result = new List<TargetChoice>();
+            foreach (var t in targets)
+            {
+                if (t.CollegeID is int c && !colleges.Contains(c))
+                    result.Add(new TargetChoice("College", c, t.Name));
+                else if (t.DepartmentID is int d && !departments.Contains(d))
+                    result.Add(new TargetChoice("Department", d, t.Name));
+                else if (t.ProgramID is int p && !programs.Contains(p))
+                    result.Add(new TargetChoice("Program", p, t.Name));
+            }
+            return result;
+        }
+
+        public async Task<bool> HasAudienceAsync(int announcementId) =>
+            await _context.AnnouncementTags.AnyAsync(t => t.AnnouncementID == announcementId) ||
+            await _context.AnnouncementTargets.AnyAsync(t => t.AnnouncementID == announcementId);
+
+        public async Task<List<string>> GetAudienceNamesAsync(int announcementId)
+        {
+            var tagNames = await _context.AnnouncementTags
+                .Where(t => t.AnnouncementID == announcementId &&
+                            !_context.Colleges.Any(c => c.LegacyTagID == t.TagID))
+                .Select(t => t.DepartmentTag.TagName)
+                .ToListAsync();
+
+            return tagNames
+                .Concat(await GetTargetNamesAsync(announcementId))
+                .Distinct()
+                .ToList();
         }
 
         public Task<List<string>> GetTargetNamesAsync(int announcementId) =>

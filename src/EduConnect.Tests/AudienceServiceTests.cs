@@ -285,6 +285,60 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task HasAudience_TargetOnly_True()
+        {
+            var a = _db.AddAnnouncement(_faculty, "Draft for BSIT");
+            _db.Target(a, p: _bsit);
+
+            Assert.True(await Service.HasAudienceAsync(a.AnnouncementID));
+        }
+
+        [Fact]
+        public async Task HasAudience_Nothing_False() =>
+            Assert.False(await Service.HasAudienceAsync(_db.AddAnnouncement(_faculty, "Empty").AnnouncementID));
+
+        [Fact]
+        public async Task Validate_ExistingOutOfScopeTarget_AllowedWhenKept() =>
+            Assert.True((await Service.ValidateTargetsAsync(_chair.UserID,
+                Sel(c: new[] { _ccit.CollegeID }),
+                keep: Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task Validate_NewOutOfScopeTarget_StillFailsWhenOthersKept() =>
+            Assert.False((await Service.ValidateTargetsAsync(_chair.UserID,
+                Sel(c: new[] { _ccit.CollegeID }, p: new[] { _bscs.ProgramID }),
+                keep: Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task OutOfScopeTargets_ListsOnlyWhatTheAuthorCannotPick()
+        {
+            var a = _db.AddAnnouncement(_chair, "Old college post");
+            _db.Target(a, c: _ccit);
+            _db.Target(a, d: _itis);
+
+            var kept = await Service.GetOutOfScopeTargetsAsync(_chair.UserID, a.AnnouncementID);
+
+            var only = Assert.Single(kept);
+            Assert.Equal(("College", _ccit.CollegeID, "CCIT"), (only.Level, only.ID, only.Name));
+        }
+
+        [Fact]
+        public async Task AudienceNames_LegacyCollegeTagNotRepeated()
+        {
+            var legacy = _db.AddTag("CCITTAG");
+            _ccit.LegacyTagID = legacy.TagID;
+            _db.Context.SaveChanges();
+            var a = _db.AddAnnouncement(_dean, "Backfilled");
+            _db.TagAnnouncement(a, legacy);
+            _db.TagAnnouncement(a, _all);
+            _db.Target(a, c: _ccit);
+
+            var names = await Service.GetAudienceNamesAsync(a.AnnouncementID);
+
+            Assert.Equal(new[] { "ALL tag", "CCIT" }, names.OrderBy(n => n));
+        }
+
+        [Fact]
         public async Task Not_InvertsVisibleTo()
         {
             var viewer = await Service.GetViewerAsync(_studentBsit.UserID);

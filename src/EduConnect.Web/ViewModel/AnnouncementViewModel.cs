@@ -34,6 +34,11 @@ namespace EduConnect.Web.ViewModels
         [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
         public EduConnect.Web.Services.TargetOptions TargetOptions { get; set; } = new();
 
+        // Edit only: targets already on the announcement that the author
+        // cannot pick themselves.
+        [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+        public List<EduConnect.Web.Services.TargetChoice> KeptTargets { get; set; } = new();
+
         public DateTime? ExpiresAt { get; set; }
         public bool IsEmergency { get; set; } = false;
 

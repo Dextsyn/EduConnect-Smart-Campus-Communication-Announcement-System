@@ -4,6 +4,27 @@
     var college = options.College;
 }
 
+@if (Model.KeptTargets.Any())
+{
+    <div class="mb-3">
+        <div class="small text-muted mb-1">Already targeted (kept unless you untick it):</div>
+        @foreach (var kept in Model.KeptTargets)
+        {
+            var name = kept.Level == "College" ? "TargetCollegeIDs"
+                     : kept.Level == "Department" ? "TargetDepartmentIDs"
+                     : "TargetProgramIDs";
+            var isChecked = kept.Level == "College" ? Model.TargetCollegeIDs.Contains(kept.ID)
+                          : kept.Level == "Department" ? Model.TargetDepartmentIDs.Contains(kept.ID)
+                          : Model.TargetProgramIDs.Contains(kept.ID);
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="@name"
+                       value="@kept.ID" id="tk_@(kept.Level)_@kept.ID" @(isChecked ? "checked" : "") />
+                <label class="form-check-label small" for="tk_@(kept.Level)_@kept.ID">@kept.Name</label>
+            </div>
+        }
+    </div>
+}
+
 @if (college != null)
 {
     <div class="mb-3" id="targetPicker">

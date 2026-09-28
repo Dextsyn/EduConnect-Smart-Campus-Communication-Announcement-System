@@ -108,6 +108,11 @@ namespace EduConnect.Web.Controllers
         {
             model.AvailableTags = await GetSelectableTagsAsync(userID);
             model.TargetOptions = await _audience.GetTargetOptionsAsync(userID);
+
+            // Editing: show targets the author cannot pick but the
+            // announcement already has, so they are kept unless unticked.
+            if (model.AnnouncementID != 0)
+                model.KeptTargets = await _audience.GetOutOfScopeTargetsAsync(userID, model.AnnouncementID);
         }
 
         private static TargetSelection SelectionOf(AnnouncementFormViewModel model) =>
@@ -336,9 +341,8 @@ namespace EduConnect.Web.Controllers
                     .ToList()
             };
 
-            foreach (var name in await _audience.GetTargetNamesAsync(announcement.AnnouncementID))
-                if (!model.Tags.Contains(name))
-                    model.Tags.Add(name);
+            // Tags that are now colleges are shown once, by their college.
+            model.Tags = await _audience.GetAudienceNamesAsync(announcement.AnnouncementID);
 
             return View(model);
         }
@@ -780,7 +784,14 @@ namespace EduConnect.Web.Controllers
                         "own department.");
             }
 
-            var targetCheck = await _audience.ValidateTargetsAsync(userID, SelectionOf(model));
+            // Targets the announcement already has may stay even when the
+            // author could not pick them now (e.g. a college target on a
+            // Chairperson's older post); editing must not silently narrow it.
+            var existing = new TargetSelection(
+                announcement.AnnouncementTargets.Where(t => t.CollegeID != null).Select(t => t.CollegeID!.Value).ToList(),
+                announcement.AnnouncementTargets.Where(t => t.DepartmentID != null).Select(t => t.DepartmentID!.Value).ToList(),
+                announcement.AnnouncementTargets.Where(t => t.ProgramID != null).Select(t => t.ProgramID!.Value).ToList());
+            var targetCheck = await _audience.ValidateTargetsAsync(userID, SelectionOf(model), keep: existing);
             if (!targetCheck.Ok)
                 ModelState.AddModelError("SelectedTagIDs", targetCheck.Error!);
 
@@ -1055,10 +1066,11 @@ namespace EduConnect.Web.Controllers
             if (announcement == null)
                 return RedirectToAction("MyAnnouncements");
 
-            if (!announcement.AnnouncementTags.Any())
+            // Programs, departments and colleges count as much as tags.
+            if (!await _audience.HasAudienceAsync(announcement.AnnouncementID))
             {
                 TempData["Error"] =
-                    "Please add at least one department tag before submitting.";
+                    "Please choose an audience before submitting.";
                 return RedirectToAction("MyAnnouncements");
             }
 
