@@ -957,8 +957,10 @@ namespace EduConnect.Web.Controllers
                 }
             }
 
-            // Reset to Draft if Faculty edits a rejected announcement
-            if (IsFaculty() && announcement.ApprovalStatus == "Rejected")
+            // Reset to Draft when an author who submits for review (Faculty,
+            // or a Chairperson whose post the Dean rejected) edits a rejection.
+            if ((IsFaculty() || GetRoleName() == RoleNames.Chairperson) &&
+                announcement.ApprovalStatus == "Rejected")
             {
                 announcement.ApprovalStatus = "Draft";
                 announcement.ChairRejectionReason = null;
@@ -1120,7 +1122,10 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
-            if (!IsFaculty())
+            // A Chairperson submits only their own posts, and only to the Dean
+            // (the ones the Dean sent back).
+            var isChair = GetRoleName() == RoleNames.Chairperson;
+            if (!IsFaculty() && !isChair)
                 return RedirectToAction("Index");
 
             var userID = GetUserID();
@@ -1129,6 +1134,7 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
                     a.AuthorID == userID &&
+                    a.Status == "Draft" &&
                     (a.ApprovalStatus == "Draft" ||
                      a.ApprovalStatus == "Rejected"));
 
@@ -1144,7 +1150,7 @@ namespace EduConnect.Web.Controllers
 
             // The department's Chairpersons, or the college's Deans when the
             // department has none.
-            var routing = await _approval.RouteAsync(userID, deanOnly: false);
+            var routing = await _approval.RouteAsync(userID, deanOnly: isChair);
             if (!routing.Ok)
             {
                 TempData["Error"] = routing.Error;
@@ -1385,7 +1391,7 @@ namespace EduConnect.Web.Controllers
                     a.AnnouncementID == id &&
                     a.AuthorID == userID &&
                     a.ApprovalStatus == "Approved" &&
-                    a.Status != "Published");
+                    a.Status == "Draft");
 
             if (announcement == null)
                 return RedirectToAction("MyAnnouncements");

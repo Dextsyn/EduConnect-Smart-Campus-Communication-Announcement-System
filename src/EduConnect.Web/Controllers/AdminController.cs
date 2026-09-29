@@ -974,7 +974,8 @@ namespace EduConnect.Web.Controllers
                 Description = dept.Description,
                 ColorHex = dept.ColorHex,
                 IsActive = dept.IsActive,
-                IsSystemDepartment = IsSystemDepartment(dept)
+                IsSystemDepartment = IsSystemDepartment(dept),
+                IsCollegeTag = await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID)
             };
 
             await PopulateDepartmentFormDropdowns(model);
@@ -1017,6 +1018,12 @@ namespace EduConnect.Web.Controllers
                 ModelState.Remove(nameof(model.TagTypeID));
                 ModelState.Remove(nameof(model.IsActive));
             }
+
+            // Tags that became colleges stay as they are; ToggleDepartment
+            // refuses them too.
+            model.IsCollegeTag = await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID);
+            if (model.IsCollegeTag)
+                model.IsActive = dept.IsActive;
 
             await ValidateDepartmentAsync(model);
 

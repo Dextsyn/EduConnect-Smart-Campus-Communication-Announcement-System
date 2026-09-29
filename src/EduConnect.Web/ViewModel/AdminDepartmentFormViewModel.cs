@@ -34,6 +34,10 @@ namespace EduConnect.Web.ViewModels
         // read-only and the controller re-asserts them on POST.
         public bool IsSystemDepartment { get; set; }
 
+        // True for a tag that became a college; its Active flag is
+        // managed under Academic Structure, not here.
+        public bool IsCollegeTag { get; set; }
+
         // Populated by the controller for the dropdown
         public List<SelectListItem> TagTypes { get; set; } = new();
     }

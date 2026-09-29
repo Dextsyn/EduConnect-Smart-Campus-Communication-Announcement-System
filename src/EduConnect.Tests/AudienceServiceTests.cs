@@ -363,6 +363,17 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task Validate_UnplacedAuthorKeepingExistingTargets_Succeeds()
+        {
+            var unplaced = _db.AddUser(RoleNames.Dean);
+            var existing = Sel(c: new[] { _ccit.CollegeID });
+
+            var r = await Service.ValidateTargetsAsync(unplaced.UserID, existing, keep: existing);
+
+            Assert.True(r.Ok);
+        }
+
+        [Fact]
         public async Task Not_InvertsVisibleTo()
         {
             var viewer = await Service.GetViewerAsync(_studentBsit.UserID);

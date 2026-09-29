@@ -60,12 +60,15 @@ namespace EduConnect.Web.Services
             var departmentId = reviewer.DepartmentID;
             var collegeId = reviewer.CollegeID;
 
+            // An archived (deleted) post is withdrawn from review.
+            var live = _context.Announcements.Where(a => a.Status != "Archived");
+
             return reviewer.RoleName switch
             {
-                RoleNames.Chairperson => _context.Announcements.Where(a =>
+                RoleNames.Chairperson => live.Where(a =>
                     a.ApprovalStatus == PendingChair &&
                     departmentId != null && a.Author.DepartmentID == departmentId),
-                RoleNames.Dean => _context.Announcements.Where(a =>
+                RoleNames.Dean => live.Where(a =>
                     a.ApprovalStatus == PendingDean &&
                     collegeId != null && a.Author.CollegeID == collegeId),
                 _ => _context.Announcements.Where(a => false)

@@ -177,5 +177,66 @@ namespace EduConnect.Tests
             Assert.Equal("Rejected", saved.ApprovalStatus);
             Assert.Equal("Not this week", saved.RejectionReason);
         }
+
+        private Announcement ChairPostRejectedByDean()
+        {
+            var post = _db.AddAnnouncement(_chair, "Chair notice");
+            post.Status = "Draft";
+            post.ApprovalStatus = "Rejected";
+            post.RejectionReason = "Not this week";
+            _db.Context.SaveChanges();
+            _db.Target(post, d: _itis);
+            return post;
+        }
+
+        [Fact]
+        public async Task Edit_ChairOwnPostRejectedByDean_ReturnsToDraft()
+        {
+            var post = ChairPostRejectedByDean();
+            var form = ChairPost();
+            form.AnnouncementID = post.AnnouncementID;
+
+            await As(_chair).Edit(form);
+
+            var saved = _db.NewContext().Announcements.Single(a => a.AnnouncementID == post.AnnouncementID);
+            Assert.Equal("Draft", saved.ApprovalStatus);
+            Assert.Null(saved.RejectionReason);
+        }
+
+        [Fact]
+        public async Task Submit_ChairOwnPost_GoesToTheDean()
+        {
+            var post = ChairPostRejectedByDean();
+
+            await As(_chair).Submit(post.AnnouncementID);
+
+            Assert.Equal("PendingDean",
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == post.AnnouncementID).ApprovalStatus);
+            Assert.Contains(_notes.Sent, n => n.UserId == _dean.UserID);
+        }
+
+        [Fact]
+        public async Task Approve_ArchivedPost_IsNotReviewable()
+        {
+            _post.Status = "Archived";
+            SetStatus("PendingChair");
+
+            await As(_chair).Approve(_post.AnnouncementID);
+
+            Assert.Equal("PendingChair", StatusNow());
+        }
+
+        [Fact]
+        public async Task Publish_ArchivedApprovedPost_StaysArchived()
+        {
+            _post.Status = "Archived";
+            SetStatus("Approved");
+
+            await As(_faculty).Publish(_post.AnnouncementID);
+
+            Assert.Equal("Archived",
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Status);
+            Assert.Empty(_notes.Sent);
+        }
     }
 }

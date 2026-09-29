@@ -97,10 +97,6 @@ namespace EduConnect.Web.Services
 
             var options = await GetTargetOptionsAsync(authorId);
             var college = options.College;
-            if (college == null)
-                return HierarchyResult.Fail(
-                    "You are not placed in a college yet, so you can only post to tags. " +
-                    "Ask your administrator to place you.");
 
             var colleges = options.CanTargetCollege && college != null
                 ? new HashSet<int> { college.CollegeID }
@@ -121,11 +117,13 @@ namespace EduConnect.Web.Services
             if (selection.CollegeIDs.Any(id => !colleges.Contains(id)) ||
                 selection.DepartmentIDs.Any(id => !departments.Contains(id)) ||
                 selection.ProgramIDs.Any(id => !programs.Contains(id)))
-                return HierarchyResult.Fail(
-                    "You can only post to your own " +
-                    (options.CanTargetCollege ? "college." :
-                     options.CanTargetDepartments ? "department and its programs." :
-                     "department's programs."));
+                return HierarchyResult.Fail(college == null
+                    ? "You are not placed in a college yet, so you can only post to tags. " +
+                      "Ask your administrator to place you."
+                    : "You can only post to your own " +
+                      (options.CanTargetCollege ? "college." :
+                       options.CanTargetDepartments ? "department and its programs." :
+                       "department's programs."));
 
             return HierarchyResult.Success;
         }

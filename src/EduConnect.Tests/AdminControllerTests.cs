@@ -41,5 +41,27 @@ namespace EduConnect.Tests
             Assert.False(_db.NewContext().DepartmentTags.Single(t => t.TagID == tag.TagID).IsActive);
             Assert.Contains("Academic Structure", (string)controller.TempData["Error"]!);
         }
+
+        [Fact]
+        public async Task EditDepartment_CollegeTag_CannotReactivate()
+        {
+            var tag = _db.AddTag("CCIT");
+            tag.IsActive = false;
+            var college = _db.AddCollege("College of Computing and Information Technology");
+            college.LegacyTagID = tag.TagID;
+            _db.Context.SaveChanges();
+
+            await Controller().EditDepartment(tag.TagID, new EduConnect.Web.ViewModels.AdminDepartmentFormViewModel
+            {
+                TagID = tag.TagID,
+                TagName = tag.TagName,
+                ShortName = tag.ShortName,
+                TagTypeID = tag.TagTypeID,
+                ColorHex = tag.ColorHex,
+                IsActive = true
+            });
+
+            Assert.False(_db.NewContext().DepartmentTags.Single(t => t.TagID == tag.TagID).IsActive);
+        }
     }
 }

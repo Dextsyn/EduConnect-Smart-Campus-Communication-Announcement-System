@@ -113,7 +113,14 @@
                     <span asp-validation-for="ColorHex" class="text-danger small"></span>
                 </div>
 
-                @if (!Model.IsSystemDepartment)
+                @if (Model.IsCollegeTag)
+                {
+                    <div class="col-12 small text-muted">
+                        <i class="bi bi-info-circle me-1"></i>This tag is now a college. Manage it under
+                        <a href="/AcademicStructure">Academic Structure</a>.
+                    </div>
+                }
+                else if (!Model.IsSystemDepartment)
                 {
                     <div class="col-12">
                         <div class="form-check">
