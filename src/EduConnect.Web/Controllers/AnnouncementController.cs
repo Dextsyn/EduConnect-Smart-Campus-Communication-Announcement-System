@@ -208,10 +208,11 @@ namespace EduConnect.Web.Controllers
                 .Include(a => a.Author)
                 .Include(a => a.AnnouncementTags)
                     .ThenInclude(at => at.DepartmentTag)
+                // The feed shows live posts only; authors find their drafts
+                // under My Announcements.
                 .Where(a =>
-                    (a.Status == "Published" &&
-                     (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now)) ||
-                    (canPublish && a.AuthorID == userID))
+                    a.Status == "Published" &&
+                    (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now))
                 .AsQueryable();
 
             // Feed type filter

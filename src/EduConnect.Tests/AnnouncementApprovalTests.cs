@@ -216,6 +216,24 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task Index_AuthorsOwnDraft_IsNotInTheFeed()
+        {
+            var draft = ChairPostRejectedByDean();
+            draft.ApprovalStatus = "Approved";
+            var live = _db.AddAnnouncement(_chair, "Chair live notice");
+            live.Status = "Published";
+            _db.Context.SaveChanges();
+            _db.Target(live, d: _itis);
+
+            var controller = As(_chair);
+            await controller.Index(null, null, null);
+            var titles = ((List<AnnouncementTableViewModel>)controller.ViewBag.Announcements)
+                .Select(a => a.Title).ToList();
+            Assert.Contains("Chair live notice", titles);
+            Assert.DoesNotContain("Chair notice", titles);
+        }
+
+        [Fact]
         public async Task Approve_ArchivedPost_IsNotReviewable()
         {
             _post.Status = "Archived";
