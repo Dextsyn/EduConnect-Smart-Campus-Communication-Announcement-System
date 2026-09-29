@@ -16,6 +16,7 @@ builder.Services.AddScoped<EduConnect.Web.Services.IBlobStorageService, EduConne
 builder.Services.AddScoped<EduConnect.Web.Services.IHierarchyService, EduConnect.Web.Services.HierarchyService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IPlacementService, EduConnect.Web.Services.PlacementService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IAudienceService, EduConnect.Web.Services.AudienceService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IApprovalService, EduConnect.Web.Services.ApprovalService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
