@@ -1,4 +1,11 @@
 -- ============================================================
+--  HISTORICAL. This script predates the EF Core migrations and
+--  no longer matches the schema (no Colleges/Departments/Programs,
+--  old role names). The migrations in src/EduConnect.Web/Migrations
+--  are the source of truth: run `dotnet ef database update`.
+-- ============================================================
+
+-- ============================================================
 --  EduConnect: Smart Campus Communication System
 --  Database Creation Script
 --  SQL Server Express

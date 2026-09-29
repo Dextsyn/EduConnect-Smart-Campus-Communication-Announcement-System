@@ -54,7 +54,7 @@ Named roles (constants in `RoleNames.cs` — never compare a literal): `Administ
 
 **Announcements** have two orthogonal status fields:
 - `Status`: `Draft` | `Published` (controls visibility)
-- `ApprovalStatus`: `Draft` | `Pending` | `Approved` | `Rejected` (Dean review workflow)
+- `ApprovalStatus`: `Draft` | `PendingChair` | `PendingDean` | `Approved` | `Rejected`. `IApprovalService` routes: a Faculty submission goes to every active Chairperson of the author's department (or, if none, the college's Deans); a Chairperson's approval is final unless they mark it a Dean-level matter, which sends it to the Deans; a Chairperson's own post can require the Dean the same way. Reviewers act only on announcements whose author is in their department (Chairperson) or college (Dean).
 
 **FeedType** on announcements (`Academic`, `Administrative`, etc.) controls which feed tab the announcement appears in.
 
@@ -62,7 +62,7 @@ Named roles (constants in `RoleNames.cs` — never compare a literal): `Administ
 
 **Academic hierarchy** (`Colleges` > `Departments` > `Programs`, entity `AcademicProgram`) is replacing the academic rows of `DepartmentTags`. Colleges without departments have one `IsImplicit` department that the UI hides. `Users.CollegeID/DepartmentID/ProgramID` hold a user's placement (Dean: college; Chairperson/Faculty: department; Student: program). `DepartmentTags` stays for `ALL` and non-academic offices. Design: `docs/superpowers/specs/2026-09-28-college-hierarchy-and-roles-design.md`.
 
-**Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and uploaded to the Azure Blob Storage container `qrcodes` (see `IBlobStorageService`); `EventRegistration.QRCode` stores the resulting public blob URL, which views render directly in `<img src>`.
+**Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and uploaded to the Azure Blob Storage container `qrcodes` (see `IBlobStorageService`); `EventRegistration.QRCode` stores the resulting public blob URL, which views render directly in `<img src>`. A Dean manages the events of organizers placed in their college, a Chairperson those in their department (`EventAccess`).
 
 ### Services
 
@@ -87,4 +87,4 @@ Razor views under `Views/<Controller>/`. Role-specific dashboards: `Admin/Index`
 
 ### Hardcoded localhost URLs
 
-Several email bodies contain `https://localhost:7135/...` links (in `AdminController`, `EventController`). These will need updating before any production deployment.
+Several email bodies contain `https://localhost:7135/...` links (in `AnnouncementController`). These will need updating before any production deployment.

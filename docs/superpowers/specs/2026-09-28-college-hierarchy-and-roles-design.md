@@ -1,7 +1,7 @@
 # College > Department > Program hierarchy and role rework — design
 
 Date: 2026-09-28
-Status: approved decisions from the 2026-09-28 audit Q&A; implementation split into five plans (see Roadmap).
+Status: implemented on feature/college-hierarchy (Plans 1–5, 2026-09-28/29).
 
 ## Problem
 
