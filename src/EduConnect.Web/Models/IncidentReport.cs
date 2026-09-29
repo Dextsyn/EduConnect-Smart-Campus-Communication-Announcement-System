@@ -46,5 +46,7 @@ namespace EduConnect.Web.Models
         // Navigation
         public User? ReportedBy { get; set; }
         public User? HandledBy { get; set; }
+        public ICollection<IncidentReportActivity> Activities { get; set; }
+            = new List<IncidentReportActivity>();
     }
 }

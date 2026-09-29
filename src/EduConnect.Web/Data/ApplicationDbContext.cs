@@ -52,6 +52,8 @@ namespace EduConnect.Web.Data
         // Campus Safety
         public DbSet<IncidentReport> IncidentReports
         { get; set; }
+        public DbSet<IncidentReportActivity> IncidentReportActivities
+        { get; set; }
 
         // Study Groups
         public DbSet<StudyGroup> StudyGroups { get; set; }
@@ -410,6 +412,23 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.HandledByID)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── IncidentReportActivities ──────────
+            modelBuilder.Entity<IncidentReportActivity>(entity =>
+            {
+                entity.HasKey(e => e.ActivityID);
+                entity.HasOne(e => e.Report)
+                      .WithMany(r => r.Activities)
+                      .HasForeignKey(e => e.ReportID)
+                      .OnDelete(DeleteBehavior.Cascade);
+                // The log outlives the account: the actor link goes,
+                // ActorName keeps who it was.
+                entity.HasOne(e => e.Actor)
+                      .WithMany()
+                      .HasForeignKey(e => e.ActorID)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(e => new { e.ActorID, e.CreatedAt });
             });
 
             // ─── StudyGroups ───────────────────────
