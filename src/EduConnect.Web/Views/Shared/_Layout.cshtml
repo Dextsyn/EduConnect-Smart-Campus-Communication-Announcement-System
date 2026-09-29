@@ -29,7 +29,8 @@
 
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body data-user-id="@Context.Session.GetString("UserID")">
+<body data-user-id="@Context.Session.GetString("UserID")"
+      class="@(ViewData["HideChatbotOnMobile"] is true ? "ec-hide-chatbot-mobile" : null)">
 
     <!-- TOPBAR -->
     <header class="ec-topbar">

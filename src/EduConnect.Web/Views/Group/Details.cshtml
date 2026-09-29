@@ -1,6 +1,8 @@
 @model EduConnect.Web.Models.Group
 @{
     ViewData["Title"] = Model.Name;
+    // The chatbot toggle covers the chat's Send button on phones.
+    ViewData["HideChatbotOnMobile"] = true;
     bool isMember = (bool)ViewBag.IsMember;
     bool isCreator = (bool)ViewBag.IsCreator;
     int currentUserId = (int)ViewBag.UserID;

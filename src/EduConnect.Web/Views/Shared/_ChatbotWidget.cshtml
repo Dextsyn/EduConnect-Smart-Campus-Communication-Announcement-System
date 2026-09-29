@@ -238,6 +238,14 @@
         }
     }
 
+    /* Pages with their own bottom-right controls (e.g. group chat) opt out on phones. */
+    @@media (max-width: 767.98px) {
+        body.ec-hide-chatbot-mobile #chatbot-toggle,
+        body.ec-hide-chatbot-mobile #chatbot-panel {
+            display: none !important;
+        }
+    }
+
     #chatbot-input {
         flex: 1;
         border: 1px solid #dee2e6;
