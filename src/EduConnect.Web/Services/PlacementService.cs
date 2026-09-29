@@ -104,43 +104,6 @@ namespace EduConnect.Web.Services
             return HierarchyResult.Success;
         }
 
-        public async Task SyncFeedTagAsync(User user)
-        {
-            int? tagId = null;
-            if (user.CollegeID != null)
-                tagId = await _context.Colleges
-                    .Where(c => c.CollegeID == user.CollegeID)
-                    .Select(c => c.LegacyTagID)
-                    .FirstOrDefaultAsync();
-
-            var rows = await _context.UserDepartments
-                .Where(ud => ud.UserID == user.UserID)
-                .ToListAsync();
-
-            var primary = rows.FirstOrDefault(ud => ud.IsPrimary);
-            if (primary?.TagID == tagId)
-                return;
-
-            if (primary != null)
-                _context.UserDepartments.Remove(primary);
-
-            if (tagId == null)
-                return;
-
-            // (UserID, TagID) is unique: promote a row that already exists.
-            var existing = rows.FirstOrDefault(ud => ud.TagID == tagId && !ud.IsPrimary);
-            if (existing != null)
-                existing.IsPrimary = true;
-            else
-                _context.UserDepartments.Add(new UserDepartment
-                {
-                    UserID = user.UserID,
-                    TagID = tagId.Value,
-                    IsPrimary = true,
-                    CreatedAt = DateTime.Now
-                });
-        }
-
         public async Task<Dictionary<int, string>> GetPlacementLabelsAsync(IEnumerable<int> userIds)
         {
             var ids = userIds.Distinct().ToList();

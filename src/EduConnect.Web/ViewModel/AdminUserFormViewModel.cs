@@ -32,8 +32,9 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Role is required")]
         public int RoleID { get; set; }
 
-        [Required(ErrorMessage = "Feed tag is required")]
-        public int DepartmentTagID { get; set; }
+        // Optional: School Wide or a non-academic office. Academic users are
+        // reached through their placement.
+        public int? DepartmentTagID { get; set; }
 
         // Academic placement; which levels apply depends on the role.
         // IPlacementService validates and derives the rest.

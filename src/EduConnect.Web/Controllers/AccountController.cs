@@ -265,11 +265,6 @@ namespace EduConnect.Web.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // The feed still reads tags (until Plan 4): give the new student
-            // their college's tag.
-            await _placement.SyncFeedTagAsync(user);
-            await _context.SaveChangesAsync();
-
             _logger.LogInformation(
                 "New registration pending: {Email}",
                 user.Email);
@@ -435,8 +430,6 @@ namespace EduConnect.Web.Controllers
                     model.CollegeID, model.DepartmentID, model.ProgramID);
                 if (!placement.Ok)
                     ModelState.AddModelError("Placement", placement.Error!);
-                else
-                    await _placement.SyncFeedTagAsync(user);
             }
 
             // ─── Handle profile picture upload ────

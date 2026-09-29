@@ -10,6 +10,7 @@
         Dictionary<int, int> ?? new Dictionary<int, int>();
     var announcementCounts = ViewBag.AnnouncementCounts as
         Dictionary<int, int> ?? new Dictionary<int, int>();
+    var collegeTagIDs = ViewBag.CollegeTagIDs as List<int> ?? new List<int>();
     var systemShortNames = ViewBag.SystemShortNames as
         string[] ?? new string[0];
 }
@@ -165,6 +166,13 @@
                                                         System
                                                     </span>
                                                 }
+                                                @if (collegeTagIDs.Contains(dept.TagID))
+                                                {
+                                                    <span class="badge bg-light text-dark border ms-1"
+                                                          style="font-size:10px">
+                                                        Now a college
+                                                    </span>
+                                                }
                                             </div>
                                             @if (!string.IsNullOrEmpty(dept.Description))
                                             {
@@ -216,7 +224,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </a>
 
-                                        @if (!isSystem)
+                                        @if (!isSystem && !collegeTagIDs.Contains(dept.TagID))
                                         {
                                             <form asp-action="ToggleDepartment"
                                                   asp-route-id="@dept.TagID"

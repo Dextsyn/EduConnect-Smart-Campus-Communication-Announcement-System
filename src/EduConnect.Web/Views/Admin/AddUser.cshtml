@@ -72,12 +72,12 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label asp-for="DepartmentTagID" class="form-label fw-semibold">Feed tag</label>
+                    <label asp-for="DepartmentTagID" class="form-label fw-semibold">Office tag <span class="text-muted fw-normal">(optional)</span></label>
                     <select asp-for="DepartmentTagID" asp-items="Model.Departments" class="form-select">
-                        <option value="">— Select tag —</option>
+                        <option value="">— None —</option>
                     </select>
                     <span asp-validation-for="DepartmentTagID" class="text-danger small"></span>
-                    <div class="form-text">School Wide or an office tag; the announcement feed uses it until targeting moves to colleges.</div>
+                    <div class="form-text">School Wide or a non-academic office. Students, faculty and deans are reached through their placement.</div>
                 </div>
 
                 @await Html.PartialAsync("_PlacementFields", Model)

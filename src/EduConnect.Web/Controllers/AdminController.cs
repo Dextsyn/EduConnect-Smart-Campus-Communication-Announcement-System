@@ -495,14 +495,17 @@ namespace EduConnect.Web.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            _context.UserDepartments.Add(new UserDepartment
+            if (model.DepartmentTagID.HasValue)
             {
-                UserID = user.UserID,
-                TagID = model.DepartmentTagID,
-                IsPrimary = true,
-                CreatedAt = DateTime.Now
-            });
-            await _context.SaveChangesAsync();
+                _context.UserDepartments.Add(new UserDepartment
+                {
+                    UserID = user.UserID,
+                    TagID = model.DepartmentTagID.Value,
+                    IsPrimary = true,
+                    CreatedAt = DateTime.Now
+                });
+                await _context.SaveChangesAsync();
+            }
 
             // Send welcome email (fire-and-forget)
             try
@@ -571,7 +574,7 @@ namespace EduConnect.Web.Controllers
                 Email = user.Email,
                 StudentID = user.StudentID,
                 RoleID = user.RoleID,
-                DepartmentTagID = primaryDept?.TagID ?? 0,
+                DepartmentTagID = primaryDept?.TagID,
                 CollegeID = user.CollegeID,
                 DepartmentID = user.DepartmentID,
                 ProgramID = user.ProgramID,
@@ -653,31 +656,19 @@ namespace EduConnect.Web.Controllers
             if (!string.IsNullOrWhiteSpace(model.Password))
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            // Replace primary department
-            var existingPrimary = user.UserDepartments
-                .FirstOrDefault(ud => ud.IsPrimary);
-
+            // Replace or clear the office tag
+            var existingPrimary = user.UserDepartments.FirstOrDefault(ud => ud.IsPrimary);
             if (existingPrimary != null && existingPrimary.TagID != model.DepartmentTagID)
-            {
                 _context.UserDepartments.Remove(existingPrimary);
+            if (model.DepartmentTagID.HasValue &&
+                (existingPrimary == null || existingPrimary.TagID != model.DepartmentTagID))
                 _context.UserDepartments.Add(new UserDepartment
                 {
                     UserID = user.UserID,
-                    TagID = model.DepartmentTagID,
+                    TagID = model.DepartmentTagID.Value,
                     IsPrimary = true,
                     CreatedAt = DateTime.Now
                 });
-            }
-            else if (existingPrimary == null)
-            {
-                _context.UserDepartments.Add(new UserDepartment
-                {
-                    UserID = user.UserID,
-                    TagID = model.DepartmentTagID,
-                    IsPrimary = true,
-                    CreatedAt = DateTime.Now
-                });
-            }
 
             await _context.SaveChangesAsync();
 
@@ -886,6 +877,10 @@ namespace EduConnect.Web.Controllers
             ViewBag.FilterType = filterType;
             ViewBag.FilterStatus = filterStatus;
             ViewBag.SystemShortNames = SystemShortNames;
+            ViewBag.CollegeTagIDs = await _context.Colleges
+                .Where(c => c.LegacyTagID != null)
+                .Select(c => c.LegacyTagID!.Value)
+                .ToListAsync();
 
             return View();
         }
@@ -1073,6 +1068,15 @@ namespace EduConnect.Web.Controllers
                 TempData["Error"] =
                     $"\"{dept.TagName}\" is referenced by the announcement " +
                     "feed and cannot be retired.";
+                return RedirectToAction("Departments");
+            }
+
+            // Tags that became colleges live on under Academic Structure;
+            // restoring one would bring back the old flat department list.
+            if (await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID))
+            {
+                TempData["Error"] =
+                    $"\"{dept.TagName}\" is now a college. Manage it under Academic Structure.";
                 return RedirectToAction("Departments");
             }
 
