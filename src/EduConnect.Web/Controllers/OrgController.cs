@@ -57,7 +57,7 @@ namespace EduConnect.Web.Controllers
 
             var now = DateTime.Now;
             var orgsQuery = _context.Organizations
-                .Include(o => o.DepartmentTag)
+                .Include(o => o.College)
                 .Where(o => o.IsActive);
 
             if (orgId.HasValue)
@@ -111,7 +111,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var org = await _context.Organizations
-                .Include(o => o.DepartmentTag)
+                .Include(o => o.College)
                 .FirstOrDefaultAsync(o => o.OrgID == id && o.IsActive);
 
             if (org == null) return NotFound();
@@ -221,7 +221,7 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var orgs = await _context.Organizations
-                .Include(o => o.DepartmentTag)
+                .Include(o => o.College)
                 .Include(o => o.Members)
                     .ThenInclude(m => m.User)
                 .OrderBy(o => o.OrgName)
@@ -266,7 +266,7 @@ namespace EduConnect.Web.Controllers
                 OrgName = vm.OrgName,
                 Description = vm.Description,
                 LogoURL = await SaveLogoFile(vm.Logo),
-                DepartmentTagID = vm.DepartmentTagID,
+                CollegeID = vm.CollegeID,
                 CreatedByID = GetUserID()
             };
 
@@ -304,7 +304,7 @@ namespace EduConnect.Web.Controllers
             vm.OrgName = org.OrgName;
             vm.Description = org.Description;
             vm.ExistingLogoURL = org.LogoURL;
-            vm.DepartmentTagID = org.DepartmentTagID;
+            vm.CollegeID = org.CollegeID;
             vm.AdviserUserID = currentAdviser?.UserID ?? 0;
 
             ViewBag.OrgID = id;
@@ -345,7 +345,7 @@ namespace EduConnect.Web.Controllers
 
             org.OrgName = vm.OrgName;
             org.Description = vm.Description;
-            org.DepartmentTagID = vm.DepartmentTagID;
+            org.CollegeID = vm.CollegeID;
             org.UpdatedAt = DateTime.Now;
 
             if (vm.Logo != null && vm.Logo.Length > 0)
@@ -429,13 +429,11 @@ namespace EduConnect.Web.Controllers
                     $"{u.LastName}, {u.FirstName}", u.UserID.ToString()))
                 .ToList();
 
-            var depts = await _context.DepartmentTags
-                .Where(d => d.IsActive)
-                .OrderBy(d => d.TagName)
-                .ToListAsync();
-
-            vm.DepartmentOptions = depts
-                .Select(d => new SelectListItem(d.TagName, d.TagID.ToString()))
+            vm.CollegeOptions = (await _context.Colleges
+                .Where(c => c.IsActive)
+                .OrderBy(c => c.Name)
+                .ToListAsync())
+                .Select(c => new SelectListItem(c.Name, c.CollegeID.ToString()))
                 .ToList();
         }
 

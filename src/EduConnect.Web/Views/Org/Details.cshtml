@@ -27,10 +27,10 @@
             }
             <div class="flex-grow-1">
                 <h4 class="fw-bold mb-1">@Model.OrgName</h4>
-                @if (Model.DepartmentTag != null)
+                @if (Model.College != null)
                 {
                     <span class="ec-chip ec-chip-neutral mb-2">
-                        @Model.DepartmentTag.TagName
+                        @Model.College.Name
                     </span>
                 }
                 else

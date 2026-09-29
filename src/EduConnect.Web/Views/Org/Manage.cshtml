@@ -79,10 +79,10 @@
                                 }
                             </td>
                             <td>
-                                @if (org.DepartmentTag != null)
+                                @if (org.College != null)
                                 {
                                     <span class="badge bg-secondary">
-                                        @org.DepartmentTag.ShortName
+                                        @(org.College.ShortName ?? org.College.Name)
                                     </span>
                                 }
                                 else

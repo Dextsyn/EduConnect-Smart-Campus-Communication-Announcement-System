@@ -81,10 +81,10 @@
                        class="fw-bold text-decoration-none text-dark">
                         @group.Org.OrgName
                     </a>
-                    @if (group.Org.DepartmentTag != null)
+                    @if (group.Org.College != null)
                     {
                         <span class="ec-chip ec-chip-neutral ms-2">
-                            @group.Org.DepartmentTag.ShortName
+                            @(group.Org.College.ShortName ?? group.Org.College.Name)
                         </span>
                     }
                     else

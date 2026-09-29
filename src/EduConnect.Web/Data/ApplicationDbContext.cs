@@ -362,6 +362,10 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.DepartmentTagID)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.College)
+                      .WithMany()
+                      .HasForeignKey(e => e.CollegeID)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ─── OrgMembers ────────────────────────

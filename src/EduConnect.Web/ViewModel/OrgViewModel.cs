@@ -29,13 +29,13 @@ namespace EduConnect.Web.ViewModels
         public IFormFile? Logo { get; set; }
         public string? ExistingLogoURL { get; set; }
 
-        public int? DepartmentTagID { get; set; }
+        public int? CollegeID { get; set; }
 
         [Required(ErrorMessage = "Please select a Faculty adviser")]
         public int AdviserUserID { get; set; }
 
         public List<SelectListItem> FacultyOptions { get; set; } = new();
-        public List<SelectListItem> DepartmentOptions { get; set; } = new();
+        public List<SelectListItem> CollegeOptions { get; set; } = new();
     }
 
     public class OrgPostViewModel
