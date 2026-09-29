@@ -16,5 +16,9 @@ namespace EduConnect.Web.Services
         // legacy tag, or removes it when the college has none. The user
         // must already be saved; stages changes, the caller saves.
         Task SyncFeedTagAsync(User user);
+
+        // Short label per user: program → department → college → primary
+        // tag → "—". For lists such as event registrants.
+        Task<Dictionary<int, string>> GetPlacementLabelsAsync(IEnumerable<int> userIds);
     }
 }

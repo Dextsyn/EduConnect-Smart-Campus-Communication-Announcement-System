@@ -141,6 +141,32 @@ namespace EduConnect.Web.Services
                 });
         }
 
+        public async Task<Dictionary<int, string>> GetPlacementLabelsAsync(IEnumerable<int> userIds)
+        {
+            var ids = userIds.Distinct().ToList();
+            var rows = await _context.Users
+                .Where(u => ids.Contains(u.UserID))
+                .Select(u => new
+                {
+                    u.UserID,
+                    Program = u.AcademicProgram == null ? null
+                        : (u.AcademicProgram.ShortName ?? u.AcademicProgram.Name),
+                    Department = u.Department == null || u.Department.IsImplicit ? null
+                        : (u.Department.ShortName ?? u.Department.Name),
+                    College = u.College == null ? null
+                        : (u.College.ShortName ?? u.College.Name),
+                    Tag = u.UserDepartments
+                        .Where(ud => ud.IsPrimary)
+                        .Select(ud => ud.DepartmentTag.ShortName)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(
+                r => r.UserID,
+                r => r.Program ?? r.Department ?? r.College ?? r.Tag ?? "—");
+        }
+
         private static void Set(User user, int? collegeId, int? departmentId, int? programId)
         {
             user.CollegeID = collegeId;

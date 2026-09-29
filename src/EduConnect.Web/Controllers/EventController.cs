@@ -20,6 +20,7 @@ namespace EduConnect.Web.Controllers
         private readonly INotificationService _notificationService;
         private readonly IHubContext<EventHub> _eventHub;
         private readonly IBlobStorageService _blobStorageService;
+        private readonly IPlacementService _placement;
 
         public EventController(
             ApplicationDbContext context,
@@ -28,7 +29,8 @@ namespace EduConnect.Web.Controllers
             IEmailService emailService,
             INotificationService notificationService,
             IHubContext<EventHub> eventHub,
-            IBlobStorageService blobStorageService)
+            IBlobStorageService blobStorageService,
+            IPlacementService placement)
         {
             _context = context;
             _logger = logger;
@@ -37,6 +39,7 @@ namespace EduConnect.Web.Controllers
             _notificationService = notificationService;
             _eventHub = eventHub;
             _blobStorageService = blobStorageService;
+            _placement = placement;
         }
 
         // ─── Helpers ───────────────────────────
@@ -68,9 +71,9 @@ namespace EduConnect.Web.Controllers
                    role == RoleNames.Chairperson;
         }
 
-        // Organizer, or a Dean / Chairperson sharing a
-        // department with the organizer. Requires
-        // Event.Organizer.UserDepartments to be loaded.
+        // Organizer, or a Dean / Chairperson whose college /
+        // department the organizer is placed in. Requires
+        // Event.Organizer to be loaded.
         private async Task<bool> CanScanRegistration(
             EventRegistration registration)
         {
@@ -80,24 +83,15 @@ namespace EduConnect.Web.Controllers
             if (registration.Event.OrganizerID == userID)
                 return true;
 
-            if (roleName != RoleNames.Dean &&
-                roleName != RoleNames.Chairperson)
-                return false;
+            var me = await _context.Users
+                .Where(u => u.UserID == userID)
+                .Select(u => new { u.CollegeID, u.DepartmentID })
+                .FirstOrDefaultAsync();
+            var organizer = registration.Event.Organizer;
 
-            var userDeptTagIDs = await _context
-                .UserDepartments
-                .Where(ud => ud.UserID == userID)
-                .Select(ud => ud.TagID)
-                .ToListAsync();
-
-            var organizerDeptTagIDs = registration
-                .Event.Organizer.UserDepartments
-                .Select(ud => ud.TagID)
-                .ToList();
-
-            return userDeptTagIDs
-                .Intersect(organizerDeptTagIDs)
-                .Any();
+            return me != null && EventAccess.ManagesEventsOf(roleName,
+                me.CollegeID, me.DepartmentID,
+                organizer.CollegeID, organizer.DepartmentID);
         }
 
         private bool IsCreator(Event ev) =>
@@ -355,6 +349,9 @@ namespace EduConnect.Web.Controllers
             else if (isFull)
                 regStatus = "Full";
 
+            var regLabels = await _placement.GetPlacementLabelsAsync(
+                ev.Registrations.Select(r => r.UserID));
+
             var model = new EventDetailViewModel
             {
                 EventID = ev.EventID,
@@ -406,12 +403,7 @@ namespace EduConnect.Web.Controllers
                             StudentID =
                                 r.User.StudentID ?? "—",
                             Email = r.User.Email,
-                            Department =
-                                r.User.UserDepartments
-                                    .FirstOrDefault(
-                                        ud => ud.IsPrimary)
-                                    ?.DepartmentTag
-                                    ?.ShortName ?? "—",
+                            Department = regLabels.GetValueOrDefault(r.UserID, "—"),
                             Status = r.Status,
                             QRCode = r.QRCode,
                             RegisteredAt = r.RegisteredAt
@@ -1449,29 +1441,24 @@ namespace EduConnect.Web.Controllers
             bool canAccess =
                 ev.OrganizerID == userID;
 
-            if (!canAccess &&
-                (roleName == RoleNames.Dean ||
-                 roleName == RoleNames.Chairperson))
+            if (!canAccess)
             {
-                var userDeptTagIDs = await _context
-                    .UserDepartments
-                    .Where(ud => ud.UserID == userID)
-                    .Select(ud => ud.TagID)
-                    .ToListAsync();
-
-                var organizerDeptTagIDs = ev.Organizer
-                    .UserDepartments
-                    .Select(ud => ud.TagID)
-                    .ToList();
-
-                canAccess = userDeptTagIDs
-                    .Intersect(organizerDeptTagIDs)
-                    .Any();
+                var me = await _context.Users
+                    .Where(u => u.UserID == userID)
+                    .Select(u => new { u.CollegeID, u.DepartmentID })
+                    .FirstOrDefaultAsync();
+                canAccess = me != null && EventAccess.ManagesEventsOf(roleName,
+                    me.CollegeID, me.DepartmentID,
+                    ev.Organizer.CollegeID, ev.Organizer.DepartmentID);
             }
 
             if (!canAccess)
                 return RedirectToAction(
                     "Details", new { id });
+
+            var regLabels = await _placement.GetPlacementLabelsAsync(
+                ev.Registrations.Select(r => r.UserID)
+                    .Concat(ev.Waitlist.Select(w => w.UserID)));
 
             var model = new EventRegistrantsViewModel
             {
@@ -1503,12 +1490,7 @@ namespace EduConnect.Web.Controllers
                             StudentID =
                                 r.User.StudentID ?? "—",
                             Email = r.User.Email,
-                            Department =
-                                r.User.UserDepartments
-                                    .FirstOrDefault(
-                                        ud => ud.IsPrimary)
-                                    ?.DepartmentTag
-                                    ?.ShortName ?? "—",
+                            Department = regLabels.GetValueOrDefault(r.UserID, "—"),
                             Status = r.Status,
                             QRCode = r.QRCode,
                             RegisteredAt = r.RegisteredAt
@@ -1527,12 +1509,7 @@ namespace EduConnect.Web.Controllers
                             StudentID =
                                 w.User.StudentID ?? "—",
                             Email    = w.User.Email,
-                            Department =
-                                w.User.UserDepartments
-                                    .FirstOrDefault(
-                                        ud => ud.IsPrimary)
-                                    ?.DepartmentTag
-                                    ?.ShortName ?? "—",
+                            Department = regLabels.GetValueOrDefault(w.UserID, "—"),
                             Status   = w.Status,
                             JoinedAt = w.JoinedAt
                         })
@@ -1584,10 +1561,7 @@ namespace EduConnect.Web.Controllers
                     user.FirstName + " " + user.LastName,
                 StudentID   = user.StudentID ?? "—",
                 Email       = user.Email,
-                Department  =
-                    user.UserDepartments
-                        .FirstOrDefault(ud => ud.IsPrimary)
-                        ?.DepartmentTag?.ShortName ?? "—",
+                Department  = (await _placement.GetPlacementLabelsAsync(new[] { user.UserID }))[user.UserID],
                 EventID       = registration.Event.EventID,
                 EventTitle    = registration.Event.EventTitle,
                 StartDateTime = registration.Event.StartDateTime,
@@ -1667,9 +1641,7 @@ namespace EduConnect.Web.Controllers
                                   + " " + registration.User.LastName,
                 studentID       = registration.User.StudentID ?? "—",
                 email           = registration.User.Email,
-                department      = registration.User.UserDepartments
-                                    .FirstOrDefault(ud => ud.IsPrimary)
-                                    ?.DepartmentTag?.ShortName ?? "—",
+                department      = (await _placement.GetPlacementLabelsAsync(new[] { registration.UserID }))[registration.UserID],
                 eventID         = registration.Event.EventID,
                 eventTitle      = registration.Event.EventTitle,
                 startDateTime   = registration.Event.StartDateTime

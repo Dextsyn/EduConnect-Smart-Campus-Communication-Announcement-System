@@ -273,6 +273,27 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task Labels_UseTheMostSpecificPlacement()
+        {
+            _bsit.ShortName = "BSIT";
+            _db.Context.SaveChanges();
+            var student = _db.AddUser(RoleNames.Student, _ccit.CollegeID, _itis.DepartmentID, _bsit.ProgramID);
+            var faculty = _db.AddUser(RoleNames.Faculty, _ccit.CollegeID, _itis.DepartmentID);
+            var lawFaculty = _db.AddUser(RoleNames.Faculty, _law.CollegeID, LawDept.DepartmentID);
+            var tagged = _db.AddUser(RoleNames.Staff);
+            _db.TagUser(tagged, _db.AddTag("REG"));
+            var nothing = _db.AddUser(RoleNames.Staff);
+
+            var labels = await Service.GetPlacementLabelsAsync(new[] { student.UserID, faculty.UserID, lawFaculty.UserID, tagged.UserID, nothing.UserID });
+
+            Assert.Equal("BSIT", labels[student.UserID]);
+            Assert.Equal("IT&IS", labels[faculty.UserID]);
+            Assert.Equal("College of Law", labels[lawFaculty.UserID]);
+            Assert.Equal("REG", labels[tagged.UserID]);
+            Assert.Equal("—", labels[nothing.UserID]);
+        }
+
+        [Fact]
         public async Task NeedsPlacement_FlagsOnlyUsersMissingTheirRequiredLevel()
         {
             _db.AddUser(RoleNames.Student, _ccit.CollegeID);                                   // no program → flagged
