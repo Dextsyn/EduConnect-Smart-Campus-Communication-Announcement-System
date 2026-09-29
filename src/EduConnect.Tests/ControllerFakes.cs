@@ -37,6 +37,36 @@ namespace EduConnect.Tests
         public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
     }
 
+    // Records notifications instead of saving or broadcasting them.
+    public sealed class FakeNotificationService : INotificationService
+    {
+        public List<(int UserId, string Type)> Sent { get; } = new();
+
+        public Task SendAsync(int userId, string type, string message, string? link = null, int? announcementId = null)
+        {
+            Sent.Add((userId, type));
+            return Task.CompletedTask;
+        }
+
+        public Task SendToManyAsync(IEnumerable<int> userIds, string type, string message, string? link = null, int? announcementId = null)
+        {
+            foreach (var id in userIds) Sent.Add((id, type));
+            return Task.CompletedTask;
+        }
+    }
+
+    // Records addresses instead of sending mail.
+    public sealed class FakeEmailService : IEmailService
+    {
+        public List<string> Sent { get; } = new();
+
+        public Task SendEmailAsync(string toEmail, string toName, string subject, string htmlBody)
+        {
+            Sent.Add(toEmail);
+            return Task.CompletedTask;
+        }
+    }
+
     // Records blob calls instead of talking to Azure.
     public sealed class FakeBlobStorage : IBlobStorageService
     {
