@@ -161,9 +161,9 @@ namespace EduConnect.Web.Services
         }
 
         /// <summary>
-        /// Published, unexpired announcements. When <paramref name="forceDepartmentScope"/> is true the
-        /// department filter is applied regardless of role, so "my department" means the same thing for
-        /// a Dean or Administrator as it does for a Student.
+        /// Published, unexpired announcements. Everyone except the Administrator is scoped by
+        /// <see cref="IAudienceService.VisibleTo"/>; when <paramref name="forceDepartmentScope"/> is true
+        /// the Administrator is scoped too, so "my department" means the same thing for every role.
         /// </summary>
         private async Task<IQueryable<Announcement>> BuildVisibleAnnouncementsQueryAsync(
             int userId, string roleName, bool forceDepartmentScope = false)
@@ -315,12 +315,11 @@ namespace EduConnect.Web.Services
                 .Take(announcementTake)
                 .ToListAsync();
 
-            // Emergency announcements are department-scoped like everything
-            // else: BuildVisibleAnnouncementsQueryAsync still applies the
-            // role-based scope, so Students, Student Pending, Faculty and
-            // Staff see only their own departments' emergencies plus School
-            // Wide ones. Omitting forceDepartmentScope here only skips the
-            // extra intent-driven narrowing, not the scope itself.
+            // Emergency announcements are scoped like everything else:
+            // BuildVisibleAnnouncementsQueryAsync limits everyone except the
+            // Administrator to what IAudienceService.VisibleTo lets them see.
+            // Omitting forceDepartmentScope here only skips the Administrator's
+            // intent-driven narrowing, not the scope itself.
             var emergencyQuery = await BuildVisibleAnnouncementsQueryAsync(userId, roleName);
             var emergencies = await emergencyQuery
                 .Where(a => a.IsEmergency)

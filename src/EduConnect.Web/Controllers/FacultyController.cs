@@ -49,7 +49,14 @@ namespace EduConnect.Web.Controllers
                         ? u.Department.ShortName
                         : u.College != null ? u.College.ShortName : null
                 })
-                .FirstAsync();
+                .FirstOrDefaultAsync();
+
+            // The account was deleted while its session was still alive.
+            if (placement == null)
+            {
+                HttpContext.Session.Clear();
+                return RedirectToAction("Login", "Account");
+            }
 
             ViewBag.DepartmentName = placement.Name ?? "No placement";
             ViewBag.DepartmentShort = placement.Short ?? "—";

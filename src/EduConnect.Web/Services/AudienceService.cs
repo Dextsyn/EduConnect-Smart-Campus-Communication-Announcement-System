@@ -97,6 +97,10 @@ namespace EduConnect.Web.Services
 
             var options = await GetTargetOptionsAsync(authorId);
             var college = options.College;
+            if (college == null)
+                return HierarchyResult.Fail(
+                    "You are not placed in a college yet, so you can only post to tags. " +
+                    "Ask your administrator to place you.");
 
             var colleges = options.CanTargetCollege && college != null
                 ? new HashSet<int> { college.CollegeID }
@@ -173,14 +177,20 @@ namespace EduConnect.Web.Services
                         ? (t.AcademicProgram!.ShortName ?? t.AcademicProgram.Name)
                         : t.DepartmentID != null
                             ? (t.Department!.ShortName ?? t.Department.Name)
-                            : (t.College!.ShortName ?? t.College.Name)
+                            : (t.College!.ShortName ?? t.College.Name),
+                    Retired = t.ProgramID != null ? !t.AcademicProgram!.IsActive
+                        : t.DepartmentID != null ? !t.Department!.IsActive
+                        : !t.College!.IsActive
                 })
                 .ToListAsync();
 
             foreach (var row in list)
                 foreach (var label in labels.Where(l => l.AnnouncementID == row.AnnouncementID))
-                    if (!row.Tags.Contains(label.Label))
-                        row.Tags.Add(label.Label);
+                {
+                    var text = label.Retired ? label.Label + RetiredSuffix : label.Label;
+                    if (!row.Tags.Contains(text))
+                        row.Tags.Add(text);
+                }
         }
 
         public async Task<List<TargetChoice>> GetOutOfScopeTargetsAsync(int authorId, int announcementId)
@@ -239,13 +249,25 @@ namespace EduConnect.Web.Services
                 .ToList();
         }
 
-        public Task<List<string>> GetTargetNamesAsync(int announcementId) =>
-            _context.AnnouncementTargets
+        public async Task<List<string>> GetTargetNamesAsync(int announcementId)
+        {
+            var targets = await _context.AnnouncementTargets
                 .Where(t => t.AnnouncementID == announcementId)
-                .Select(t => t.ProgramID != null ? t.AcademicProgram!.Name
-                    : t.DepartmentID != null ? t.Department!.Name
-                    : t.College!.Name)
+                .Select(t => new
+                {
+                    Name = t.ProgramID != null ? t.AcademicProgram!.Name
+                        : t.DepartmentID != null ? t.Department!.Name
+                        : t.College!.Name,
+                    Retired = t.ProgramID != null ? !t.AcademicProgram!.IsActive
+                        : t.DepartmentID != null ? !t.Department!.IsActive
+                        : !t.College!.IsActive
+                })
                 .ToListAsync();
+
+            return targets.Select(t => t.Retired ? t.Name + RetiredSuffix : t.Name).ToList();
+        }
+
+        private const string RetiredSuffix = " (retired)";
 
         public static Expression<Func<Announcement, bool>> Not(
             Expression<Func<Announcement, bool>> expression) =>

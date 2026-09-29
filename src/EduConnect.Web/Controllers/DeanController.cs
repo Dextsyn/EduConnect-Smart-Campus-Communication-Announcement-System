@@ -58,7 +58,14 @@ namespace EduConnect.Web.Controllers
                     DepartmentName = u.Department == null || u.Department.IsImplicit ? null : u.Department.Name,
                     DepartmentShort = u.Department == null || u.Department.IsImplicit ? null : u.Department.ShortName
                 })
-                .FirstAsync();
+                .FirstOrDefaultAsync();
+
+            // The account was deleted while its session was still alive.
+            if (scope == null)
+            {
+                HttpContext.Session.Clear();
+                return RedirectToAction("Login", "Account");
+            }
 
             ViewBag.DepartmentName = (isDean ? scope.CollegeName : scope.DepartmentName ?? scope.CollegeName)
                 ?? "No placement";

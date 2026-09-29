@@ -119,6 +119,34 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task ProfilePost_NewProgramButOtherErrors_StaysEditable()
+        {
+            var college = _db.AddCollege("CCIT");
+            var dept = _db.AddDepartment(college, "IT&IS");
+            var bsit = _db.AddProgram(dept, "BSIT");
+            var student = _db.AddUser(RoleNames.Student);
+            _session.SetString("UserID", student.UserID.ToString());
+
+            var result = await Controller().Profile(new ProfileViewModel { ProgramID = bsit.ProgramID, Suffix = "Esq." });
+
+            var model = Assert.IsType<ProfileViewModel>(Assert.IsType<ViewResult>(result).Model);
+            Assert.True(model.CanEditProgram);
+            Assert.Null((await _db.NewContext().Users.SingleAsync()).ProgramID);
+        }
+
+        [Fact]
+        public async Task Register_WithoutProgram_ReportsItWithTheOtherErrors()
+        {
+            var controller = Controller();
+            controller.ModelState.AddModelError("Password", "Password is required");
+
+            var result = await controller.Register(new RegisterViewModel { Email = "x@test.local" });
+
+            Assert.IsType<ViewResult>(result);
+            Assert.True(controller.ModelState.ContainsKey("Placement"));
+        }
+
+        [Fact]
         public async Task ProfileGet_UserNoLongerExists_ClearsTheSession()
         {
             _session.SetString("UserID", "999");

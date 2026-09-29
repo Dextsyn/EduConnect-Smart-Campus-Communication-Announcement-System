@@ -171,6 +171,10 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Register(
             RegisterViewModel model)
         {
+            // Report a missing program together with every other error.
+            if (model.ProgramID == null)
+                ModelState.AddModelError("Placement", "Choose a program.");
+
             if (!ModelState.IsValid)
             {
                 model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
@@ -322,12 +326,14 @@ namespace EduConnect.Web.Controllers
 
         // Placement fields for the profile page. Loads the tree only for
         // students, who are the only ones who edit it here.
-        private async Task FillPlacementAsync(ProfileViewModel model, User user)
+        // programLocked: whether the student had a program before this
+        // request (a failed save may have set one in memory only).
+        private async Task FillPlacementAsync(ProfileViewModel model, User user, bool? programLocked = null)
         {
             // A student picks a program once (registration or first login);
             // after that only the admin moves them.
-            model.CanEditProgram =
-                user.Role.RoleName == RoleNames.Student && user.ProgramID == null;
+            var locked = programLocked ?? user.ProgramID != null;
+            model.CanEditProgram = user.Role.RoleName == RoleNames.Student && !locked;
 
             var parts = await _context.Users
                 .Where(u => u.UserID == user.UserID)
@@ -423,7 +429,8 @@ namespace EduConnect.Web.Controllers
 
             // A student without a program chooses one here; once chosen it
             // is locked and only the admin changes it.
-            if (user.Role.RoleName == RoleNames.Student && user.ProgramID == null)
+            var hadProgram = user.ProgramID != null;
+            if (user.Role.RoleName == RoleNames.Student && !hadProgram)
             {
                 var placement = await _placement.ApplyAsync(
                     user, RoleNames.Student,
@@ -518,9 +525,9 @@ namespace EduConnect.Web.Controllers
                 model.Email = user.Email;
                 model.RoleName = user.Role.RoleName;
                 model.ProfilePicturePath = user.ProfilePicture;
-                await FillPlacementAsync(model, user);
+                await FillPlacementAsync(model, user, programLocked: hadProgram);
                 ViewBag.MustChooseProgram =
-                    ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID);
+                    user.Role.RoleName == RoleNames.Student && !hadProgram;
                 return View(model);
             }
 
