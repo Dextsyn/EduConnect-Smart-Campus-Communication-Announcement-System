@@ -108,6 +108,21 @@ namespace EduConnect.Web.Controllers
                 ReportedAt = DateTime.Now
             };
 
+            var reporterName = model.IsAnonymous
+                ? "Anonymous"
+                : await _context.Users
+                    .Where(u => u.UserID == report.ReportedByID)
+                    .Select(u => u.FirstName + " " + u.LastName)
+                    .FirstOrDefaultAsync();
+            report.Activities.Add(new IncidentReportActivity
+            {
+                ActorID = model.IsAnonymous ? null : report.ReportedByID,
+                ActorName = reporterName,
+                Action = IncidentReportActivity.Received,
+                ToStatus = report.Status,
+                CreatedAt = report.ReportedAt
+            });
+
             _context.IncidentReports.Add(report);
             await _context.SaveChangesAsync();
 

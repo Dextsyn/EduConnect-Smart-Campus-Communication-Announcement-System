@@ -1,4 +1,5 @@
 using EduConnect.Web.Data;
+using EduConnect.Web.Models;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +60,7 @@ namespace EduConnect.Web.Controllers
             var report = await _context.IncidentReports
                 .Include(r => r.ReportedBy)
                 .Include(r => r.HandledBy)
+                .Include(r => r.Activities)
                 .FirstOrDefaultAsync(r => r.ReportID == id);
 
             if (report == null) return NotFound();
@@ -80,9 +82,35 @@ namespace EduConnect.Web.Controllers
 
             if (report == null) return NotFound();
 
+            var note = string.IsNullOrWhiteSpace(resolution)
+                ? null
+                : resolution.Trim();
+            var action =
+                report.Status != status ? IncidentReportActivity.StatusChanged
+                : report.Resolution != note ? IncidentReportActivity.NoteUpdated
+                : null;
+
+            if (action == null)
+            {
+                TempData["Success"] = "Nothing changed.";
+                return RedirectToAction("ReportDetails", new { id });
+            }
+
+            var userId = GetUserID();
+            _context.IncidentReportActivities.Add(new IncidentReportActivity
+            {
+                ReportID = report.ReportID,
+                ActorID = userId,
+                ActorName = await ActorNameAsync(userId),
+                Action = action,
+                FromStatus = report.Status,
+                ToStatus = status,
+                Note = note
+            });
+
             report.Status = status;
-            report.Resolution = resolution;
-            report.HandledByID = GetUserID();
+            report.Resolution = note;
+            report.HandledByID = userId;
 
             if (status == "Resolved" || status == "Dismissed")
                 report.ResolvedAt = DateTime.Now;
@@ -94,5 +122,71 @@ namespace EduConnect.Web.Controllers
             TempData["Success"] = "Report status updated.";
             return RedirectToAction("ReportDetails", new { id });
         }
+
+        // GET /Staff/Activity
+        public async Task<IActionResult> Activity(
+            StaffActivityFilterViewModel filter)
+        {
+            if (!IsStaffOrAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var userId = GetUserID();
+            if (!filter.IsAll)
+                filter.Scope = StaffActivityFilterViewModel.Mine;
+            if (filter.Page < 1)
+                filter.Page = 1;
+
+            // Period and building narrow everything. The work counts
+            // follow the scope; Received counts every report that came
+            // in, since every staff member receives every report.
+            var period = _context.IncidentReportActivities.AsQueryable();
+            if (filter.From.HasValue)
+                period = period.Where(a => a.CreatedAt >= filter.From.Value.Date);
+            if (filter.To.HasValue)
+            {
+                var end = filter.To.Value.Date.AddDays(1);
+                period = period.Where(a => a.CreatedAt < end);
+            }
+            if (!string.IsNullOrEmpty(filter.Building))
+                period = period.Where(a => a.Report.IncidentType == filter.Building);
+
+            var work = period.Where(a => a.Action != IncidentReportActivity.Received);
+            if (!filter.IsAll)
+                work = work.Where(a => a.ActorID == userId);
+
+            var rows = filter.IsAll ? period : work;
+            if (!string.IsNullOrEmpty(filter.Status))
+                rows = rows.Where(a => a.ToStatus == filter.Status);
+
+            var model = new StaffActivityViewModel
+            {
+                Filter = filter,
+                ReceivedCount = await period.CountAsync(
+                    a => a.Action == IncidentReportActivity.Received),
+                ResolvedCount = await work.CountAsync(a =>
+                    a.Action == IncidentReportActivity.StatusChanged
+                    && a.ToStatus == "Resolved"),
+                DismissedCount = await work.CountAsync(a =>
+                    a.Action == IncidentReportActivity.StatusChanged
+                    && a.ToStatus == "Dismissed"),
+                ActionCount = await work.CountAsync(),
+                TotalRows = await rows.CountAsync(),
+                Rows = await rows
+                    .Include(a => a.Report)
+                    .OrderByDescending(a => a.CreatedAt)
+                    .ThenByDescending(a => a.ActivityID)
+                    .Skip((filter.Page - 1) * StaffActivityViewModel.PageSize)
+                    .Take(StaffActivityViewModel.PageSize)
+                    .ToListAsync()
+            };
+
+            return View(model);
+        }
+
+        private async Task<string?> ActorNameAsync(int userId) =>
+            await _context.Users
+                .Where(u => u.UserID == userId)
+                .Select(u => u.FirstName + " " + u.LastName)
+                .FirstOrDefaultAsync();
     }
 }

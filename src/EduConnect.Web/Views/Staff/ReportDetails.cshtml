@@ -187,3 +187,47 @@
 
     </div>
 </div>
+
+<!-- History -->
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-body p-4">
+        <h6 class="text-muted text-uppercase fw-bold mb-3 small">
+            <i class="bi bi-clock-history me-1"></i>History
+        </h6>
+
+        @if (!Model.Activities.Any())
+        {
+            <p class="text-muted small mb-0">No recorded activity yet.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0">
+                @foreach (var a in Model.Activities
+                    .OrderBy(a => a.CreatedAt).ThenBy(a => a.ActivityID))
+                {
+                    <li class="border-start border-3 ps-3 pb-3
+                               @(a.Action == EduConnect.Web.Models.IncidentReportActivity.Received
+                                   ? "border-primary" : "border-warning")">
+                        <div class="small text-muted">
+                            @a.CreatedAt.ToString("MMM dd, yyyy h:mm tt")
+                            ·
+                            @if (a.ActorName == "Anonymous")
+                            {
+                                <span class="fst-italic">Anonymous</span>
+                            }
+                            else
+                            {
+                                @(a.ActorName ?? "—")
+                            }
+                        </div>
+                        <div class="fw-semibold">@a.Summary</div>
+                        @if (!string.IsNullOrWhiteSpace(a.Note))
+                        {
+                            <div class="small" style="white-space:pre-wrap">@a.Note</div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
