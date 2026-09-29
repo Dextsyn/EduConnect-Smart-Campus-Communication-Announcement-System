@@ -484,6 +484,16 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("SelectedTagIDs",
                     "Choose at least one audience: a program, department, college or tag.");
 
+            // A Chairperson can hand a Dean-level post to the college's Deans
+            // for final approval instead of publishing it.
+            ApprovalRouting? deanRouting = null;
+            if (GetRoleName() == RoleNames.Chairperson && model.RequiresDeanApproval)
+            {
+                deanRouting = await _approval.RouteAsync(userID, deanOnly: true);
+                if (!deanRouting.Ok)
+                    ModelState.AddModelError("RequiresDeanApproval", deanRouting.Error!);
+            }
+
             if (!ModelState.IsValid)
             {
                 // Reload dropdowns
@@ -500,7 +510,8 @@ namespace EduConnect.Web.Controllers
 
             // Faculty always drafts for review. Dean / Chairperson need no
             // review, so they pick: publish straight away, or park it as a
-            // draft that's already "Approved" and simply not out yet.
+            // draft that's already "Approved" and simply not out yet — unless
+            // a Chairperson sends it to the Dean.
             string approvalStatus;
             string status;
             DateTime? publishedAt;
@@ -508,6 +519,12 @@ namespace EduConnect.Web.Controllers
             if (IsFaculty())
             {
                 approvalStatus = "Draft";
+                status = "Draft";
+                publishedAt = null;
+            }
+            else if (deanRouting != null && deanRouting.Ok)
+            {
+                approvalStatus = "PendingDean";
                 status = "Draft";
                 publishedAt = null;
             }
@@ -601,6 +618,7 @@ namespace EduConnect.Web.Controllers
                 Status = status,
                 ApprovalStatus = approvalStatus,
                 PublishedAt = publishedAt,
+                SubmittedAt = deanRouting != null && deanRouting.Ok ? DateTime.Now : null,
                 CreatedAt = DateTime.Now
             };
 
@@ -635,6 +653,16 @@ namespace EduConnect.Web.Controllers
 
             if (announcement.Status == "Published")
                 await NotifyAsync(announcement, userID);
+
+            if (announcement.ApprovalStatus == "PendingDean")
+            {
+                await NotifyReviewersAsync(announcement, deanRouting!.Reviewers,
+                    $"Announcement pending your approval: {announcement.Title}",
+                    "EduConnect: Announcement Pending Your Approval",
+                    "A Chairperson has sent you an announcement for final approval");
+                TempData["Success"] = "Sent to the Dean for final approval.";
+                return RedirectToAction("MyAnnouncements");
+            }
 
             if (announcement.Status != "Published")
             {

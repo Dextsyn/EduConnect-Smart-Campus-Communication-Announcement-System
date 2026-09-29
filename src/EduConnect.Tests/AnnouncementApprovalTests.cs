@@ -2,6 +2,7 @@ using EduConnect.Web;
 using EduConnect.Web.Controllers;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -130,6 +131,39 @@ namespace EduConnect.Tests
 
             Assert.Equal("PendingChair", StatusNow());
             Assert.Equal("Review", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        }
+
+        private AnnouncementFormViewModel ChairPost() => new()
+        {
+            Title = "Dean-level notice",
+            Body = "Body",
+            CategoryID = _db.CategoryID(),
+            Priority = 1,
+            TargetDepartmentIDs = new List<int> { _itis.DepartmentID },
+            RequiresDeanApproval = true
+        };
+
+        [Fact]
+        public async Task Create_ChairRequiringDean_SavesPendingDeanAndNotifiesDean()
+        {
+            await As(_chair).Create(ChairPost());
+
+            var saved = _db.NewContext().Announcements.Single(a => a.Title == "Dean-level notice");
+            Assert.Equal("PendingDean", saved.ApprovalStatus);
+            Assert.Equal("Draft", saved.Status);
+            Assert.Contains(_notes.Sent, n => n.UserId == _dean.UserID);
+        }
+
+        [Fact]
+        public async Task Create_ChairRequiringDeanWithoutDean_IsRefused()
+        {
+            _dean.IsActive = false;
+            _db.Context.SaveChanges();
+
+            var result = await As(_chair).Create(ChairPost());
+
+            Assert.IsType<ViewResult>(result);
+            Assert.False(_db.NewContext().Announcements.Any(a => a.Title == "Dean-level notice"));
         }
 
         [Fact]

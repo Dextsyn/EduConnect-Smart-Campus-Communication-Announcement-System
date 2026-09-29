@@ -42,6 +42,10 @@ namespace EduConnect.Web.ViewModels
         public DateTime? ExpiresAt { get; set; }
         public bool IsEmergency { get; set; } = false;
 
+        // Chairperson only: a Dean-level matter goes to the college's Deans
+        // for final approval instead of being published.
+        public bool RequiresDeanApproval { get; set; }
+
         // Set by the controller: whether this author's role may mark an
         // announcement as an emergency. The server re-checks on POST.
         public bool CanSetEmergency { get; set; } = false;

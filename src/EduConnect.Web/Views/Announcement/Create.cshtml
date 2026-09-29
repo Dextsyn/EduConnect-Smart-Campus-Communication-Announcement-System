@@ -221,6 +221,17 @@
                     <span asp-validation-for="SelectedTagIDs"
                           class="text-danger small d-block mb-2"></span>
                     @await Html.PartialAsync("_TargetPicker", Model)
+                    @if (roleName == RoleNames.Chairperson)
+                    {
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" name="RequiresDeanApproval" value="true"
+                                   id="RequiresDeanApproval" @(Model.RequiresDeanApproval ? "checked" : "") />
+                            <label class="form-check-label small" for="RequiresDeanApproval">
+                                Dean-level matter — send to the Dean for final approval instead of publishing
+                            </label>
+                            <span asp-validation-for="RequiresDeanApproval" class="text-danger small d-block"></span>
+                        </div>
+                    }
                     @foreach (var tag in Model.AvailableTags)
                     {
                         <div class="form-check mb-2">

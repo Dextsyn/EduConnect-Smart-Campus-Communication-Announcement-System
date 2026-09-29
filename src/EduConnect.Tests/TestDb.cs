@@ -100,6 +100,18 @@ namespace EduConnect.Tests
             return tag;
         }
 
+        public int CategoryID()
+        {
+            var category = Context.AnnouncementCategories.FirstOrDefault();
+            if (category == null)
+            {
+                category = new AnnouncementCategory { CategoryName = "General", ColorHex = "#000000", FeedType = "Academic" };
+                Context.AnnouncementCategories.Add(category);
+                Context.SaveChanges();
+            }
+            return category.CategoryID;
+        }
+
         public Announcement AddAnnouncement(User author, string title)
         {
             var category = Context.AnnouncementCategories.FirstOrDefault();
