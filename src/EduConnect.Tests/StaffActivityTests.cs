@@ -43,6 +43,16 @@ namespace EduConnect.Tests
                 NullLogger<SafetyReportController>.Instance, new FakeBlobStorage()));
         }
 
+        private static IFormFile PhotoFile()
+        {
+            var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+            return new FormFile(new MemoryStream(bytes), 0, bytes.Length, "Photo", "leak.png")
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = "image/png"
+            };
+        }
+
         private IncidentReport AddReport(string building = "SV", string status = "Pending")
         {
             var report = new IncidentReport { IncidentType = building, Description = "Broken light", Status = status };
@@ -62,7 +72,7 @@ namespace EduConnect.Tests
         {
             var student = _db.AddUser(RoleNames.Student);
 
-            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak" });
+            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak", Photo = PhotoFile() });
 
             var activity = Assert.Single(_db.NewContext().IncidentReportActivities.ToList());
             Assert.Equal(IncidentReportActivity.Received, activity.Action);
@@ -72,11 +82,22 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task Submit_WithoutPhoto_IsRejected()
+        {
+            var student = _db.AddUser(RoleNames.Student);
+
+            var result = await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak" });
+
+            Assert.IsType<ViewResult>(result);
+            Assert.Empty(_db.NewContext().IncidentReports.ToList());
+        }
+
+        [Fact]
         public async Task Submit_Anonymous_HidesReporter()
         {
             var student = _db.AddUser(RoleNames.Student);
 
-            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak", IsAnonymous = true });
+            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak", Photo = PhotoFile(), IsAnonymous = true });
 
             var activity = Assert.Single(_db.NewContext().IncidentReportActivities.ToList());
             Assert.Null(activity.ActorID);
@@ -167,7 +188,7 @@ namespace EduConnect.Tests
             var colleague = _db.AddUser(RoleNames.Staff);
             var student = _db.AddUser(RoleNames.Student);
 
-            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak" });
+            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak", Photo = PhotoFile() });
             var reportId = _db.NewContext().IncidentReports.Single().ReportID;
             await Staff(colleague).UpdateStatus(reportId, "Dismissed", "Duplicate");
 

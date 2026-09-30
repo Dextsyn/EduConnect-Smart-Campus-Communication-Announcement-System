@@ -88,14 +88,14 @@
                     <div class="mb-4">
                         <label asp-for="Photo"
                                class="form-label fw-semibold">
-                            Photo
+                            Photo <span class="text-danger">*</span>
                         </label>
                         <input asp-for="Photo"
                                type="file"
                                accept=".jpg,.jpeg,.png"
                                class="form-control" />
                         <div class="form-text">
-                            Optional. JPG or PNG, max 5 MB.
+                            Required. JPG or PNG, max 5 MB.
                         </div>
                         <span asp-validation-for="Photo"
                               class="text-danger small"></span>
@@ -147,9 +147,9 @@
             .addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
-                const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                const allowed = ['image/jpeg', 'image/png'];
                 if (!allowed.includes(file.type)) {
-                    alert('Only image files are allowed (JPG, PNG, GIF, WebP).');
+                    alert('Only JPG or PNG images are allowed.');
                     e.target.value = '';
                     const wrapper = document.getElementById('photo-preview-wrapper');
                     wrapper.classList.add('d-none');

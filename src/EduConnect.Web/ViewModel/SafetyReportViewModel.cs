@@ -13,6 +13,7 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Please describe the issue.")]
         public string Description { get; set; }
 
+        [Required(ErrorMessage = "Please attach a photo of the issue.")]
         public IFormFile? Photo { get; set; }
 
         public bool IsAnonymous { get; set; }

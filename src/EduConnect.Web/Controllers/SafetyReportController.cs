@@ -65,36 +65,35 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
+            if (model.Photo == null || model.Photo.Length == 0)
+                ModelState.AddModelError("Photo", "Please attach a photo of the issue.");
+
             if (!ModelState.IsValid)
                 return View(model);
 
-            string? photoURL = null;
-            if (model.Photo != null && model.Photo.Length > 0)
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+            var extension = Path.GetExtension(
+                model.Photo!.FileName).ToLowerInvariant();
+
+            if (!allowedExtensions.Contains(extension) ||
+                model.Photo.Length > 5 * 1024 * 1024)
             {
-                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
-                var extension = Path.GetExtension(
-                    model.Photo.FileName).ToLowerInvariant();
-
-                if (!allowedExtensions.Contains(extension) ||
-                    model.Photo.Length > 5 * 1024 * 1024)
-                {
-                    ModelState.AddModelError("Photo",
-                        "Photo must be a JPG or PNG under 5 MB.");
-                    return View(model);
-                }
-
-                byte[] photoBytes;
-                using (var memoryStream = new MemoryStream())
-                {
-                    await model.Photo.CopyToAsync(memoryStream);
-                    photoBytes = memoryStream.ToArray();
-                }
-
-                var fileName = Guid.NewGuid().ToString() + extension;
-
-                photoURL = await _blobStorageService.UploadAsync(
-                    photoBytes, fileName, "safety-reports", model.Photo.ContentType);
+                ModelState.AddModelError("Photo",
+                    "Photo must be a JPG or PNG under 5 MB.");
+                return View(model);
             }
+
+            byte[] photoBytes;
+            using (var memoryStream = new MemoryStream())
+            {
+                await model.Photo.CopyToAsync(memoryStream);
+                photoBytes = memoryStream.ToArray();
+            }
+
+            var fileName = Guid.NewGuid().ToString() + extension;
+
+            var photoURL = await _blobStorageService.UploadAsync(
+                photoBytes, fileName, "safety-reports", model.Photo.ContentType);
 
             var report = new IncidentReport
             {
