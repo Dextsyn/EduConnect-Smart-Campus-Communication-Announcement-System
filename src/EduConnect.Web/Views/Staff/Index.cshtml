@@ -111,18 +111,9 @@
                                         : r.Location)
                                 </td>
                                 <td class="small">
-                                    @if (r.IsAnonymous)
-                                    {
-                                        <span class="text-muted fst-italic">
-                                            Anonymous
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        @(r.ReportedBy != null
+                                    @(r.ReportedBy != null
                                             ? $"{r.ReportedBy.FirstName} {r.ReportedBy.LastName}"
                                             : "—")
-                                    }
                                 </td>
                                 <td class="small text-muted">
                                     @r.ReportedAt.ToString("MMM dd, yyyy")

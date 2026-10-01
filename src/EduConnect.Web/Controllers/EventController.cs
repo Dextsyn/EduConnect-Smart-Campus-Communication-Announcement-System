@@ -1388,7 +1388,8 @@ namespace EduConnect.Web.Controllers
             else
             {
                 registration.Status = "Attended";
-                registration.UpdatedAt = DateTime.Now;
+                registration.CheckedInAt = DateTime.Now;
+                registration.UpdatedAt = registration.CheckedInAt;
                 await _context.SaveChangesAsync();
 
                 TempData["Success"] =
@@ -1493,7 +1494,8 @@ namespace EduConnect.Web.Controllers
                             Department = regLabels.GetValueOrDefault(r.UserID, "—"),
                             Status = r.Status,
                             QRCode = r.QRCode,
-                            RegisteredAt = r.RegisteredAt
+                            RegisteredAt = r.RegisteredAt,
+                            CheckedInAt = r.CheckedInAt
                         })
                     .ToList(),
                 Waitlist = ev.Waitlist
@@ -1716,7 +1718,8 @@ namespace EduConnect.Web.Controllers
                 });
 
             registration.Status = "Attended";
-            registration.UpdatedAt = DateTime.Now;
+            registration.CheckedInAt = DateTime.Now;
+            registration.UpdatedAt = registration.CheckedInAt;
             await _context.SaveChangesAsync();
 
             return Json(new

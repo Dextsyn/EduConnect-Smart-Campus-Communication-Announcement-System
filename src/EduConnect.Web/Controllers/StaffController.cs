@@ -1,5 +1,6 @@
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
+using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +10,18 @@ namespace EduConnect.Web.Controllers
     public class StaffController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public StaffController(ApplicationDbContext context)
+        // The statuses staff can set, in the order the form offers them.
+        public static readonly IReadOnlyList<string> ReportStatuses =
+            new[] { "Pending", "Investigating", "Resolved", "Dismissed" };
+
+        public StaffController(
+            ApplicationDbContext context,
+            INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         private bool IsStaffOrAdmin()
@@ -77,6 +86,10 @@ namespace EduConnect.Web.Controllers
             if (!IsStaffOrAdmin())
                 return RedirectToAction("Login", "Account");
 
+            // The form only offers these; anything else was not sent by it.
+            if (!ReportStatuses.Contains(status))
+                return BadRequest();
+
             var report = await _context.IncidentReports
                 .FirstOrDefaultAsync(r => r.ReportID == id);
 
@@ -118,6 +131,17 @@ namespace EduConnect.Web.Controllers
                 report.ResolvedAt = null;
 
             await _context.SaveChangesAsync();
+
+            // The reporter sees status and note on My Reports; tell them
+            // something there changed.
+            if (report.ReportedByID is int reporterId)
+                await _notificationService.SendAsync(
+                    reporterId,
+                    "SafetyReport",
+                    action == IncidentReportActivity.StatusChanged
+                        ? $"Your safety report #{report.ReportID} is now {status}"
+                        : $"Campus staff updated the note on your safety report #{report.ReportID}",
+                    "/SafetyReport/MyReports");
 
             TempData["Success"] = "Report status updated.";
             return RedirectToAction("ReportDetails", new { id });
@@ -173,6 +197,7 @@ namespace EduConnect.Web.Controllers
                 TotalRows = await rows.CountAsync(),
                 Rows = await rows
                     .Include(a => a.Report)
+                        .ThenInclude(r => r.ReportedBy)
                     .OrderByDescending(a => a.CreatedAt)
                     .ThenByDescending(a => a.ActivityID)
                     .Skip((filter.Page - 1) * StaffActivityViewModel.PageSize)

@@ -256,5 +256,41 @@ namespace EduConnect.Tests
                 _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Status);
             Assert.Empty(_notes.Sent);
         }
+
+        [Fact]
+        public async Task Edit_ReviewerApprovedPost_IsLocked()
+        {
+            SetStatus("Approved");
+            _post.ApprovedByID = _chair.UserID;
+            _db.Context.SaveChanges();
+
+            var get = await As(_faculty).Edit(_post.AnnouncementID);
+            var post = await As(_faculty).Edit(new AnnouncementFormViewModel
+            {
+                AnnouncementID = _post.AnnouncementID,
+                Title = "Changed after approval",
+                Body = "Body",
+                CategoryID = _db.CategoryID(),
+                TargetProgramIDs = new() { _bsit.ProgramID }
+            });
+
+            Assert.Equal("MyAnnouncements", Assert.IsType<RedirectToActionResult>(get).ActionName);
+            Assert.Equal("MyAnnouncements", Assert.IsType<RedirectToActionResult>(post).ActionName);
+            Assert.Equal("For BSIT",
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Title);
+        }
+
+        [Fact]
+        public async Task Edit_DeansOwnApprovedDraft_StaysEditable()
+        {
+            var draft = _db.AddAnnouncement(_dean, "Dean draft");
+            draft.Status = "Draft";
+            draft.PublishedAt = null;
+            _db.Context.SaveChanges();
+
+            var result = await As(_dean).Edit(draft.AnnouncementID);
+
+            Assert.IsType<ViewResult>(result);
+        }
     }
 }

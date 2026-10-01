@@ -62,16 +62,9 @@
 
                     <dt class="col-sm-4 text-muted small">Reporter</dt>
                     <dd class="col-sm-8 small">
-                        @if (Model.IsAnonymous)
-                        {
-                            <span class="text-muted fst-italic">Anonymous</span>
-                        }
-                        else
-                        {
-                            @(Model.ReportedBy != null
+                        @(Model.ReportedBy != null
                                 ? $"{Model.ReportedBy.FirstName} {Model.ReportedBy.LastName}"
                                 : "—")
-                        }
                     </dd>
 
                     <dt class="col-sm-4 text-muted small">Submitted</dt>
@@ -211,14 +204,7 @@
                         <div class="small text-muted">
                             @a.CreatedAt.ToString("MMM dd, yyyy h:mm tt")
                             ·
-                            @if (a.ActorName == "Anonymous")
-                            {
-                                <span class="fst-italic">Anonymous</span>
-                            }
-                            else
-                            {
-                                @(a.ActorName ?? "—")
-                            }
+                            @(a.DisplayActorName ?? "—")
                         </div>
                         <div class="fw-semibold">@a.Summary</div>
                         @if (!string.IsNullOrWhiteSpace(a.Note))

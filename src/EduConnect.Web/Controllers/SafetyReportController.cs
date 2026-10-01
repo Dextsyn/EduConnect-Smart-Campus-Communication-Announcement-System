@@ -102,20 +102,17 @@ namespace EduConnect.Web.Controllers
                 Description = model.Description,
                 Location = model.SpecificLocation,
                 PhotoURL = photoURL,
-                IsAnonymous = model.IsAnonymous,
                 Status = "Pending",
                 ReportedAt = DateTime.Now
             };
 
-            var reporterName = model.IsAnonymous
-                ? "Anonymous"
-                : await _context.Users
-                    .Where(u => u.UserID == report.ReportedByID)
-                    .Select(u => u.FirstName + " " + u.LastName)
-                    .FirstOrDefaultAsync();
+            var reporterName = await _context.Users
+                .Where(u => u.UserID == report.ReportedByID)
+                .Select(u => u.FirstName + " " + u.LastName)
+                .FirstOrDefaultAsync();
             report.Activities.Add(new IncidentReportActivity
             {
-                ActorID = model.IsAnonymous ? null : report.ReportedByID,
+                ActorID = report.ReportedByID,
                 ActorName = reporterName,
                 Action = IncidentReportActivity.Received,
                 ToStatus = report.Status,
@@ -136,12 +133,32 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
+            // Only the reporter may see their report here; anyone else
+            // gets the same answer as for a report that does not exist.
+            var userID = GetUserID();
             var report = await _context.IncidentReports
-                .FirstOrDefaultAsync(r => r.ReportID == id);
+                .FirstOrDefaultAsync(r => r.ReportID == id &&
+                                          r.ReportedByID == userID);
 
             if (report == null) return NotFound();
 
             return View(report);
+        }
+
+        // GET /SafetyReport/MyReports
+        // The reporter's own reports, with status and the staff's note.
+        public async Task<IActionResult> MyReports()
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var userID = GetUserID();
+            var reports = await _context.IncidentReports
+                .Where(r => r.ReportedByID == userID)
+                .OrderByDescending(r => r.ReportedAt)
+                .ToListAsync();
+
+            return View(reports);
         }
 
         private async Task DispatchNotificationsAsync(IncidentReport report)
@@ -176,21 +193,13 @@ namespace EduConnect.Web.Controllers
                 await _notificationService.SendToManyAsync(
                     staffIds, "SafetyReport", message, link);
 
-                string reporterLine;
-                if (report.IsAnonymous)
-                {
-                    reporterLine = "";
-                }
-                else
-                {
-                    var reporter = await _context.Users
-                        .Where(u => u.UserID == report.ReportedByID)
-                        .Select(u => new { u.FirstName, u.LastName })
-                        .FirstOrDefaultAsync();
-                    reporterLine = reporter != null
-                        ? $"<p><strong>Reported by:</strong> {System.Net.WebUtility.HtmlEncode($"{reporter.FirstName} {reporter.LastName}")}</p>"
-                        : "";
-                }
+                var reporter = await _context.Users
+                    .Where(u => u.UserID == report.ReportedByID)
+                    .Select(u => new { u.FirstName, u.LastName })
+                    .FirstOrDefaultAsync();
+                var reporterLine = reporter != null
+                    ? $"<p><strong>Reported by:</strong> {System.Net.WebUtility.HtmlEncode($"{reporter.FirstName} {reporter.LastName}")}</p>"
+                    : "";
 
                 var emailBody = $@"
 <h2 style='color:#0d6efd'>New Campus Safety Report</h2>

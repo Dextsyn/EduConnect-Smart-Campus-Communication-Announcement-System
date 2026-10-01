@@ -266,6 +266,7 @@ namespace EduConnect.Web.Controllers
                                    + " " + a.Author.LastName,
                     Status = a.Status,
                     ViewCount = a.ViewCount,
+                    IsLockedByReview = Announcement.IsLockedByReview(a.ApprovalStatus, a.ApprovedByID),
                     PublishedAt = a.PublishedAt,
                     Tags = a.AnnouncementTags
                         .Select(at =>
@@ -754,6 +755,13 @@ namespace EduConnect.Web.Controllers
             if (!CanCreate())
                 return RedirectToAction("Details", new { id });
 
+            if (Announcement.IsLockedByReview(announcement.ApprovalStatus, announcement.ApprovedByID))
+            {
+                TempData["Error"] =
+                    "This announcement has been approved and can no longer be edited.";
+                return RedirectToAction("MyAnnouncements");
+            }
+
             if (IsFaculty() &&
                 announcement.ApprovalStatus != "Draft" &&
                 announcement.ApprovalStatus != "Rejected")
@@ -821,6 +829,13 @@ namespace EduConnect.Web.Controllers
             if (!CanCreate())
                 return RedirectToAction("Details",
                     new { id = model.AnnouncementID });
+
+            if (Announcement.IsLockedByReview(announcement.ApprovalStatus, announcement.ApprovedByID))
+            {
+                TempData["Error"] =
+                    "This announcement has been approved and can no longer be edited.";
+                return RedirectToAction("MyAnnouncements");
+            }
 
             if (IsFaculty() &&
                 announcement.ApprovalStatus != "Draft" &&
@@ -1100,6 +1115,7 @@ namespace EduConnect.Web.Controllers
                     a.FeedType,
                     a.Status,
                     a.ApprovalStatus,
+                    a.ApprovedByID,
                     a.SubmittedAt,
                     a.CreatedAt,
                     a.ChairRejectionReason,

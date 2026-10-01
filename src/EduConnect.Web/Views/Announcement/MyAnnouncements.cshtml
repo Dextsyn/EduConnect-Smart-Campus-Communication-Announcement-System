@@ -98,7 +98,8 @@
                                     @if (approvalStatus == "Draft" ||
                                          approvalStatus == "Rejected" ||
                                          (approvalStatus == "Approved" &&
-                                          (string)a.Status != "Published"))
+                                          (string)a.Status != "Published" &&
+                                          !Announcement.IsLockedByReview(approvalStatus, (int?)a.ApprovedByID)))
                                     {
                                         <a href="/Announcement/Edit/@a.AnnouncementID"
                                            class="btn btn-sm btn-outline-secondary">

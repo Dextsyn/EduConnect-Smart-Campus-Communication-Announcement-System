@@ -110,6 +110,7 @@ namespace EduConnect.Web.ViewModels
         public string Status { get; set; }
         public string? QRCode { get; set; }
         public DateTime RegisteredAt { get; set; }
+        public DateTime? CheckedInAt { get; set; }
     }
 
     // ─── For Event List/Calendar ───────────

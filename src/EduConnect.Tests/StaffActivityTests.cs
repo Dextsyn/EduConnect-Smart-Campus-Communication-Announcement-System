@@ -13,6 +13,7 @@ namespace EduConnect.Tests
     {
         private readonly TestDb _db = new();
         private readonly FakeSession _session = new();
+        private readonly FakeNotificationService _notes = new();
 
         public void Dispose() => _db.Dispose();
 
@@ -32,7 +33,7 @@ namespace EduConnect.Tests
         private StaffController Staff(User staff)
         {
             LogIn(staff, RoleNames.Staff);
-            return Wire(new StaffController(_db.Context));
+            return Wire(new StaffController(_db.Context, _notes));
         }
 
         private SafetyReportController Reporting(User user)
@@ -93,15 +94,83 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task Submit_Anonymous_HidesReporter()
+        public async Task ReportDetails_LegacyAnonymousReport_ShowsTheReporter()
         {
+            var staff = _db.AddUser(RoleNames.Staff);
             var student = _db.AddUser(RoleNames.Student);
+            var report = AddReport();
+            report.ReportedByID = student.UserID;
+            report.IsAnonymous = true;
+            _db.Context.IncidentReportActivities.Add(new IncidentReportActivity
+            {
+                ReportID = report.ReportID,
+                ActorName = "Anonymous",
+                Action = IncidentReportActivity.Received
+            });
+            _db.Context.SaveChanges();
+            _db.Context.ChangeTracker.Clear();
 
-            await Reporting(student).Submit(new SafetyReportViewModel { Building = "SV", Description = "Leak", Photo = PhotoFile(), IsAnonymous = true });
+            var result = (ViewResult)await Staff(staff).ReportDetails(report.ReportID);
+            var activity = Assert.Single(((IncidentReport)result.Model!).Activities);
 
-            var activity = Assert.Single(_db.NewContext().IncidentReportActivities.ToList());
-            Assert.Null(activity.ActorID);
-            Assert.Equal("Anonymous", activity.ActorName);
+            Assert.Equal("Test Student", activity.DisplayActorName);
+        }
+
+        [Fact]
+        public async Task UpdateStatus_UnknownStatus_IsRejected()
+        {
+            var staff = _db.AddUser(RoleNames.Staff);
+            var report = AddReport();
+
+            var result = await Staff(staff).UpdateStatus(report.ReportID, "Closed", null);
+
+            Assert.IsType<BadRequestResult>(result);
+            Assert.Equal("Pending", _db.NewContext().IncidentReports.Single().Status);
+            Assert.Empty(Activities(report.ReportID));
+        }
+
+        [Fact]
+        public async Task UpdateStatus_NotifiesTheReporter()
+        {
+            var staff = _db.AddUser(RoleNames.Staff);
+            var student = _db.AddUser(RoleNames.Student);
+            var report = AddReport();
+            report.ReportedByID = student.UserID;
+            _db.Context.SaveChanges();
+
+            await Staff(staff).UpdateStatus(report.ReportID, "Investigating", null);
+
+            Assert.Contains(_notes.Sent, n => n.UserId == student.UserID);
+        }
+
+        [Fact]
+        public async Task Confirmation_SomeoneElsesReport_IsNotFound()
+        {
+            var reporter = _db.AddUser(RoleNames.Student);
+            var other = _db.AddUser(RoleNames.Student);
+            var report = AddReport();
+            report.ReportedByID = reporter.UserID;
+            _db.Context.SaveChanges();
+
+            Assert.IsType<NotFoundResult>(await Reporting(other).Confirmation(report.ReportID));
+            Assert.IsType<ViewResult>(await Reporting(reporter).Confirmation(report.ReportID));
+        }
+
+        [Fact]
+        public async Task MyReports_ListsOnlyTheReportersOwn()
+        {
+            var reporter = _db.AddUser(RoleNames.Student);
+            var other = _db.AddUser(RoleNames.Student);
+            var mine = AddReport();
+            mine.ReportedByID = reporter.UserID;
+            var theirs = AddReport();
+            theirs.ReportedByID = other.UserID;
+            _db.Context.SaveChanges();
+
+            var result = (ViewResult)await Reporting(reporter).MyReports();
+
+            var row = Assert.Single((List<IncidentReport>)result.Model!);
+            Assert.Equal(mine.ReportID, row.ReportID);
         }
 
         [Fact]
@@ -236,7 +305,7 @@ namespace EduConnect.Tests
         {
             var student = _db.AddUser(RoleNames.Student);
             LogIn(student, RoleNames.Student);
-            var controller = Wire(new StaffController(_db.Context));
+            var controller = Wire(new StaffController(_db.Context, _notes));
 
             var result = await controller.Activity(new StaffActivityFilterViewModel());
 
