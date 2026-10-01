@@ -97,6 +97,7 @@
                                 <th>Department</th>
                                 <th>Status</th>
                                 <th>Registered On</th>
+                                <th>Checked In</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -148,6 +149,10 @@
                                     </td>
                                     <td class="small text-muted">
                                         @reg.RegisteredAt.ToString("MMM dd, yyyy")
+                                    </td>
+                                    <td class="small text-muted">
+                                        @(reg.CheckedInAt?.ToString("MMM dd, yyyy h:mm tt")
+                                            ?? (reg.Status == "Attended" ? "Not recorded" : "—"))
                                     </td>
                                     <td>
                                         @if (reg.Status == "Registered")

@@ -10,7 +10,7 @@ namespace EduConnect.Web.Models
         public int ReportID { get; set; }
 
         public int? ReportedByID { get; set; }
-        // NULL = anonymous report
+        // NULL only if the reporter's account was deleted
 
         [Required]
         [MaxLength(50)]
@@ -36,6 +36,8 @@ namespace EduConnect.Web.Models
 
         public string? Resolution { get; set; }
 
+        // Legacy: reports can no longer be filed anonymously. Rows that
+        // were still carry ReportedByID, and staff now see that reporter.
         public bool IsAnonymous { get; set; } = false;
 
         public DateTime ReportedAt { get; set; }

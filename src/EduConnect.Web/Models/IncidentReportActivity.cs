@@ -20,7 +20,7 @@ namespace EduConnect.Web.Models
         public int ReportID { get; set; }
 
         public int? ActorID { get; set; }
-        // NULL = anonymous reporter, or the account was deleted
+        // NULL = a legacy anonymous reporter, or the account was deleted
 
         [MaxLength(200)]
         public string? ActorName { get; set; }
@@ -48,6 +48,15 @@ namespace EduConnect.Web.Models
             NoteUpdated   => "Note updated",
             _             => Action
         };
+
+        // Reports filed while anonymous reporting existed logged their
+        // reporter as "Anonymous", but the report itself always kept who
+        // filed it. Load Report.ReportedBy to show that name instead.
+        [NotMapped]
+        public string? DisplayActorName =>
+            ActorName == "Anonymous" && Report?.ReportedBy != null
+                ? $"{Report.ReportedBy.FirstName} {Report.ReportedBy.LastName}"
+                : ActorName;
 
         // Navigation
         public IncidentReport Report { get; set; }

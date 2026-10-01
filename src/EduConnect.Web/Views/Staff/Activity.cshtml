@@ -165,14 +165,7 @@
                                     @a.Summary
                                 </td>
                                 <td class="small">
-                                    @if (a.ActorName == "Anonymous")
-                                    {
-                                        <span class="text-muted fst-italic">Anonymous</span>
-                                    }
-                                    else
-                                    {
-                                        @(a.ActorName ?? "—")
-                                    }
+                                    @(a.DisplayActorName ?? "—")
                                 </td>
                                 <td class="small text-muted" style="max-width:280px">
                                     <div class="text-truncate" title="@a.Note">@(a.Note ?? "")</div>

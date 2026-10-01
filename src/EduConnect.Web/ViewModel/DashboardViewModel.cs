@@ -63,6 +63,7 @@
         public string CategoryColor { get; set; }
         public string FeedType { get; set; }
         public bool IsEmergency { get; set; }
+        public bool IsLockedByReview { get; set; }
         public string AuthorName { get; set; }
         public string Status { get; set; }
         public int ViewCount { get; set; }

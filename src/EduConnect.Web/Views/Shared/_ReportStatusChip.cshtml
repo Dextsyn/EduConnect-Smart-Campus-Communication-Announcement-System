@@ -1,0 +1,13 @@
+@model string
+@* A safety report's status, styled the way the staff screens show it. *@
+@{
+    var (badgeClass, badgeLabel) = Model switch
+    {
+        "Pending"       => ("ec-chip ec-chip-gold",     "Pending"),
+        "Investigating" => ("ec-chip ec-chip-academic", "Investigating"),
+        "Resolved"      => ("badge text-bg-success",    "Resolved"),
+        "Dismissed"     => ("ec-chip ec-chip-neutral",  "Dismissed"),
+        _               => ("badge bg-light text-dark", Model)
+    };
+}
+<span class="@badgeClass">@badgeLabel</span>

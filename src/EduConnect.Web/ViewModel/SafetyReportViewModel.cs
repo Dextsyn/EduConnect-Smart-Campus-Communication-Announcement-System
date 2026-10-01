@@ -15,8 +15,6 @@ namespace EduConnect.Web.ViewModels
 
         [Required(ErrorMessage = "Please attach a photo of the issue.")]
         public IFormFile? Photo { get; set; }
-
-        public bool IsAnonymous { get; set; }
     }
 
     public class SafetyReportFilterViewModel

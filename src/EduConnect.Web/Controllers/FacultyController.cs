@@ -1,4 +1,5 @@
 using EduConnect.Web.Data;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -86,23 +87,31 @@ namespace EduConnect.Web.Controllers
                     r.Status != "Cancelled")
                 .CountAsync();
 
-            // ─── Chart: events created per month ─
-            var months = Enumerable.Range(0, 6)
-                .Select(i => DateTime.Now.AddMonths(-i))
-                .Reverse()
-                .ToList();
+            // ─── My Submissions ─────────────────
+            // Announcements still in the approval flow: waiting on a
+            // reviewer, sent back, or approved and not yet published.
+            var submissions = await _context.Announcements
+                .Where(a =>
+                    a.AuthorID == userID &&
+                    a.Status == "Draft" &&
+                    (a.ApprovalStatus == "PendingChair" ||
+                     a.ApprovalStatus == "PendingDean" ||
+                     a.ApprovalStatus == "Rejected" ||
+                     a.ApprovalStatus == "Approved"))
+                .OrderByDescending(a => a.SubmittedAt ?? a.CreatedAt)
+                .Select(a => new FacultySubmissionRow
+                {
+                    AnnouncementID = a.AnnouncementID,
+                    Title = a.Title,
+                    ApprovalStatus = a.ApprovalStatus,
+                    RejectionReason = string.IsNullOrEmpty(a.ChairRejectionReason)
+                        ? a.RejectionReason
+                        : a.ChairRejectionReason,
+                    SubmittedAt = a.SubmittedAt
+                })
+                .ToListAsync();
 
-            ViewBag.MonthLabels = months
-                .Select(m => m.ToString("MMM yyyy"))
-                .ToList();
-
-            ViewBag.MonthlyCount = months
-                .Select(m => _context.Events
-                    .Count(e =>
-                        e.OrganizerID == userID &&
-                        e.CreatedAt.Month == m.Month &&
-                        e.CreatedAt.Year == m.Year))
-                .ToList();
+            ViewBag.MySubmissions = submissions;
 
             // ─── Recent Events ──────────────────
             ViewBag.MyEventList = await _context.Events

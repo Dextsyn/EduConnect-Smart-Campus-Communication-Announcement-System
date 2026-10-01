@@ -1,10 +1,9 @@
 @{
     ViewData["Title"] = "Faculty Dashboard";
     var userName = Context.Session.GetString("UserName");
-    var monthLabels = ViewBag.MonthLabels as List<string>
-        ?? new List<string>();
-    var monthlyCount = ViewBag.MonthlyCount as List<int>
-        ?? new List<int>();
+    var submissions = ViewBag.MySubmissions
+        as List<EduConnect.Web.ViewModels.FacultySubmissionRow>
+        ?? new List<EduConnect.Web.ViewModels.FacultySubmissionRow>();
     var myEventList =
         ViewBag.MyEventList as
         List<EduConnect.Web.Models.Event>
@@ -123,17 +122,97 @@
 
 </div>
 
-<!-- ─── CHART ─────────────────────────── -->
+<!-- ─── MY SUBMISSIONS ────────────────── -->
 <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white border-0 pt-3">
+    <div class="card-header bg-white border-0 pt-3
+                d-flex justify-content-between align-items-center">
         <h6 class="fw-bold mb-0">
-            <i class="bi bi-graph-up
-                       me-2 text-primary"></i>
-            My Events Created — Last 6 Months
+            <i class="bi bi-send-check me-2 text-primary"></i>
+            My Submissions
         </h6>
+        <a href="/Announcement/MyAnnouncements"
+           class="btn btn-sm btn-outline-primary">
+            My Announcements
+        </a>
     </div>
-    <div class="card-body">
-        <canvas id="monthlyChart" height="80"></canvas>
+    <div class="card-body p-0">
+        @if (!submissions.Any())
+        {
+            <div class="ec-empty">
+                <i class="bi bi-check2-circle"></i>
+                No announcements awaiting review or action
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Title</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in submissions)
+                        {
+                            <tr>
+                                <td class="ps-3 align-middle fw-semibold small">@s.Title</td>
+                                <td class="align-middle">
+                                    @switch (s.ApprovalStatus)
+                                    {
+                                        case "PendingChair":
+                                            <span class="ec-chip ec-chip-gold">Awaiting Chairperson</span>
+                                            break;
+                                        case "PendingDean":
+                                            <span class="ec-chip ec-chip-gold">Awaiting Dean</span>
+                                            break;
+                                        case "Rejected":
+                                            <span class="badge text-bg-danger">Rejected</span>
+                                            break;
+                                        case "Approved":
+                                            <span class="badge text-bg-success">Approved — ready to publish</span>
+                                            break;
+                                    }
+                                    @if (s.ApprovalStatus == "Rejected" &&
+                                         !string.IsNullOrEmpty(s.RejectionReason))
+                                    {
+                                        <div class="small text-danger mt-1">
+                                            <i class="bi bi-x-circle me-1"></i>@s.RejectionReason
+                                        </div>
+                                    }
+                                </td>
+                                <td class="align-middle small text-muted">
+                                    @(s.SubmittedAt?.ToString("MMM dd, yyyy") ?? "—")
+                                </td>
+                                <td class="align-middle text-end pe-3">
+                                    @if (s.ApprovalStatus == "Rejected")
+                                    {
+                                        <a href="/Announcement/Edit/@s.AnnouncementID"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-pencil me-1"></i>Edit
+                                        </a>
+                                    }
+                                    else if (s.ApprovalStatus == "Approved")
+                                    {
+                                        <form method="post"
+                                              action="/Announcement/Publish/@s.AnnouncementID"
+                                              class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="bi bi-globe me-1"></i>Publish
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
 
@@ -162,6 +241,7 @@
                         <th>Date</th>
                         <th>Location</th>
                         <th>Registrants</th>
+                        <th>Turnout</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
@@ -170,7 +250,7 @@
                     @if (!myEventList.Any())
                     {
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="ec-empty">
                                     <i class="bi bi-calendar-event"></i>
                                     No events yet.
@@ -189,6 +269,15 @@
                             var registeredCount = ev.Registrations
                                 ?.Count(r => r.Status != "Cancelled")
                                 ?? 0;
+                            var attendedCount = ev.Registrations
+                                ?.Count(r => r.Status == "Attended")
+                                ?? 0;
+                            var ended = ev.EndDateTime < DateTime.Now;
+                            var regClosed = !ev.IsRegistrationOpen ||
+                                (ev.RegistrationDeadline.HasValue &&
+                                 ev.RegistrationDeadline.Value < DateTime.Now);
+                            var isFull = ev.MaxAttendees.HasValue &&
+                                registeredCount >= ev.MaxAttendees.Value;
                             <tr>
                                 <td class="ps-3">
                                     <a href="/Event/Details/@ev.EventID"
@@ -211,6 +300,38 @@
                                     @if (ev.MaxAttendees.HasValue)
                                     {
                                         <span>/ @ev.MaxAttendees</span>
+                                    }
+                                </td>
+                                <td class="small text-muted">
+                                    @if (ev.Status == "Cancelled")
+                                    {
+                                        <span>—</span>
+                                    }
+                                    else if (ended)
+                                    {
+                                        <span>
+                                            <i class="bi bi-person-check me-1"></i>@attendedCount attended
+                                            @if (registeredCount > 0)
+                                            {
+                                                <span>· @(attendedCount * 100 / registeredCount)%</span>
+                                            }
+                                        </span>
+                                    }
+                                    else if (regClosed)
+                                    {
+                                        <span>Registration closed</span>
+                                    }
+                                    else if (isFull)
+                                    {
+                                        <span class="text-warning">Full</span>
+                                    }
+                                    else if (ev.RegistrationDeadline.HasValue)
+                                    {
+                                        <span>Closes @ev.RegistrationDeadline.Value.ToString("MMM dd, h:mm tt")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Open</span>
                                     }
                                 </td>
                                 <td>
@@ -257,31 +378,3 @@
         </div>
     </div>
 </div>
-
-@section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        new Chart(
-            document.getElementById('monthlyChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: @Html.Raw(
-                    System.Text.Json.JsonSerializer.Serialize(monthLabels)),
-                datasets: [{
-                    label: 'Events Created',
-                    data: @Html.Raw(
-                        System.Text.Json.JsonSerializer.Serialize(monthlyCount)),
-                    backgroundColor: 'rgba(13,110,253,0.7)',
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
-                }
-            }
-        });
-    </script>
-}

@@ -28,6 +28,10 @@ namespace EduConnect.Web.Models
         public DateTime RegisteredAt { get; set; }
             = DateTime.Now;
 
+        // When the QR code was scanned (or attendance marked by hand).
+        // NULL until the student attends.
+        public DateTime? CheckedInAt { get; set; }
+
         public DateTime? UpdatedAt { get; set; }
 
         // Navigation

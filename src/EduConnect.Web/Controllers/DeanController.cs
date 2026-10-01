@@ -1,5 +1,6 @@
 ﻿using EduConnect.Web.Data;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,15 +11,22 @@ namespace EduConnect.Web.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DeanController> _logger;
         private readonly IAudienceService _audience;
+        private readonly IApprovalService _approval;
+
+        // How many pending announcements the dashboard lists before
+        // pointing to the full review queue.
+        private const int PendingShown = 5;
 
         public DeanController(
             ApplicationDbContext context,
             ILogger<DeanController> logger,
-            IAudienceService audience)
+            IAudienceService audience,
+            IApprovalService approval)
         {
             _context = context;
             _logger = logger;
             _audience = audience;
+            _approval = approval;
         }
 
         // ─── Helpers ───────────────────────────
@@ -93,27 +101,28 @@ namespace EduConnect.Web.Controllers
                 .Where(addressed)
                 .CountAsync();
 
-            // ─── Chart Data ────────────────────
-            var months = Enumerable.Range(0, 6)
-                .Select(i => DateTime.Now.AddMonths(-i))
-                .Reverse()
-                .ToList();
+            // ─── Pending Announcements ─────────
+            // The same set as the review queue: what this viewer can approve.
+            var reviewable = _approval.ReviewableBy(viewer);
+            ViewBag.PendingCount = await reviewable.CountAsync();
 
-            ViewBag.MonthLabels = months
-                .Select(m => m.ToString("MMM yyyy"))
-                .ToList();
+            var pending = await reviewable
+                .OrderBy(a => a.SubmittedAt)
+                .Take(PendingShown)
+                .Select(a => new PendingAnnouncementRow
+                {
+                    AnnouncementID = a.AnnouncementID,
+                    Title = a.Title,
+                    AuthorName = a.Author.FirstName + " " + a.Author.LastName,
+                    CategoryName = a.Category.CategoryName,
+                    SubmittedAt = a.SubmittedAt
+                })
+                .ToListAsync();
 
-            ViewBag.MonthlyCount = months
-                .Select(m => _context.Announcements
-                    .Where(addressed)
-                    .Count(a =>
-                        a.Status == "Published" &&
-                        a.PublishedAt.HasValue &&
-                        a.PublishedAt.Value.Month
-                            == m.Month &&
-                        a.PublishedAt.Value.Year
-                            == m.Year))
-                .ToList();
+            foreach (var row in pending)
+                row.Audience = await _audience.GetAudienceNamesAsync(row.AnnouncementID);
+
+            ViewBag.PendingAnnouncements = pending;
 
             // ─── Recent Published ───────────────
             ViewBag.RecentAnnouncements = await _context

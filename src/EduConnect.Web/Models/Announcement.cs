@@ -56,6 +56,13 @@ namespace EduConnect.Web.Models
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
 
+        // A Chairperson's or Dean's approval is final: the author can no
+        // longer change what the reviewer signed off on. Dean and
+        // Chairperson posts approve themselves (no ApprovedByID) and stay
+        // editable.
+        public static bool IsLockedByReview(string approvalStatus, int? approvedById) =>
+            approvalStatus == "Approved" && approvedById != null;
+
         // Navigation Properties
         public User Author { get; set; }
         public User? ApprovedBy { get; set; }
