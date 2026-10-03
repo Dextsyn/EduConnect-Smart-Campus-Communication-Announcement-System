@@ -1,0 +1,190 @@
+@model EduConnect.Web.ViewModels.AuditLogViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Audit Log";
+
+    // Old/new values are flat {field: value} JSON written by IAuditService.
+    static Dictionary<string, string?> Parse(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return new();
+        try { return JsonSerializer.Deserialize<Dictionary<string, string?>>(json) ?? new(); }
+        catch (JsonException) { return new(); }
+    }
+
+    string PageUrl(int page) => Url.Action("AuditLog", new
+    {
+        actor = Model.Actor,
+        area = Model.Area,
+        actionName = Model.ActionName,
+        from = Model.From?.ToString("yyyy-MM-dd"),
+        to = Model.To?.ToString("yyyy-MM-dd"),
+        page
+    })!;
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-journal-text me-2 text-primary"></i>
+            Audit Log
+        </h4>
+        <small class="text-muted">
+            User and academic-structure changes · @Model.TotalCount record(s)
+        </small>
+    </div>
+    <a href="/Admin" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+<!-- ─── FILTERS ──────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2">
+            <div class="col-12 col-md-3">
+                <input type="text" name="actor" value="@Model.Actor"
+                       class="form-control" placeholder="Done by…" />
+            </div>
+            <div class="col-6 col-md-2">
+                <select name="area" class="form-select">
+                    <option value="">Any area</option>
+                    @foreach (var a in EduConnect.Web.Services.AuditArea.All)
+                    {
+                        <option value="@a" selected="@(Model.Area == a)">@a</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <select name="actionName" class="form-select">
+                    <option value="">Any action</option>
+                    @foreach (var a in Model.Actions)
+                    {
+                        <option value="@a" selected="@(Model.ActionName == a)">@a</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")"
+                       class="form-control" aria-label="From date" />
+            </div>
+            <div class="col-6 col-md-2">
+                <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")"
+                       class="form-control" aria-label="To date" />
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill" title="Filter">
+                    <i class="bi bi-funnel"></i>
+                </button>
+                <a href="/Admin/AuditLog" class="btn btn-outline-secondary" title="Clear">
+                    <i class="bi bi-x"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ─── LOG TABLE ────────────────────── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        @if (!Model.Rows.Any())
+        {
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-journal display-6 d-block mb-2"></i>
+                No audit records match these filters.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3" style="width:11rem">When</th>
+                            <th>Done by</th>
+                            <th>Action</th>
+                            <th>What happened</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Rows)
+                        {
+                            var oldValues = Parse(row.OldValues);
+                            var newValues = Parse(row.NewValues);
+                            var keys = oldValues.Keys.Union(newValues.Keys).ToList();
+                            <tr>
+                                <td class="ps-3 small text-nowrap">
+                                    @row.CreatedAt.ToString("MMM dd, yyyy")<br />
+                                    <span class="text-muted">@row.CreatedAt.ToString("hh:mm tt")</span>
+                                </td>
+                                <td class="small">
+                                    @row.Actor
+                                    @if (row.ActorDeleted)
+                                    {
+                                        <span class="badge bg-secondary ms-1">deleted</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(row.IPAddress))
+                                    {
+                                        <div class="text-muted" style="font-size:11px">@row.IPAddress</div>
+                                    }
+                                </td>
+                                <td class="small text-nowrap">
+                                    <span class="ec-chip ec-chip-neutral">@row.Action</span>
+                                    <div class="text-muted" style="font-size:11px">@row.Area</div>
+                                </td>
+                                <td class="small">
+                                    @row.Summary
+                                    @if (keys.Any())
+                                    {
+                                        <details class="mt-1">
+                                            <summary class="text-primary" style="cursor:pointer">Details</summary>
+                                            <table class="table table-sm table-borderless mb-0 mt-1">
+                                                @foreach (var key in keys)
+                                                {
+                                                    oldValues.TryGetValue(key, out var was);
+                                                    newValues.TryGetValue(key, out var now);
+                                                    <tr>
+                                                        <th class="fw-semibold text-muted pe-2" style="width:7rem">@key</th>
+                                                        <td>
+                                                            @if (oldValues.ContainsKey(key) && newValues.ContainsKey(key))
+                                                            {
+                                                                <span class="text-decoration-line-through text-muted">@(was ?? "—")</span>
+                                                                <i class="bi bi-arrow-right mx-1"></i>
+                                                                <span>@(now ?? "—")</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                @(was ?? now ?? "—")
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </table>
+                                        </details>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.PageCount > 1)
+{
+    <nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Audit log pages">
+        <small class="text-muted">Page @Model.Page of @Model.PageCount</small>
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+               href="@PageUrl(Model.Page - 1)">
+                <i class="bi bi-chevron-left"></i> Newer
+            </a>
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.PageCount ? "disabled" : "")"
+               href="@PageUrl(Model.Page + 1)">
+                Older <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </nav>
+}

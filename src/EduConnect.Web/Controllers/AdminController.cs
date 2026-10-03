@@ -15,19 +15,22 @@ namespace EduConnect.Web.Controllers
         private readonly ILogger<AdminController> _logger;
         private readonly IHierarchyService _hierarchy;
         private readonly IPlacementService _placement;
+        private readonly IAuditService _audit;
 
         public AdminController(
             ApplicationDbContext context,
             IEmailService emailService,
             ILogger<AdminController> logger,
             IHierarchyService hierarchy,
-            IPlacementService placement)
+            IPlacementService placement,
+            IAuditService audit)
         {
             _context = context;
             _emailService = emailService;
             _logger = logger;
             _hierarchy = hierarchy;
             _placement = placement;
+            _audit = audit;
         }
 
         // ─── Check if Admin ────────────────────
@@ -37,6 +40,54 @@ namespace EduConnect.Web.Controllers
 
         private string GetBaseUrl() =>
             $"{Request.Scheme}://{Request.Host}";
+
+        // ─── Audit helpers ─────────────────────
+        // "BSIT · ITIS · CCIT" (implicit departments hidden), or "—".
+        private async Task<string> PlacementTextAsync(int? collegeId, int? departmentId, int? programId)
+        {
+            var program = programId == null ? null : await _context.Programs
+                .Where(p => p.ProgramID == programId)
+                .Select(p => p.ShortName ?? p.Name).FirstOrDefaultAsync();
+            var department = departmentId == null ? null : await _context.Departments
+                .Where(d => d.DepartmentID == departmentId && !d.IsImplicit)
+                .Select(d => d.ShortName ?? d.Name).FirstOrDefaultAsync();
+            var college = collegeId == null ? null : await _context.Colleges
+                .Where(c => c.CollegeID == collegeId)
+                .Select(c => c.ShortName ?? c.Name).FirstOrDefaultAsync();
+
+            var text = string.Join(" · ", new[] { program, department, college }
+                .Where(s => !string.IsNullOrEmpty(s)));
+            return text.Length > 0 ? text : "—";
+        }
+
+        // The fields an EditUser audit row compares.
+        private async Task<Dictionary<string, string?>> AuditSnapshotAsync(User user)
+        {
+            var role = await _context.Roles
+                .Where(r => r.RoleID == user.RoleID)
+                .Select(r => r.RoleName).FirstOrDefaultAsync();
+            // Taken before SaveChanges too: pull in tag rows added since
+            // the load and skip ones marked for removal.
+            _context.ChangeTracker.DetectChanges();
+            var tagIds = user.UserDepartments?
+                .Where(ud => _context.Entry(ud).State != EntityState.Deleted)
+                .Select(ud => ud.TagID).ToList() ?? new List<int>();
+            var tags = await _context.DepartmentTags
+                .Where(t => tagIds.Contains(t.TagID))
+                .OrderBy(t => t.ShortName)
+                .Select(t => t.ShortName).ToListAsync();
+
+            return new Dictionary<string, string?>
+            {
+                ["Name"] = $"{user.FirstName} {user.LastName}",
+                ["Email"] = user.Email,
+                ["Student ID"] = user.StudentID,
+                ["Role"] = role,
+                ["Status"] = user.IsActive ? "Active" : "Inactive",
+                ["Placement"] = await PlacementTextAsync(user.CollegeID, user.DepartmentID, user.ProgramID),
+                ["Tags"] = tags.Count > 0 ? string.Join(", ", tags) : "—"
+            };
+        }
 
         // ─── GET: /Admin ───────────────────────
         public async Task<IActionResult> Index()
@@ -185,6 +236,8 @@ namespace EduConnect.Web.Controllers
             user.VerifiedAt = DateTime.Now;
             user.UpdatedAt = DateTime.Now;
 
+            _audit.Record("Approve", AuditArea.Users, user.UserID,
+                $"Approved the registration of {user.FirstName} {user.LastName} ({user.Email}).");
             await _context.SaveChangesAsync();
 
             // Send approval email
@@ -286,6 +339,8 @@ namespace EduConnect.Web.Controllers
                 rejectionReason;
             user.UpdatedAt = DateTime.Now;
 
+            _audit.Record("Reject", AuditArea.Users, user.UserID,
+                $"Rejected the registration of {user.FirstName} {user.LastName} ({user.Email}): {rejectionReason}");
             await _context.SaveChangesAsync();
 
             // Send rejection email
@@ -504,8 +559,12 @@ namespace EduConnect.Web.Controllers
                     IsPrimary = true,
                     CreatedAt = DateTime.Now
                 });
-                await _context.SaveChangesAsync();
             }
+
+            _audit.Record("Create", AuditArea.Users, user.UserID,
+                $"Created {roleName} account {user.FirstName} {user.LastName} ({user.Email}).",
+                newValues: await AuditSnapshotAsync(user));
+            await _context.SaveChangesAsync();
 
             // Send welcome email (fire-and-forget)
             try
@@ -619,6 +678,8 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Users");
             }
 
+            var before = await AuditSnapshotAsync(user);
+
             var roleName = await _context.Roles
                 .Where(r => r.RoleID == model.RoleID)
                 .Select(r => r.RoleName)
@@ -669,6 +730,20 @@ namespace EduConnect.Web.Controllers
                     IsPrimary = true,
                     CreatedAt = DateTime.Now
                 });
+
+            // Only what changed; a password reset is recorded, never its value.
+            var after = await AuditSnapshotAsync(user);
+            var changed = after.Keys.Where(k => before[k] != after[k]).ToList();
+            if (!string.IsNullOrWhiteSpace(model.Password))
+            {
+                changed.Add("Password");
+                after["Password"] = "reset";
+            }
+            if (changed.Count > 0)
+                _audit.Record("Update", AuditArea.Users, user.UserID,
+                    $"Edited {user.FirstName} {user.LastName}: {string.Join(", ", changed)}.",
+                    before.Where(kv => changed.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value),
+                    after.Where(kv => changed.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value));
 
             await _context.SaveChangesAsync();
 
@@ -731,6 +806,10 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Users");
             }
 
+            // Before the cleanup below marks their tag rows deleted.
+            await _context.Entry(user).Collection(u => u.UserDepartments).LoadAsync();
+            var deleted = await AuditSnapshotAsync(user);
+
             // Remove all cleanable child records in FK-safe order
             _context.UserAnnouncementInteractions.RemoveRange(
                 _context.UserAnnouncementInteractions.Where(i => i.UserID == id));
@@ -765,8 +844,9 @@ namespace EduConnect.Web.Controllers
             _context.RefreshTokens.RemoveRange(
                 _context.RefreshTokens.Where(t => t.UserID == id));
 
-            _context.AuditLogs.RemoveRange(
-                _context.AuditLogs.Where(l => l.UserID == id));
+            // Keep their audit trail; ActorName still says who it was.
+            foreach (var log in await _context.AuditLogs.Where(l => l.UserID == id).ToListAsync())
+                log.UserID = null;
 
             _context.PasswordResetTokens.RemoveRange(
                 _context.PasswordResetTokens.Where(t => t.UserID == id));
@@ -774,12 +854,75 @@ namespace EduConnect.Web.Controllers
             _context.UserDepartments.RemoveRange(
                 _context.UserDepartments.Where(d => d.UserID == id));
 
+            _audit.Record("Delete", AuditArea.Users, user.UserID,
+                $"Deleted {user.FirstName} {user.LastName} ({user.Email}).",
+                oldValues: deleted);
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
             TempData["Success"] =
                 $"{user.FirstName} {user.LastName}'s account has been permanently deleted.";
             return RedirectToAction("Users");
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Admin/AuditLog
+        //  Read-only history of user and structure changes
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> AuditLog(
+            string? actor, string? area, string? actionName,
+            DateTime? from, DateTime? to, int page = 1)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var query = _context.AuditLogs.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(actor))
+                query = query.Where(l => l.ActorName != null && l.ActorName.Contains(actor.Trim()));
+            if (!string.IsNullOrEmpty(area))
+                query = query.Where(l => l.TableAffected == area);
+            if (!string.IsNullOrEmpty(actionName))
+                query = query.Where(l => l.Action == actionName);
+            if (from.HasValue)
+                query = query.Where(l => l.CreatedAt >= from.Value.Date);
+            if (to.HasValue)
+                query = query.Where(l => l.CreatedAt < to.Value.Date.AddDays(1));
+
+            var model = new AuditLogViewModel
+            {
+                Actor = actor,
+                Area = area,
+                ActionName = actionName,
+                From = from,
+                To = to,
+                TotalCount = await query.CountAsync(),
+                Actions = await _context.AuditLogs
+                    .Select(l => l.Action).Distinct().OrderBy(a => a).ToListAsync()
+            };
+            model.Page = Math.Clamp(page, 1, model.PageCount);
+
+            model.Rows = await query
+                .OrderByDescending(l => l.CreatedAt)
+                .ThenByDescending(l => l.LogID)
+                .Skip((model.Page - 1) * AuditLogViewModel.PageSize)
+                .Take(AuditLogViewModel.PageSize)
+                .Select(l => new AuditLogRow
+                {
+                    CreatedAt = l.CreatedAt,
+                    Actor = l.ActorName ?? "System",
+                    ActorDeleted = l.UserID == null && l.ActorName != null,
+                    Action = l.Action,
+                    Area = l.TableAffected,
+                    Summary = l.Summary,
+                    OldValues = l.OldValues,
+                    NewValues = l.NewValues,
+                    IPAddress = l.IPAddress
+                })
+                .ToListAsync();
+
+            return View(model);
         }
 
         // ═══════════════════════════════════════

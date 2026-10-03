@@ -20,6 +20,7 @@ namespace EduConnect.Web.Controllers
         private readonly IBlobStorageService _blobStorageService;
         private readonly IHierarchyService _hierarchy;
         private readonly IPlacementService _placement;
+        private readonly IAuditService _audit;
 
         public AccountController(
             ApplicationDbContext context,
@@ -30,8 +31,10 @@ namespace EduConnect.Web.Controllers
             IConfiguration configuration,
             IBlobStorageService blobStorageService,
             IHierarchyService hierarchy,
-            IPlacementService placement)
+            IPlacementService placement,
+            IAuditService audit)
         {
+            _audit = audit;
             _context = context;
             _logger = logger;
             _environment = environment;
@@ -534,6 +537,15 @@ namespace EduConnect.Web.Controllers
             // Update editable fields only
             user.Suffix = string.IsNullOrWhiteSpace(model.Suffix) ? null : model.Suffix;
             user.UpdatedAt = DateTime.Now;
+
+            if (!hadProgram && user.ProgramID != null)
+            {
+                var program = await _context.Programs
+                    .Where(p => p.ProgramID == user.ProgramID)
+                    .Select(p => p.Name).FirstOrDefaultAsync();
+                _audit.Record("Place", AuditArea.Users, user.UserID,
+                    $"{user.FirstName} {user.LastName} chose their program: {program}.");
+            }
 
             await _context.SaveChangesAsync();
 
