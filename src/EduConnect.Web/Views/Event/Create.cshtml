@@ -245,6 +245,8 @@
                                class="form-control"
                                id="regDeadline"
                                step="60" />
+                        <span asp-validation-for="RegistrationDeadline"
+                              class="text-danger small"></span>
                     </div>
 
                     <!-- Link to Announcement -->
@@ -351,8 +353,20 @@
             if (startField) startField.min = todayStr;
             if (endField)   endField.min   = (startField && startField.value) ? startField.value : todayStr;
             if (regDeadline) {
-                regDeadline.min = todayStr;
+                regDeadline.min = formatDateTimeLocal(new Date());
             }
+
+            // Registration must close before the event starts. max is
+            // inclusive, so the strictly-before rule needs a custom message.
+            function syncDeadline() {
+                if (!regDeadline || !startField) return;
+                regDeadline.max = startField.value;
+                regDeadline.setCustomValidity(
+                    regDeadline.value && startField.value && regDeadline.value >= startField.value
+                        ? 'Registration deadline must be before the event starts.'
+                        : '');
+            }
+            if (regDeadline) regDeadline.addEventListener('input', syncDeadline);
 
             // Set start to tomorrow at 9AM
             var tomorrow = new Date();
@@ -373,6 +387,7 @@
 
             // Re-apply endField.min with the default start value now set
             if (endField) endField.min = startField ? startField.value : todayStr;
+            syncDeadline();
 
             // Auto-update end + regDeadline max when start changes
             if (startField) {
@@ -385,8 +400,7 @@
                     }
                     // Always update endField.min; fall back to todayStr if start cleared
                     if (endField) endField.min = this.value || todayStr;
-                    // Setting to "" removes the cap — intentional; start is required so no data risk
-                    if (regDeadline) regDeadline.max = this.value;
+                    syncDeadline();
                 });
             }
         });
