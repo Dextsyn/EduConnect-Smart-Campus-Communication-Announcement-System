@@ -72,11 +72,12 @@
                     <span asp-validation-for="RoleID" class="text-danger small"></span>
                 </div>
 
-                <div class="col-md-6">
-                    <label asp-for="DepartmentTagID" class="form-label fw-semibold">Office tag <span class="text-muted fw-normal">(optional)</span></label>
-                    <select asp-for="DepartmentTagID" asp-items="Model.Departments" class="form-select"><option value="">— None —</option></select>
-                    <span asp-validation-for="DepartmentTagID" class="text-danger small"></span>
-                    <div class="form-text">School Wide or a non-academic office. Students, faculty and deans are reached through their placement.</div>
+                <div class="col-md-6 d-flex flex-column justify-content-end">
+                    <div class="form-check">
+                        <input asp-for="CanPostSchoolWide" class="form-check-input" type="checkbox" />
+                        <label asp-for="CanPostSchoolWide" class="form-check-label">Can post School Wide announcements</label>
+                    </div>
+                    <div class="form-text">Applies to Deans, Chairpersons and Faculty, who author announcements.</div>
                 </div>
 
                 @await Html.PartialAsync("_PlacementFields", Model)

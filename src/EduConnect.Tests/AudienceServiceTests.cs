@@ -110,6 +110,30 @@ namespace EduConnect.Tests
             Assert.Equal(new[] { "ALL", "OFFICE" }, await Visible(_staff));
 
         [Fact]
+        public async Task VisibleTo_RetiredTag_NoLongerCounts()
+        {
+            // A legacy college tag the student still holds.
+            var legacy = _db.AddTag("COS-OLD");
+            legacy.IsActive = false;
+            _db.Context.SaveChanges();
+            _db.TagUser(_studentBsit, legacy, primary: false);
+            var author = _db.AddUser(RoleNames.Administrator);
+            _db.TagAnnouncement(_db.AddAnnouncement(author, "LEGACY"), legacy);
+
+            Assert.DoesNotContain("LEGACY", await Visible(_studentBsit));
+            Assert.Empty((await Service.GetViewerAsync(_studentBsit.UserID)).TagIDs);
+        }
+
+        [Fact]
+        public async Task Recipients_RetiredTag_NoLongerCounts()
+        {
+            _office.IsActive = false;
+            _db.Context.SaveChanges();
+
+            Assert.DoesNotContain(_staff.UserID, await RecipientsOf("OFFICE"));
+        }
+
+        [Fact]
         public async Task VisibleTo_Author_AlwaysSeesOwnAnnouncement()
         {
             _db.Target(_db.AddAnnouncement(_faculty, "Mine"), p: _bsbio);

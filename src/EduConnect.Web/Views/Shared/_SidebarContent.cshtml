@@ -1,3 +1,5 @@
+@using Microsoft.EntityFrameworkCore
+@inject EduConnect.Web.Data.ApplicationDbContext Db
 <!-- User Info -->
 <div class="ec-user-card mb-4">
     @{
@@ -60,10 +62,6 @@
         <a href="/AcademicStructure" class="ec-side-link">
             <i class="bi bi-bank"></i>
             Academic Structure
-        </a>
-        <a href="/Admin/Departments" class="ec-side-link">
-            <i class="bi bi-tags"></i>
-            Tags &amp; Offices
         </a>
         <a href="/Admin/AuditLog" class="ec-side-link">
             <i class="bi bi-journal-text"></i>
@@ -304,14 +302,51 @@
 
 <hr />
 
-<!-- Department Tags -->
-<div class="ec-side-heading">My Department</div>
-<div class="mt-2 px-2">
-    <span class="ec-chip ec-chip-gold" style="background:rgba(255,255,255,.12);color:#fff">CCIT</span>
-    <span class="ec-chip ec-chip-neutral mt-1" style="background:rgba(255,255,255,.12);color:#fff">School Wide</span>
-</div>
+<!-- Placement: college, department, program, and School Wide posting -->
+@{
+    // This partial renders twice per page (sidebar + drawer); load once.
+    if (Context.Items["SidebarPlacement"] is not List<string> _placement)
+    {
+        _placement = new List<string>();
+        if (int.TryParse(Context.Session.GetString("UserID"), out var _uid))
+        {
+            var _p = await Db.Users
+                .Where(u => u.UserID == _uid)
+                .Select(u => new
+                {
+                    College = u.College == null ? null : (u.College.ShortName ?? u.College.Name),
+                    Department = u.Department == null || u.Department.IsImplicit ? null
+                        : (u.Department.ShortName ?? u.Department.Name),
+                    Program = u.AcademicProgram == null ? null
+                        : (u.AcademicProgram.ShortName ?? u.AcademicProgram.Name),
+                    SchoolWide = u.UserDepartments.Any(ud =>
+                        ud.DepartmentTag.ShortName == EduConnect.Web.Services.AudienceService.SchoolWide)
+                })
+                .FirstOrDefaultAsync();
+            if (_p != null)
+            {
+                _placement.AddRange(new[] { _p.College, _p.Department, _p.Program }
+                    .Where(s => !string.IsNullOrEmpty(s))!);
+                if (_p.SchoolWide)
+                    _placement.Add("Posts School Wide");
+            }
+        }
+        Context.Items["SidebarPlacement"] = _placement;
+    }
+}
+@if (_placement.Any())
+{
+    <div class="ec-side-heading">My Placement</div>
+    <div class="mt-2 px-2 d-flex flex-wrap gap-1">
+        @for (var i = 0; i < _placement.Count; i++)
+        {
+            <span class="ec-chip @(i == 0 ? "ec-chip-gold" : "ec-chip-neutral")"
+                  style="background:rgba(255,255,255,.12);color:#fff">@_placement[i]</span>
+        }
+    </div>
 
-<hr />
+    <hr />
+}
 <a href="/Account/Profile" class="ec-side-link d-lg-none">
     <i class="bi bi-person"></i> Profile
 </a>

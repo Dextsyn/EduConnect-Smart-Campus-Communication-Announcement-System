@@ -8,7 +8,9 @@ namespace EduConnect.Web.Services
 {
     public class AudienceService : IAudienceService
     {
-        private const string SchoolWide = "ALL";
+        // ShortName of the School Wide tag. Every announcement carrying it
+        // reaches everyone; holding it lets an author post one.
+        public const string SchoolWide = "ALL";
 
         private readonly ApplicationDbContext _context;
 
@@ -34,8 +36,10 @@ namespace EduConnect.Web.Services
             if (user == null)
                 return new Viewer(userId, "", null, null, null, Array.Empty<int>());
 
+            // Only active tags count. Retired ones (the old college tags,
+            // now reached through placement) stay on users for history.
             var tagIds = await _context.UserDepartments
-                .Where(ud => ud.UserID == userId)
+                .Where(ud => ud.UserID == userId && ud.DepartmentTag.IsActive)
                 .Select(ud => ud.TagID)
                 .ToListAsync();
 
@@ -151,7 +155,7 @@ namespace EduConnect.Web.Services
 
             return await active
                 .Where(u =>
-                    u.UserDepartments.Any(ud => tagIds.Contains(ud.TagID)) ||
+                    u.UserDepartments.Any(ud => tagIds.Contains(ud.TagID) && ud.DepartmentTag.IsActive) ||
                     (u.CollegeID != null && collegeIds.Contains(u.CollegeID)) ||
                     (u.DepartmentID != null && departmentIds.Contains(u.DepartmentID)) ||
                     (u.ProgramID != null && programIds.Contains(u.ProgramID)))

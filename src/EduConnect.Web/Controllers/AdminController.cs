@@ -72,10 +72,8 @@ namespace EduConnect.Web.Controllers
             var tagIds = user.UserDepartments?
                 .Where(ud => _context.Entry(ud).State != EntityState.Deleted)
                 .Select(ud => ud.TagID).ToList() ?? new List<int>();
-            var tags = await _context.DepartmentTags
-                .Where(t => tagIds.Contains(t.TagID))
-                .OrderBy(t => t.ShortName)
-                .Select(t => t.ShortName).ToListAsync();
+            var schoolWide = await _context.DepartmentTags
+                .AnyAsync(t => tagIds.Contains(t.TagID) && t.ShortName == AudienceService.SchoolWide);
 
             return new Dictionary<string, string?>
             {
@@ -85,7 +83,7 @@ namespace EduConnect.Web.Controllers
                 ["Role"] = role,
                 ["Status"] = user.IsActive ? "Active" : "Inactive",
                 ["Placement"] = await PlacementTextAsync(user.CollegeID, user.DepartmentID, user.ProgramID),
-                ["Tags"] = tags.Count > 0 ? string.Join(", ", tags) : "—"
+                ["School Wide"] = schoolWide ? "Can post" : "No"
             };
         }
 
@@ -469,13 +467,32 @@ namespace EduConnect.Web.Controllers
             model.Roles = (await _context.Roles.ToListAsync())
                 .Select(r => new SelectListItem(r.RoleName, r.RoleID.ToString()))
                 .ToList();
-            model.Departments = (await _context.DepartmentTags
-                .Where(d => d.IsActive)
-                .ToListAsync())
-                .Select(d => new SelectListItem(
-                    $"{d.ShortName} — {d.TagName}", d.TagID.ToString()))
-                .ToList();
             model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+        }
+
+        // Gives or takes away the School Wide tag, the permission to post
+        // campus-wide announcements. Other tag rows (retired college tags
+        // kept for history) are left alone. Mutates only; the caller saves.
+        private async Task SetSchoolWideAsync(User user, bool canPost)
+        {
+            var tagId = await _context.DepartmentTags
+                .Where(t => t.ShortName == AudienceService.SchoolWide)
+                .Select(t => (int?)t.TagID)
+                .FirstOrDefaultAsync();
+            if (tagId == null)
+                return;
+
+            var existing = user.UserDepartments?.FirstOrDefault(ud => ud.TagID == tagId);
+            if (canPost && existing == null)
+                _context.UserDepartments.Add(new UserDepartment
+                {
+                    UserID = user.UserID,
+                    TagID = tagId.Value,
+                    IsPrimary = false,
+                    CreatedAt = DateTime.Now
+                });
+            else if (!canPost && existing != null)
+                _context.UserDepartments.Remove(existing);
         }
 
         // ═══════════════════════════════════════
@@ -550,16 +567,7 @@ namespace EduConnect.Web.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            if (model.DepartmentTagID.HasValue)
-            {
-                _context.UserDepartments.Add(new UserDepartment
-                {
-                    UserID = user.UserID,
-                    TagID = model.DepartmentTagID.Value,
-                    IsPrimary = true,
-                    CreatedAt = DateTime.Now
-                });
-            }
+            await SetSchoolWideAsync(user, model.CanPostSchoolWide);
 
             _audit.Record("Create", AuditArea.Users, user.UserID,
                 $"Created {roleName} account {user.FirstName} {user.LastName} ({user.Email}).",
@@ -622,9 +630,6 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Users");
             }
 
-            var primaryDept = user.UserDepartments
-                .FirstOrDefault(ud => ud.IsPrimary);
-
             var model = new AdminUserFormViewModel
             {
                 UserID = user.UserID,
@@ -633,7 +638,9 @@ namespace EduConnect.Web.Controllers
                 Email = user.Email,
                 StudentID = user.StudentID,
                 RoleID = user.RoleID,
-                DepartmentTagID = primaryDept?.TagID,
+                CanPostSchoolWide = await _context.UserDepartments.AnyAsync(ud =>
+                    ud.UserID == user.UserID &&
+                    ud.DepartmentTag.ShortName == AudienceService.SchoolWide),
                 CollegeID = user.CollegeID,
                 DepartmentID = user.DepartmentID,
                 ProgramID = user.ProgramID,
@@ -717,19 +724,7 @@ namespace EduConnect.Web.Controllers
             if (!string.IsNullOrWhiteSpace(model.Password))
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            // Replace or clear the office tag
-            var existingPrimary = user.UserDepartments.FirstOrDefault(ud => ud.IsPrimary);
-            if (existingPrimary != null && existingPrimary.TagID != model.DepartmentTagID)
-                _context.UserDepartments.Remove(existingPrimary);
-            if (model.DepartmentTagID.HasValue &&
-                (existingPrimary == null || existingPrimary.TagID != model.DepartmentTagID))
-                _context.UserDepartments.Add(new UserDepartment
-                {
-                    UserID = user.UserID,
-                    TagID = model.DepartmentTagID.Value,
-                    IsPrimary = true,
-                    CreatedAt = DateTime.Now
-                });
+            await SetSchoolWideAsync(user, model.CanPostSchoolWide);
 
             // Only what changed; a password reset is recorded, never its value.
             var after = await AuditSnapshotAsync(user);
@@ -923,322 +918,6 @@ namespace EduConnect.Web.Controllers
                 .ToListAsync();
 
             return View(model);
-        }
-
-        // ═══════════════════════════════════════
-        //  DEPARTMENTS
-        // ═══════════════════════════════════════
-
-        // The School Wide row, whose ShortName "ALL" is matched as a literal
-        // string by the announcement feed (FeedRankingService,
-        // AnnouncementController, HomeController, ChatbotService). Renaming
-        // or retiring it would silently stop campus-wide announcements from
-        // reaching anyone, so its ShortName, type and active state are locked.
-        private static readonly string[] SystemShortNames = { "ALL" };
-
-        private static bool IsSystemDepartment(DepartmentTag dept) =>
-            dept.ShortName != null &&
-            SystemShortNames.Contains(
-                dept.ShortName, StringComparer.OrdinalIgnoreCase);
-
-        private async Task PopulateDepartmentFormDropdowns(
-            AdminDepartmentFormViewModel model)
-        {
-            model.TagTypes = (await _context.TagTypes
-                    .OrderBy(t => t.TagTypeID)
-                    .ToListAsync())
-                .Select(t => new SelectListItem(
-                    t.TypeName, t.TagTypeID.ToString()))
-                .ToList();
-        }
-
-        // Shared by both POST actions. On create TagID is 0, which never
-        // matches an existing row, so the same expression covers both cases.
-        private async Task ValidateDepartmentAsync(
-            AdminDepartmentFormViewModel model)
-        {
-            // TagName carries a UNIQUE index — without this pre-check EF
-            // throws DbUpdateException and the user gets a 500, not an error.
-            if (!string.IsNullOrWhiteSpace(model.TagName) &&
-                await _context.DepartmentTags.AnyAsync(d =>
-                    d.TagName == model.TagName && d.TagID != model.TagID))
-                ModelState.AddModelError("TagName",
-                    "A department with this name already exists.");
-
-            if (!string.IsNullOrWhiteSpace(model.ShortName) &&
-                await _context.DepartmentTags.AnyAsync(d =>
-                    d.ShortName == model.ShortName && d.TagID != model.TagID))
-                // ShortName has no unique index, but the feed treats it as a key
-                ModelState.AddModelError("ShortName",
-                    "A department with this short code already exists.");
-        }
-
-        // ═══════════════════════════════════════
-        //  GET: /Admin/Departments
-        //  Manage department tags
-        // ═══════════════════════════════════════
-        public async Task<IActionResult> Departments(
-            string? filterType,
-            string? filterStatus)
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            var query = _context.DepartmentTags
-                .Include(d => d.TagType)
-                .AsQueryable();
-
-            if (!string.IsNullOrEmpty(filterType))
-                query = query.Where(d =>
-                    d.TagType.TypeName == filterType);
-
-            if (filterStatus == "Active")
-                query = query.Where(d => d.IsActive);
-            else if (filterStatus == "Inactive")
-                query = query.Where(d => !d.IsActive);
-
-            var departments = await query
-                .OrderBy(d => d.TagType.TagTypeID)
-                .ThenBy(d => d.TagName)
-                .ToListAsync();
-
-            // Counted up front — doing this per row in the view would N+1
-            ViewBag.UserCounts = await _context.UserDepartments
-                .GroupBy(ud => ud.TagID)
-                .Select(g => new { TagID = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.TagID, x => x.Count);
-
-            ViewBag.AnnouncementCounts = await _context.AnnouncementTags
-                .GroupBy(at => at.TagID)
-                .Select(g => new { TagID = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.TagID, x => x.Count);
-
-            ViewBag.Departments = departments;
-            ViewBag.TagTypes = await _context.TagTypes
-                .OrderBy(t => t.TagTypeID)
-                .ToListAsync();
-            ViewBag.FilterType = filterType;
-            ViewBag.FilterStatus = filterStatus;
-            ViewBag.SystemShortNames = SystemShortNames;
-            ViewBag.CollegeTagIDs = await _context.Colleges
-                .Where(c => c.LegacyTagID != null)
-                .Select(c => c.LegacyTagID!.Value)
-                .ToListAsync();
-
-            return View();
-        }
-
-        // ═══════════════════════════════════════
-        //  GET: /Admin/AddDepartment
-        // ═══════════════════════════════════════
-        public async Task<IActionResult> AddDepartment()
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            var model = new AdminDepartmentFormViewModel();
-            await PopulateDepartmentFormDropdowns(model);
-            return View(model);
-        }
-
-        // ═══════════════════════════════════════
-        //  POST: /Admin/AddDepartment
-        // ═══════════════════════════════════════
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddDepartment(
-            AdminDepartmentFormViewModel model)
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            model.TagName = model.TagName?.Trim();
-            model.ShortName = model.ShortName?.Trim();
-
-            // A new department must not claim one of the reserved codes
-            if (!string.IsNullOrWhiteSpace(model.ShortName) &&
-                SystemShortNames.Contains(
-                    model.ShortName, StringComparer.OrdinalIgnoreCase))
-                ModelState.AddModelError("ShortName",
-                    $"\"{model.ShortName}\" is reserved by the announcement " +
-                    "feed and cannot be used for a new department.");
-
-            await ValidateDepartmentAsync(model);
-
-            if (!ModelState.IsValid)
-            {
-                await PopulateDepartmentFormDropdowns(model);
-                return View(model);
-            }
-
-            var dept = new DepartmentTag
-            {
-                TagName = model.TagName,
-                ShortName = model.ShortName,
-                TagTypeID = model.TagTypeID,
-                Description = string.IsNullOrWhiteSpace(model.Description)
-                    ? null
-                    : model.Description.Trim(),
-                ColorHex = model.ColorHex,
-                IsActive = model.IsActive,
-                CreatedAt = DateTime.Now
-            };
-
-            _context.DepartmentTags.Add(dept);
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = $"\"{dept.TagName}\" has been created.";
-            return RedirectToAction("Departments");
-        }
-
-        // ═══════════════════════════════════════
-        //  GET: /Admin/EditDepartment/5
-        // ═══════════════════════════════════════
-        public async Task<IActionResult> EditDepartment(int id)
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            var dept = await _context.DepartmentTags
-                .FirstOrDefaultAsync(d => d.TagID == id);
-
-            if (dept == null)
-            {
-                TempData["Error"] = "Department not found.";
-                return RedirectToAction("Departments");
-            }
-
-            var model = new AdminDepartmentFormViewModel
-            {
-                TagID = dept.TagID,
-                TagName = dept.TagName,
-                ShortName = dept.ShortName,
-                TagTypeID = dept.TagTypeID,
-                Description = dept.Description,
-                ColorHex = dept.ColorHex,
-                IsActive = dept.IsActive,
-                IsSystemDepartment = IsSystemDepartment(dept),
-                IsCollegeTag = await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID)
-            };
-
-            await PopulateDepartmentFormDropdowns(model);
-            return View(model);
-        }
-
-        // ═══════════════════════════════════════
-        //  POST: /Admin/EditDepartment/5
-        // ═══════════════════════════════════════
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditDepartment(
-            int id, AdminDepartmentFormViewModel model)
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            var dept = await _context.DepartmentTags
-                .FirstOrDefaultAsync(d => d.TagID == id);
-
-            if (dept == null)
-            {
-                TempData["Error"] = "Department not found.";
-                return RedirectToAction("Departments");
-            }
-
-            model.TagID = id;
-            model.TagName = model.TagName?.Trim();
-            model.ShortName = model.ShortName?.Trim();
-            model.IsSystemDepartment = IsSystemDepartment(dept);
-
-            // A disabled input posts nothing and a hostile client can post
-            // anything, so never trust the form for these three fields.
-            if (model.IsSystemDepartment)
-            {
-                model.ShortName = dept.ShortName;
-                model.TagTypeID = dept.TagTypeID;
-                model.IsActive = dept.IsActive;
-                ModelState.Remove(nameof(model.ShortName));
-                ModelState.Remove(nameof(model.TagTypeID));
-                ModelState.Remove(nameof(model.IsActive));
-            }
-
-            // Tags that became colleges stay as they are; ToggleDepartment
-            // refuses them too.
-            model.IsCollegeTag = await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID);
-            if (model.IsCollegeTag)
-                model.IsActive = dept.IsActive;
-
-            await ValidateDepartmentAsync(model);
-
-            if (!ModelState.IsValid)
-            {
-                await PopulateDepartmentFormDropdowns(model);
-                return View(model);
-            }
-
-            dept.TagName = model.TagName;
-            dept.ShortName = model.ShortName;
-            dept.TagTypeID = model.TagTypeID;
-            dept.Description = string.IsNullOrWhiteSpace(model.Description)
-                ? null
-                : model.Description.Trim();
-            dept.ColorHex = model.ColorHex;
-            dept.IsActive = model.IsActive;
-            dept.UpdatedAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = $"\"{dept.TagName}\" has been updated.";
-            return RedirectToAction("Departments");
-        }
-
-        // ═══════════════════════════════════════
-        //  POST: /Admin/ToggleDepartment/5
-        //  Retire or restore — never a hard delete,
-        //  every FK into DepartmentTags is Restrict
-        // ═══════════════════════════════════════
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleDepartment(int id)
-        {
-            if (!IsAdmin())
-                return RedirectToAction("Login", "Account");
-
-            var dept = await _context.DepartmentTags
-                .FirstOrDefaultAsync(d => d.TagID == id);
-
-            if (dept == null)
-            {
-                TempData["Error"] = "Department not found.";
-                return RedirectToAction("Departments");
-            }
-
-            if (IsSystemDepartment(dept))
-            {
-                TempData["Error"] =
-                    $"\"{dept.TagName}\" is referenced by the announcement " +
-                    "feed and cannot be retired.";
-                return RedirectToAction("Departments");
-            }
-
-            // Tags that became colleges live on under Academic Structure;
-            // restoring one would bring back the old flat department list.
-            if (await _context.Colleges.AnyAsync(c => c.LegacyTagID == dept.TagID))
-            {
-                TempData["Error"] =
-                    $"\"{dept.TagName}\" is now a college. Manage it under Academic Structure.";
-                return RedirectToAction("Departments");
-            }
-
-            dept.IsActive = !dept.IsActive;
-            dept.UpdatedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = dept.IsActive
-                ? $"\"{dept.TagName}\" has been restored."
-                : $"\"{dept.TagName}\" has been retired.";
-
-            return RedirectToAction("Departments");
         }
     }
 }
