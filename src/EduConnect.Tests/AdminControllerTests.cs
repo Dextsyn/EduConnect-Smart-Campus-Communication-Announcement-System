@@ -1,6 +1,8 @@
 using EduConnect.Web;
 using EduConnect.Web.Controllers;
+using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -12,6 +14,14 @@ namespace EduConnect.Tests
     {
         private readonly TestDb _db = new();
         private readonly FakeSession _session = new();
+        private readonly DepartmentTag _schoolWide;
+
+        public AdminControllerTests()
+        {
+            _schoolWide = _db.AddTag(AudienceService.SchoolWide);
+            var admin = _db.AddUser(RoleNames.Administrator);
+            _session.SetString("UserID", admin.UserID.ToString());
+        }
 
         public void Dispose() => _db.Dispose();
 
@@ -28,42 +38,67 @@ namespace EduConnect.Tests
             return controller;
         }
 
-        [Fact]
-        public async Task ToggleDepartment_CollegeTag_Refused()
+        private static AdminUserFormViewModel FormFor(User user, bool canPostSchoolWide) => new()
         {
-            var tag = _db.AddTag("CCIT");
-            tag.IsActive = false;
+            UserID = user.UserID,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            RoleID = user.RoleID,
+            CollegeID = user.CollegeID,
+            DepartmentID = user.DepartmentID,
+            ProgramID = user.ProgramID,
+            IsActive = user.IsActive,
+            CanPostSchoolWide = canPostSchoolWide
+        };
+
+        private int[] TagsOf(User user) =>
+            _db.NewContext().UserDepartments.Where(ud => ud.UserID == user.UserID)
+                .Select(ud => ud.TagID).OrderBy(id => id).ToArray();
+
+        private (College College, Department Dept) Placement()
+        {
             var college = _db.AddCollege("College of Computing and Information Technology");
-            college.LegacyTagID = tag.TagID;
-            _db.Context.SaveChanges();
-
-            var controller = Controller();
-            await controller.ToggleDepartment(tag.TagID);
-
-            Assert.False(_db.NewContext().DepartmentTags.Single(t => t.TagID == tag.TagID).IsActive);
-            Assert.Contains("Academic Structure", (string)controller.TempData["Error"]!);
+            return (college, _db.AddDepartment(college, "Information Technology"));
         }
 
         [Fact]
-        public async Task EditDepartment_CollegeTag_CannotReactivate()
+        public async Task EditUser_GrantsSchoolWide()
         {
-            var tag = _db.AddTag("CCIT");
-            tag.IsActive = false;
-            var college = _db.AddCollege("College of Computing and Information Technology");
-            college.LegacyTagID = tag.TagID;
+            var (college, dept) = Placement();
+            var faculty = _db.AddUser(RoleNames.Faculty, college.CollegeID, dept.DepartmentID);
+
+            await Controller().EditUser(faculty.UserID, FormFor(faculty, canPostSchoolWide: true));
+
+            Assert.Equal(new[] { _schoolWide.TagID }, TagsOf(faculty));
+        }
+
+        [Fact]
+        public async Task EditUser_RevokesSchoolWide_KeepsRetiredTags()
+        {
+            var (college, dept) = Placement();
+            var faculty = _db.AddUser(RoleNames.Faculty, college.CollegeID, dept.DepartmentID);
+            var legacy = _db.AddTag("CCIT");
+            legacy.IsActive = false;
             _db.Context.SaveChanges();
+            _db.TagUser(faculty, legacy);
+            _db.TagUser(faculty, _schoolWide, primary: false);
 
-            await Controller().EditDepartment(tag.TagID, new EduConnect.Web.ViewModels.AdminDepartmentFormViewModel
-            {
-                TagID = tag.TagID,
-                TagName = tag.TagName,
-                ShortName = tag.ShortName,
-                TagTypeID = tag.TagTypeID,
-                ColorHex = tag.ColorHex,
-                IsActive = true
-            });
+            await Controller().EditUser(faculty.UserID, FormFor(faculty, canPostSchoolWide: false));
 
-            Assert.False(_db.NewContext().DepartmentTags.Single(t => t.TagID == tag.TagID).IsActive);
+            Assert.Equal(new[] { legacy.TagID }, TagsOf(faculty));
+        }
+
+        [Fact]
+        public async Task EditUser_ShowsSchoolWidePermission()
+        {
+            var staff = _db.AddUser(RoleNames.Staff);
+            _db.TagUser(staff, _schoolWide);
+
+            var result = await Controller().EditUser(staff.UserID);
+
+            var model = Assert.IsType<AdminUserFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+            Assert.True(model.CanPostSchoolWide);
         }
     }
 }

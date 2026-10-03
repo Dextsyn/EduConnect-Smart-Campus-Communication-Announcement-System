@@ -32,9 +32,9 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Role is required")]
         public int RoleID { get; set; }
 
-        // Optional: School Wide or a non-academic office. Academic users are
-        // reached through their placement.
-        public int? DepartmentTagID { get; set; }
+        // Holding the School Wide ("ALL") tag is what lets an author post
+        // campus-wide announcements.
+        public bool CanPostSchoolWide { get; set; }
 
         // Academic placement; which levels apply depends on the role.
         // IPlacementService validates and derives the rest.
@@ -46,7 +46,6 @@ namespace EduConnect.Web.ViewModels
 
         // Populated by the controller for the dropdowns
         public List<SelectListItem> Roles { get; set; } = new();
-        public List<SelectListItem> Departments { get; set; } = new();
         public List<College> Hierarchy { get; set; } = new();
     }
 }

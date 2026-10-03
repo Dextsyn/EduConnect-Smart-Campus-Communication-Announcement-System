@@ -146,10 +146,10 @@ namespace EduConnect.Web.Services
                 })
                 .FirstOrDefaultAsync();
 
-            // Office tags (and School Wide) still describe non-academic users.
+            // Active tags (School Wide) still describe non-academic users;
+            // retired ones, such as the old college tags, no longer count.
             var tags = await _context.UserDepartments
-                .Where(ud => ud.UserID == userId &&
-                             !_context.Colleges.Any(c => c.LegacyTagID == ud.TagID))
+                .Where(ud => ud.UserID == userId && ud.DepartmentTag.IsActive)
                 .Select(ud => ud.DepartmentTag.TagName)
                 .ToListAsync();
 
