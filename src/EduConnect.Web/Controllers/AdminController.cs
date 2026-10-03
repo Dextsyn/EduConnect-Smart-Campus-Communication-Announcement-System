@@ -410,7 +410,8 @@ namespace EduConnect.Web.Controllers
             string? searchQuery,
             string? filterRole,
             string? filterStatus,
-            string? filterPlacement)
+            string? filterPlacement,
+            int? filterCollege = null)
         {
             if (!IsAdmin())
                 return RedirectToAction(
@@ -443,6 +444,9 @@ namespace EduConnect.Web.Controllers
             if (filterPlacement == "missing")
                 query = query.Where(PlacementService.NeedsPlacement);
 
+            if (filterCollege.HasValue)
+                query = query.Where(u => u.CollegeID == filterCollege);
+
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
                 .ToListAsync();
@@ -458,7 +462,120 @@ namespace EduConnect.Web.Controllers
                 .Where(PlacementService.NeedsPlacement)
                 .CountAsync();
 
+            // Retired colleges stay in the filter so their users can be found
+            // and moved; the move picker offers only active ones.
+            ViewBag.FilterCollege = filterCollege;
+            ViewBag.Colleges = await _context.Colleges
+                .OrderByDescending(c => c.IsActive).ThenBy(c => c.Name)
+                .ToListAsync();
+            ViewBag.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+
             return View();
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Admin/BulkMove
+        //  Move the selected users to one destination
+        // ═══════════════════════════════════════
+        // Each user lands at the level their role uses: a Student in the
+        // program, a Chairperson or Faculty in its department, a Dean in its
+        // college. Anyone who can't be placed there is skipped and listed.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BulkMove(
+            int[] userIds, int? collegeId, int? departmentId, int? programId,
+            string? returnQuery = null)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var back = Redirect("/Admin/Users" + (returnQuery?.StartsWith("?") == true ? returnQuery : ""));
+
+            if (userIds == null || userIds.Length == 0)
+            {
+                TempData["Error"] = "Select at least one user to move.";
+                return back;
+            }
+
+            // Fill in the levels above the most specific one chosen.
+            if (programId != null)
+            {
+                var p = await _context.Programs
+                    .Where(p => p.ProgramID == programId)
+                    .Select(p => new { p.DepartmentID, p.Department.CollegeID, p.Department.IsImplicit })
+                    .FirstOrDefaultAsync();
+                if (p != null)
+                {
+                    departmentId = p.IsImplicit ? null : p.DepartmentID;
+                    collegeId = p.CollegeID;
+                }
+            }
+            else if (departmentId != null)
+            {
+                collegeId = await _context.Departments
+                    .Where(d => d.DepartmentID == departmentId)
+                    .Select(d => (int?)d.CollegeID)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (collegeId == null)
+            {
+                TempData["Error"] = "Choose where to move the selected users.";
+                return back;
+            }
+
+            var destination = await PlacementTextAsync(collegeId, departmentId, programId);
+
+            var users = await _context.Users
+                .Include(u => u.Role)
+                .Where(u => userIds.Contains(u.UserID))
+                .ToListAsync();
+
+            var moved = 0;
+            var skipped = new List<string>();
+
+            foreach (var user in users)
+            {
+                var name = $"{user.FirstName} {user.LastName}";
+                var role = user.Role.RoleName;
+
+                if (role == RoleNames.Administrator || role == RoleNames.Staff)
+                {
+                    skipped.Add($"{name} ({role}s are not placed)");
+                    continue;
+                }
+
+                var from = await PlacementTextAsync(user.CollegeID, user.DepartmentID, user.ProgramID);
+                var result = await _placement.ApplyAsync(user, role, collegeId, departmentId, programId);
+                if (!result.Ok)
+                {
+                    skipped.Add($"{name} ({result.Error})");
+                    continue;
+                }
+
+                var to = await PlacementTextAsync(user.CollegeID, user.DepartmentID, user.ProgramID);
+                if (from == to)
+                    continue;
+
+                user.UpdatedAt = DateTime.Now;
+                _audit.Record("Move", AuditArea.Users, user.UserID,
+                    $"Moved {name} ({role}) from {from} to {to}.",
+                    new Dictionary<string, string?> { ["Placement"] = from },
+                    new Dictionary<string, string?> { ["Placement"] = to });
+                moved++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var unchanged = users.Count - moved - skipped.Count;
+            TempData["Success"] = $"Moved {moved} user(s) to {destination}." +
+                (unchanged > 0 ? $" {unchanged} already there." : "");
+            if (skipped.Any())
+                TempData["Error"] = $"Skipped {skipped.Count}: " +
+                    string.Join("; ", skipped.Take(10)) +
+                    (skipped.Count > 10 ? $"; and {skipped.Count - 10} more." : ".");
+
+            return back;
         }
 
         // Dropdown data for the Add/Edit User forms.

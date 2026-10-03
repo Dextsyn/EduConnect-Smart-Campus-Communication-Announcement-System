@@ -6,6 +6,13 @@
     var roles = ViewBag.Roles as
         List<EduConnect.Web.Models.Role>
         ?? new List<EduConnect.Web.Models.Role>();
+    var colleges = ViewBag.Colleges as List<College> ?? new List<College>();
+    var hierarchy = ViewBag.Hierarchy as List<College> ?? new List<College>();
+    var filterCollege = ViewBag.FilterCollege as int?;
+
+    // Only these roles have a placement to move.
+    var movableRoles = new[] { RoleNames.Dean, RoleNames.Chairperson, RoleNames.Faculty,
+                               RoleNames.Student, RoleNames.StudentPending };
 }
 
 <!-- ─── PAGE HEADER ──────────────────── -->
@@ -112,7 +119,19 @@
                 </select>
             </div>
 
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-2">
+                <select name="filterCollege" class="form-select" aria-label="College">
+                    <option value="">All colleges</option>
+                    @foreach (var c in colleges)
+                    {
+                        <option value="@c.CollegeID" selected="@(filterCollege == c.CollegeID)">
+                            @(c.ShortName ?? c.Name)@(c.IsActive ? "" : " (retired)")
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-2">
                 <select name="filterPlacement" class="form-select">
                     <option value="">Any placement</option>
                     <option value="missing" selected="@(ViewBag.FilterPlacement == "missing")">
@@ -121,13 +140,12 @@
                 </select>
             </div>
 
-            <div class="col-12 col-md-2
+            <div class="col-12 col-md-1
                         d-flex gap-2">
                 <button type="submit"
                         class="btn btn-primary
-                               flex-fill">
-                    <i class="bi bi-funnel me-1"></i>
-                    Filter
+                               flex-fill" title="Filter">
+                    <i class="bi bi-funnel"></i>
                 </button>
                 <a href="/Admin/Users"
                    class="btn btn-outline-secondary">
@@ -139,6 +157,70 @@
     </div>
 </div>
 
+<!-- ─── BULK MOVE ────────────────────── -->
+<!-- Shown once users are ticked; the row checkboxes join this form via form="bulkMoveForm". -->
+<form id="bulkMoveForm" asp-action="BulkMove" method="post"
+      class="card border-0 shadow-sm mb-4 d-none">
+    <input type="hidden" name="returnQuery" value="@Context.Request.QueryString" />
+    <div class="card-body">
+        <div class="fw-semibold mb-2">
+            <i class="bi bi-arrow-left-right me-1 text-primary"></i>
+            Move <span id="bulkCount">0</span> selected user(s) to
+        </div>
+        <div class="row g-2">
+            <div class="col-12 col-md-4">
+                <select name="collegeId" id="moveCollege" class="form-select" required aria-label="College">
+                    <option value="">— College —</option>
+                    @foreach (var c in hierarchy)
+                    {
+                        <option value="@c.CollegeID" data-flat="@(c.Departments.Any(d => d.IsImplicit) ? "1" : "0")">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="departmentId" id="moveDept" class="form-select" aria-label="Department">
+                    <option value="">— Department —</option>
+                    @foreach (var c in hierarchy)
+                    {
+                        foreach (var d in c.Departments.Where(d => !d.IsImplicit))
+                        {
+                            <option value="@d.DepartmentID" data-college="@c.CollegeID">@d.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="programId" id="moveProgram" class="form-select" aria-label="Program">
+                    <option value="">— Program —</option>
+                    @foreach (var c in hierarchy)
+                    {
+                        foreach (var d in c.Departments)
+                        {
+                            foreach (var p in d.Programs)
+                            {
+                                <option value="@p.ProgramID" data-college="@c.CollegeID"
+                                        data-department="@(d.IsImplicit ? "" : d.DepartmentID.ToString())">@p.Name</option>
+                            }
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="bi bi-arrow-right-circle me-1"></i>Move
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="bulkClear" title="Clear selection">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        <div class="form-text">
+            Students need a program; Chairpersons and Faculty a department (or a college without
+            departments); Deans just the college. Anyone who doesn't fit is skipped and listed.
+        </div>
+    </div>
+</form>
+
 <!-- ─── USERS TABLE ──────────────────── -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
@@ -146,7 +228,11 @@
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3">User</th>
+                        <th class="ps-3" style="width:2rem">
+                            <input type="checkbox" class="form-check-input" id="bulkAll"
+                                   title="Select all that can be moved" aria-label="Select all" />
+                        </th>
+                        <th>User</th>
                         <th>Student ID</th>
                         <th>Placement</th>
                         <th>Role</th>
@@ -159,7 +245,7 @@
                     @if (!users.Any())
                     {
                         <tr>
-                            <td colspan="7"
+                            <td colspan="8"
                                 class="text-center
                                             py-5 text-muted">
                                 <i class="bi bi-people
@@ -178,8 +264,18 @@
                             ud => ud.IsPrimary);
 
                             <tr>
-                                <!-- User -->
+                                <!-- Select for bulk move -->
                                 <td class="ps-3">
+                                    @if (movableRoles.Contains(user.Role.RoleName))
+                                    {
+                                        <input type="checkbox" class="form-check-input bulk-check"
+                                               form="bulkMoveForm" name="userIds" value="@user.UserID"
+                                               aria-label="Select @user.FirstName @user.LastName" />
+                                    }
+                                </td>
+
+                                <!-- User -->
+                                <td>
                                     <div class="d-flex
                                                         align-items-center
                                                         gap-2">
@@ -341,3 +437,67 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('bulkMoveForm');
+            const count = document.getElementById('bulkCount');
+            const all = document.getElementById('bulkAll');
+            const checks = () => [...document.querySelectorAll('.bulk-check')];
+            const college = document.getElementById('moveCollege');
+            const dept = document.getElementById('moveDept');
+            const program = document.getElementById('moveProgram');
+
+            function sync() {
+                const n = checks().filter(c => c.checked).length;
+                count.textContent = n;
+                form.classList.toggle('d-none', n === 0);
+                all.checked = n > 0 && n === checks().length;
+                all.indeterminate = n > 0 && n < checks().length;
+            }
+
+            all.addEventListener('change', () => { checks().forEach(c => c.checked = all.checked); sync(); });
+            checks().forEach(c => c.addEventListener('change', sync));
+            document.getElementById('bulkClear').addEventListener('click', () => {
+                checks().forEach(c => c.checked = false);
+                sync();
+            });
+
+            // Department and program lists follow the chosen college and
+            // department, as on the Add/Edit User form.
+            function filter(select, keep) {
+                for (const opt of select.options) {
+                    if (!opt.value) continue;
+                    const show = keep(opt);
+                    opt.hidden = !show;
+                    opt.disabled = !show;
+                }
+                const current = select.options[select.selectedIndex];
+                if (current && current.disabled) select.value = '';
+            }
+            function refresh() {
+                const opt = college.options[college.selectedIndex];
+                const flat = opt && opt.dataset.flat === '1';
+                dept.closest('div').hidden = flat;
+                if (flat) dept.value = '';
+                filter(dept, o => o.dataset.college === college.value);
+                filter(program, o => o.dataset.college === college.value &&
+                    (flat || !dept.value || o.dataset.department === dept.value));
+            }
+            college.addEventListener('change', refresh);
+            dept.addEventListener('change', refresh);
+            refresh();
+
+            form.addEventListener('submit', function (e) {
+                const dest = [college, dept, program]
+                    .map(s => s.value ? s.options[s.selectedIndex].text : '')
+                    .filter(Boolean).join(' / ');
+                if (!confirm('Move ' + count.textContent + ' user(s) to ' + dest + '?'))
+                    e.preventDefault();
+            });
+
+            sync();
+        })();
+    </script>
+}

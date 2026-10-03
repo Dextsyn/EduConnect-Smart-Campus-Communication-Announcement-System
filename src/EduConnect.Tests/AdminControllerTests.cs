@@ -89,6 +89,97 @@ namespace EduConnect.Tests
             Assert.Equal(new[] { legacy.TagID }, TagsOf(faculty));
         }
 
+        // ─── Bulk move ─────────────────────────
+
+        private User Saved(User u) => _db.NewContext().Users.Single(x => x.UserID == u.UserID);
+
+        [Fact]
+        public async Task BulkMove_ToProgram_EachRoleLandsAtItsLevel()
+        {
+            var (oldCollege, oldDept) = Placement();
+            var oldProgram = _db.AddProgram(oldDept, "BS Old");
+            var student = _db.AddUser(RoleNames.Student, oldCollege.CollegeID, oldDept.DepartmentID, oldProgram.ProgramID);
+            var faculty = _db.AddUser(RoleNames.Faculty, oldCollege.CollegeID, oldDept.DepartmentID);
+            var dean = _db.AddUser(RoleNames.Dean, oldCollege.CollegeID);
+
+            var newCollege = _db.AddCollege("College of Science");
+            var newDept = _db.AddDepartment(newCollege, "Biology");
+            var newProgram = _db.AddProgram(newDept, "BS Biology");
+
+            await Controller().BulkMove(new[] { student.UserID, faculty.UserID, dean.UserID },
+                null, null, newProgram.ProgramID);
+
+            var s = Saved(student);
+            Assert.Equal((newCollege.CollegeID, newDept.DepartmentID, newProgram.ProgramID),
+                (s.CollegeID!.Value, s.DepartmentID!.Value, s.ProgramID!.Value));
+            var f = Saved(faculty);
+            Assert.Equal((newCollege.CollegeID, newDept.DepartmentID, (int?)null),
+                (f.CollegeID!.Value, f.DepartmentID!.Value, f.ProgramID));
+            var d = Saved(dean);
+            Assert.Equal((newCollege.CollegeID, (int?)null), (d.CollegeID!.Value, d.DepartmentID));
+
+            Assert.Equal(3, _db.NewContext().AuditLogs.Count(l => l.Action == "Move"));
+        }
+
+        [Fact]
+        public async Task BulkMove_CollegeOnly_SkipsStudentsAndStaff()
+        {
+            var (oldCollege, oldDept) = Placement();
+            var oldProgram = _db.AddProgram(oldDept, "BS Old");
+            var student = _db.AddUser(RoleNames.Student, oldCollege.CollegeID, oldDept.DepartmentID, oldProgram.ProgramID);
+            var dean = _db.AddUser(RoleNames.Dean, oldCollege.CollegeID);
+            var staff = _db.AddUser(RoleNames.Staff);
+            var newCollege = _db.AddCollege("College of Science");
+            _db.AddDepartment(newCollege, "Biology");
+
+            var controller = Controller();
+            await controller.BulkMove(new[] { student.UserID, dean.UserID, staff.UserID },
+                newCollege.CollegeID, null, null);
+
+            Assert.Equal(oldProgram.ProgramID, Saved(student).ProgramID);
+            Assert.Equal(newCollege.CollegeID, Saved(dean).CollegeID);
+            var error = (string)controller.TempData["Error"]!;
+            Assert.Contains("Skipped 2", error);
+            Assert.Contains("Choose a program", error);
+            Assert.Contains("Moved 1", (string)controller.TempData["Success"]!);
+        }
+
+        [Fact]
+        public async Task BulkMove_RetiredDestination_MovesNoOne()
+        {
+            var (oldCollege, oldDept) = Placement();
+            var oldProgram = _db.AddProgram(oldDept, "BS Old");
+            var student = _db.AddUser(RoleNames.Student, oldCollege.CollegeID, oldDept.DepartmentID, oldProgram.ProgramID);
+            var newCollege = _db.AddCollege("College of Science");
+            var retired = _db.AddProgram(_db.AddDepartment(newCollege, "Biology"), "BS Retired");
+            retired.IsActive = false;
+            _db.Context.SaveChanges();
+
+            await Controller().BulkMove(new[] { student.UserID }, null, null, retired.ProgramID);
+
+            Assert.Equal(oldProgram.ProgramID, Saved(student).ProgramID);
+            Assert.Empty(_db.NewContext().AuditLogs);
+        }
+
+        [Fact]
+        public async Task BulkMove_ThenOldCollegeCanBeRetired()
+        {
+            var oldCollege = _db.AddCollege("College of Old Studies", flat: true);
+            var oldProgram = _db.AddProgram(_db.NewContext().Departments.Single(d => d.CollegeID == oldCollege.CollegeID), "BS Old");
+            var oldDeptId = _db.NewContext().Departments.Single(d => d.CollegeID == oldCollege.CollegeID).DepartmentID;
+            var student = _db.AddUser(RoleNames.Student, oldCollege.CollegeID, oldDeptId, oldProgram.ProgramID);
+            var newCollege = _db.AddCollege("College of Science");
+            var newProgram = _db.AddProgram(_db.AddDepartment(newCollege, "Biology"), "BS Biology");
+            var hierarchy = new HierarchyService(_db.Context);
+
+            Assert.False((await hierarchy.SetCollegeActiveAsync(oldCollege.CollegeID, false)).Ok);
+
+            await Controller().BulkMove(new[] { student.UserID }, null, null, newProgram.ProgramID);
+            await hierarchy.SetProgramActiveAsync(oldProgram.ProgramID, false);
+
+            Assert.True((await new HierarchyService(_db.NewContext()).SetCollegeActiveAsync(oldCollege.CollegeID, false)).Ok);
+        }
+
         [Fact]
         public async Task EditUser_ShowsSchoolWidePermission()
         {
