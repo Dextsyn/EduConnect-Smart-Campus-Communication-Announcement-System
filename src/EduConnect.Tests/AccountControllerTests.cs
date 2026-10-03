@@ -22,16 +22,18 @@ namespace EduConnect.Tests
 
         private AccountController Controller()
         {
+            var http = FakeSession.HttpContextWith(_session);
             var controller = new AccountController(
                 _db.Context,
                 NullLogger<AccountController>.Instance,
                 null!, null!, null!, null!,
                 _blobs,
                 new HierarchyService(_db.Context),
-                new PlacementService(_db.Context));
+                new PlacementService(_db.Context),
+                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }));
             controller.ControllerContext = new ControllerContext
             {
-                HttpContext = FakeSession.HttpContextWith(_session)
+                HttpContext = http
             };
             controller.TempData = new TempDataDictionary(
                 controller.ControllerContext.HttpContext, new NullTempDataProvider());

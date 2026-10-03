@@ -1,6 +1,8 @@
 using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Session;
 
@@ -84,5 +86,16 @@ namespace EduConnect.Tests
             Deleted.Add(blobName);
             return Task.CompletedTask;
         }
+    }
+
+    // Url.Action without routing: "/<action>".
+    public sealed class FakeUrlHelper : IUrlHelper
+    {
+        public ActionContext ActionContext { get; } = new();
+        public string? Action(UrlActionContext actionContext) => "/" + actionContext.Action;
+        public string? Content(string? contentPath) => contentPath;
+        public bool IsLocalUrl(string? url) => true;
+        public string? Link(string? routeName, object? values) => null;
+        public string? RouteUrl(UrlRouteContext routeContext) => null;
     }
 }

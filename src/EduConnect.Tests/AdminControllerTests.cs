@@ -18,10 +18,12 @@ namespace EduConnect.Tests
         private AdminController Controller()
         {
             _session.SetString("RoleName", RoleNames.Administrator);
+            var http = FakeSession.HttpContextWith(_session);
             var controller = new AdminController(
                 _db.Context, new FakeEmailService(), NullLogger<AdminController>.Instance,
-                new HierarchyService(_db.Context), new PlacementService(_db.Context));
-            controller.ControllerContext = new ControllerContext { HttpContext = FakeSession.HttpContextWith(_session) };
+                new HierarchyService(_db.Context), new PlacementService(_db.Context),
+                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }));
+            controller.ControllerContext = new ControllerContext { HttpContext = http };
             controller.TempData = new TempDataDictionary(controller.ControllerContext.HttpContext, new NullTempDataProvider());
             return controller;
         }

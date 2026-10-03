@@ -10,7 +10,12 @@ namespace EduConnect.Web.Models
         [Key]
         public long LogID { get; set; }
 
+        // The actor. Set to null when that user is deleted; ActorName
+        // keeps who it was.
         public int? UserID { get; set; }
+
+        [MaxLength(150)]
+        public string? ActorName { get; set; }
 
         [Required]
         [MaxLength(100)]
@@ -21,6 +26,11 @@ namespace EduConnect.Web.Models
         public string TableAffected { get; set; }
 
         public int? RecordID { get; set; }
+
+        // One readable line for the Audit Log page.
+        [MaxLength(500)]
+        public string? Summary { get; set; }
+
         public string? OldValues { get; set; }
         public string? NewValues { get; set; }
 
