@@ -142,10 +142,31 @@ namespace EduConnect.Tests
             var controller = Controller();
             controller.ModelState.AddModelError("Password", "Password is required");
 
-            var result = await controller.Register(new RegisterViewModel { Email = "x@test.local" });
+            var result = await controller.Register(new RegisterViewModel { EmailUser = "x" });
 
             Assert.IsType<ViewResult>(result);
             Assert.True(controller.ModelState.ContainsKey("Placement"));
+        }
+
+        [Theory]
+        [InlineData("juan.delacruz", true)]
+        [InlineData("Juan.DelaCruz@adamson.edu.ph", true)]   // pasted full address
+        [InlineData("juan@gmail.com", false)]
+        [InlineData("juan@adamson.edu.ph@gmail.com", false)]
+        [InlineData("juan.delacruz@gmail.com", false)]
+        [InlineData(".juan", false)]
+        public void RegisterEmail_OnlyAdamsonAccounts(string typed, bool valid)
+        {
+            var model = new RegisterViewModel { EmailUser = typed };
+            var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+            var ok = System.ComponentModel.DataAnnotations.Validator.TryValidateProperty(
+                model.EmailUser,
+                new System.ComponentModel.DataAnnotations.ValidationContext(model) { MemberName = nameof(RegisterViewModel.EmailUser) },
+                errors);
+
+            Assert.Equal(valid, ok);
+            if (valid)
+                Assert.EndsWith("@adamson.edu.ph", model.Email);
         }
 
         [Fact]

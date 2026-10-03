@@ -191,7 +191,7 @@ namespace EduConnect.Web.Controllers
 
             if (existingUser != null)
             {
-                ModelState.AddModelError("Email",
+                ModelState.AddModelError(nameof(RegisterViewModel.EmailUser),
                     "Email is already registered.");
                 model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
                 return View(model);
