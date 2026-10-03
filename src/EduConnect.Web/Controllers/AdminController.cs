@@ -658,7 +658,9 @@ namespace EduConnect.Web.Controllers
                 LastName = model.LastName,
                 Email = model.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password ?? ""),
-                StudentID = model.StudentID,
+                // Only students have a student number.
+                StudentID = roleName == RoleNames.Student || roleName == RoleNames.StudentPending
+                    ? model.StudentID : null,
                 RoleID = model.RoleID,
                 IsActive = model.IsActive,
                 VerificationStatus = "Verified",

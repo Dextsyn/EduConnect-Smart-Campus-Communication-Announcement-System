@@ -13,9 +13,30 @@ namespace EduConnect.Web.ViewModels
         [MaxLength(100)]
         public string LastName { get; set; }
 
+        // Only Adamson accounts can register: the student types the part
+        // before the domain and the domain is fixed. A pasted full Adamson
+        // address is accepted; any other "@" fails the pattern.
+        public const string EmailDomain = "@adamson.edu.ph";
+
+        private string? _emailUser;
+
         [Required(ErrorMessage = "Email is required")]
-        [EmailAddress(ErrorMessage = "Invalid email format")]
-        public string Email { get; set; }
+        [MaxLength(80)]
+        [RegularExpression(@"^[A-Za-z0-9]+([._-][A-Za-z0-9]+)*$",
+            ErrorMessage = "Enter only the part before @adamson.edu.ph (letters, numbers, dots, dashes or underscores).")]
+        public string? EmailUser
+        {
+            get => _emailUser;
+            set
+            {
+                var v = value?.Trim();
+                if (v != null && v.EndsWith(EmailDomain, StringComparison.OrdinalIgnoreCase))
+                    v = v[..^EmailDomain.Length];
+                _emailUser = v;
+            }
+        }
+
+        public string Email => (EmailUser + EmailDomain).ToLowerInvariant();
 
         [Required(ErrorMessage = "Password is required")]
         [MinLength(8, ErrorMessage =

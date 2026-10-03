@@ -142,20 +142,26 @@
                         
                         <!-- Email -->
                         <div class="mb-3">
-                            <label asp-for="Email"
+                            <label asp-for="EmailUser"
                                    class="form-label fw-semibold">
-                                Email Address
+                                Adamson Email Address
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text">
                                     <i class="bi bi-envelope"></i>
                                 </span>
-                                <input asp-for="Email"
+                                <input asp-for="EmailUser"
+                                       id="emailUser"
                                        class="form-control"
-                                       placeholder="your@email.com" />
+                                       placeholder="juan.delacruz"
+                                       autocomplete="username"
+                                       autocapitalize="off"
+                                       spellcheck="false" />
+                                <span class="input-group-text">@EduConnect.Web.ViewModels.RegisterViewModel.EmailDomain</span>
                             </div>
-                            <span asp-validation-for="Email"
+                            <span asp-validation-for="EmailUser"
                                   class="text-danger small"></span>
+                            <div class="form-text">Use your Adamson account; other email providers can't be used.</div>
                         </div>
 
                         <!-- Program -->
@@ -278,6 +284,28 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js">
     </script>
     <script>
+        // The domain is fixed: a pasted full Adamson address is trimmed to
+        // the part before it; any other "@@" (e.g. @@gmail.com) is refused.
+        (function () {
+            const input = document.getElementById('emailUser');
+            const domain = '@EduConnect.Web.ViewModels.RegisterViewModel.EmailDomain';
+            const pattern = /^[A-Za-z0-9]+([._-][A-Za-z0-9]+)*$/;
+            function check() {
+                let v = input.value.trim();
+                if (v.toLowerCase().endsWith(domain)) {
+                    v = v.slice(0, -domain.length);
+                    input.value = v;
+                }
+                input.setCustomValidity(
+                    !v ? '' :
+                    v.includes("@@") ? 'Only Adamson accounts can register. Type just the part before ' + domain + '.' :
+                    !pattern.test(v) ? 'Use only letters, numbers, dots, dashes or underscores.' : '');
+            }
+            input.addEventListener('input', check);
+            input.addEventListener('change', check);
+            check();
+        })();
+
         // Toggle password visibility
         function togglePassword(fieldId, iconId) {
             const field = document.getElementById(fieldId);
