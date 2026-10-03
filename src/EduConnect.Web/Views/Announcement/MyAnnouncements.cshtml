@@ -53,6 +53,10 @@
                     @foreach (var a in announcements)
                     {
                         string approvalStatus = a.ApprovalStatus;
+                        // Archiving is final: an archived post keeps its
+                        // approval status but can't be edited, submitted or
+                        // published again.
+                        bool archived = (string)a.Status == "Archived";
                         string badgeClass = approvalStatus switch
                         {
                             "Draft"        => "badge bg-secondary",
@@ -74,8 +78,15 @@
                             <td class="align-middle">@a.CategoryName</td>
                             <td class="align-middle">@a.FeedType</td>
                             <td class="align-middle">
-                                <span class="@badgeClass">@badgeLabel</span>
-                                @if (approvalStatus == "Rejected")
+                                @if (archived)
+                                {
+                                    <span class="badge bg-secondary">Archived</span>
+                                }
+                                else
+                                {
+                                    <span class="@badgeClass">@badgeLabel</span>
+                                }
+                                @if (!archived && approvalStatus == "Rejected")
                                 {
                                     string reason = !string.IsNullOrEmpty((string)a.ChairRejectionReason)
                                         ? (string)a.ChairRejectionReason
@@ -95,18 +106,23 @@
                             </td>
                             <td class="align-middle">
                                 <div class="d-flex gap-2 flex-wrap">
-                                    @if (approvalStatus == "Draft" ||
+                                    @if (archived)
+                                    {
+                                        <span class="text-muted small">Archived — no longer shown</span>
+                                    }
+                                    @if (!archived &&
+                                         (approvalStatus == "Draft" ||
                                          approvalStatus == "Rejected" ||
                                          (approvalStatus == "Approved" &&
                                           (string)a.Status != "Published" &&
-                                          !Announcement.IsLockedByReview(approvalStatus, (int?)a.ApprovedByID)))
+                                          !Announcement.IsLockedByReview(approvalStatus, (int?)a.ApprovedByID))))
                                     {
                                         <a href="/Announcement/Edit/@a.AnnouncementID"
                                            class="btn btn-sm btn-outline-secondary">
                                             <i class="bi bi-pencil"></i> Edit
                                         </a>
                                     }
-                                    @if (approvalStatus == "Draft")
+                                    @if (!archived && approvalStatus == "Draft")
                                     {
                                         <form method="post"
                                               action="/Announcement/Submit/@a.AnnouncementID"
@@ -117,7 +133,7 @@
                                             </button>
                                         </form>
                                     }
-                                    @if (approvalStatus == "Approved" && (string)a.Status != "Published")
+                                    @if (!archived && approvalStatus == "Approved" && (string)a.Status != "Published")
                                     {
                                         <form method="post"
                                               action="/Announcement/Publish/@a.AnnouncementID"

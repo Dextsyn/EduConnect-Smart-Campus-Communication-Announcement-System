@@ -1406,12 +1406,21 @@ namespace EduConnect.Web.Controllers
             var announcement = await _context.Announcements
                 .FirstOrDefaultAsync(a =>
                     a.AnnouncementID == id &&
-                    a.AuthorID == userID &&
-                    a.ApprovalStatus == "Approved" &&
-                    a.Status == "Draft");
+                    a.AuthorID == userID);
 
-            if (announcement == null)
+            // Say why instead of silently returning to the same page.
+            var refusal =
+                announcement == null ? "Announcement not found." :
+                announcement.Status == "Published" ? "This announcement is already published." :
+                announcement.Status == "Archived" ? "This announcement is archived and can't be published." :
+                announcement.ApprovalStatus != "Approved" ? "This announcement needs to be approved before it can be published." :
+                announcement.Status != "Draft" ? "This announcement can't be published." :
+                null;
+            if (refusal != null)
+            {
+                TempData["Error"] = refusal;
                 return RedirectToAction("MyAnnouncements");
+            }
 
             announcement.Status = "Published";
             announcement.PublishedAt = DateTime.Now;
