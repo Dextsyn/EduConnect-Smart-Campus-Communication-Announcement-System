@@ -250,11 +250,44 @@ namespace EduConnect.Tests
             _post.Status = "Archived";
             SetStatus("Approved");
 
-            await As(_faculty).Publish(_post.AnnouncementID);
+            var controller = As(_faculty);
+            await controller.Publish(_post.AnnouncementID);
 
             Assert.Equal("Archived",
                 _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Status);
             Assert.Empty(_notes.Sent);
+            // Used to return to My Announcements with no message at all.
+            Assert.Contains("archived", (string)controller.TempData["Error"]!);
+        }
+
+        [Fact]
+        public async Task Publish_ChairsOwnApprovedDraft_Publishes()
+        {
+            var draft = _db.AddAnnouncement(_chair, "Chair draft");
+            draft.Status = "Draft";
+            draft.PublishedAt = null;
+            _db.Context.SaveChanges();
+            _db.Target(draft, d: _itis);
+
+            var controller = As(_chair);
+            await controller.Publish(draft.AnnouncementID);
+
+            Assert.Equal("Published",
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == draft.AnnouncementID).Status);
+            Assert.NotNull(controller.TempData["Success"]);
+        }
+
+        [Fact]
+        public async Task Publish_NotYetApproved_SaysWhy()
+        {
+            SetStatus("PendingChair");
+
+            var controller = As(_faculty);
+            await controller.Publish(_post.AnnouncementID);
+
+            Assert.Equal("Draft",
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Status);
+            Assert.Contains("approved", (string)controller.TempData["Error"]!);
         }
 
         [Fact]
