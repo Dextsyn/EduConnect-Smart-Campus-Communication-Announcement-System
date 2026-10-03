@@ -146,6 +146,24 @@ namespace EduConnect.Web.Controllers
             }
         }
 
+        // Registration must close before the event starts. A deadline in
+        // the past is refused unless it is the one already saved, so an
+        // event whose registration has closed can still be edited.
+        private void ValidateDeadline(EventFormViewModel model, DateTime? savedDeadline)
+        {
+            if (!model.RegistrationDeadline.HasValue)
+                return;
+
+            var deadline = model.RegistrationDeadline.Value;
+
+            if (model.StartDateTime.HasValue && deadline >= model.StartDateTime.Value)
+                ModelState.AddModelError("RegistrationDeadline",
+                    "Registration deadline must be before the event starts.");
+            else if (deadline != savedDeadline && deadline <= DateTime.Now)
+                ModelState.AddModelError("RegistrationDeadline",
+                    "Registration deadline must be in the future.");
+        }
+
         // ═══════════════════════════════════════
         //  GET: /Event
         //  List all upcoming events
@@ -344,7 +362,8 @@ namespace EduConnect.Web.Controllers
             else if (userWaitlist != null)
                 regStatus = "Waitlist";
             else if (!ev.IsRegistrationOpen ||
-                     ev.StartDateTime <= DateTime.Now)
+                     ev.StartDateTime <= DateTime.Now ||
+                     ev.RegistrationDeadline <= DateTime.Now)
                 regStatus = "Closed";
             else if (isFull)
                 regStatus = "Full";
@@ -505,6 +524,8 @@ namespace EduConnect.Web.Controllers
                         "in the future.");
                 }
             }
+
+            ValidateDeadline(model, savedDeadline: null);
 
             if (!ModelState.IsValid)
             {
@@ -718,6 +739,8 @@ namespace EduConnect.Web.Controllers
                     "EndDateTime",
                     "End date must be after start date.");
             }
+
+            ValidateDeadline(model, ev.RegistrationDeadline);
 
             if (!ModelState.IsValid)
             {
@@ -1028,8 +1051,10 @@ namespace EduConnect.Web.Controllers
                     "Details", new { id = eventID });
             }
 
-            // Check if registration is open
-            if (!ev.IsRegistrationOpen)
+            // Check if registration is open. It closes once the
+            // event starts, whatever the deadline says.
+            if (!ev.IsRegistrationOpen ||
+                ev.StartDateTime <= DateTime.Now)
             {
                 TempData["Error"] =
                     "Registration is closed.";
