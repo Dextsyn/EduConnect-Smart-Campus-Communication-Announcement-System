@@ -237,7 +237,7 @@
                         <th>Category</th>
                         <th>Views</th>
                         <th>Status</th>
-                        <th>Date</th>
+                        <th class="pe-3">Date</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -257,58 +257,31 @@
                         @foreach (var item in recentList)
                         {
                             <tr>
-                                <td class="ps-3">
+                                <td class="ps-3 align-middle">
                                     <a href="/Announcement/Details/@item.AnnouncementID"
-                                       class="text-decoration-none
-                                                      fw-semibold text-dark
-                                                      small">
-                                        @item.Title
-                                    </a>
+                                       class="text-decoration-none fw-semibold text-dark small">@item.Title</a>
                                 </td>
-                                <td class="small
-                                                    text-muted">
-                                    @item.Author?.FirstName
-                                    @item.Author?.LastName
+                                <td class="align-middle small text-muted text-nowrap">
+                                    @($"{item.Author?.FirstName} {item.Author?.LastName}")
                                 </td>
-                                <td>
-                                    <span class="badge
-                                                         rounded-pill"
-                                          style="background-color:
-                                                         @item.Category
-                                                              ?.ColorHex">
-                                        @item.Category
-                                        ?.CategoryName
-                                    </span>
-                                </td>
-                                <td class="small
-                                                    text-muted">
-                                    <i class="bi bi-eye
-                                                       me-1"></i>
-                                    @item.ViewCount
-                                </td>
-                                <td>
-                                    @if (item.Status
-                                                                == "Published")
+                                <td class="align-middle">
+                                    @if (item.Category != null)
                                     {
-                                        <span class="badge
-                                                                 bg-success">
-                                            Published
-                                        </span>
+                                        <span class="badge rounded-pill" style="background-color:@item.Category.ColorHex">@item.Category.CategoryName</span>
                                     }
                                     else
                                     {
-                                        <span class="badge
-                                                                 bg-secondary">
-                                            @item.Status
-                                        </span>
+                                        <span class="text-muted small">—</span>
                                     }
                                 </td>
-                                <td class="small
-                                                    text-muted">
-                                    @(item.PublishedAt?
-                                                                .ToString(
-                                                                                                "MMM dd, yyyy")
-                                                                ?? "—")
+                                <td class="align-middle small text-muted text-nowrap">
+                                    <i class="bi bi-eye me-1"></i>@item.ViewCount
+                                </td>
+                                <td class="align-middle">
+                                    <span class="badge @(item.Status == "Published" ? "bg-success" : "bg-secondary")">@item.Status</span>
+                                </td>
+                                <td class="align-middle small text-muted text-nowrap pe-3">
+                                    @(item.PublishedAt?.ToString("MMM dd, yyyy") ?? "—")
                                 </td>
                             </tr>
                         }
