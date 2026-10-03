@@ -131,8 +131,11 @@
                 </span>
                 @if (Model.ChatExpiresAt.HasValue)
                 {
+                    @* ChatExpiresAt is stored in UTC but comes back from SQL with no
+                       kind; mark it UTC so "o" emits a trailing Z and the browser
+                       doesn't read it as local time. *@
                     <small class="text-warning fw-semibold" id="expiry-countdown"
-                           data-expires="@Model.ChatExpiresAt.Value.ToString("o")">
+                           data-expires="@DateTime.SpecifyKind(Model.ChatExpiresAt.Value, DateTimeKind.Utc).ToString("o")">
                         Calculating…
                     </small>
                 }
