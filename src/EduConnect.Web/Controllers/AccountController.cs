@@ -21,6 +21,7 @@ namespace EduConnect.Web.Controllers
         private readonly IHierarchyService _hierarchy;
         private readonly IPlacementService _placement;
         private readonly IAuditService _audit;
+        private readonly IAccountEmailService _accountEmails;
 
         public AccountController(
             ApplicationDbContext context,
@@ -32,9 +33,11 @@ namespace EduConnect.Web.Controllers
             IBlobStorageService blobStorageService,
             IHierarchyService hierarchy,
             IPlacementService placement,
-            IAuditService audit)
+            IAuditService audit,
+            IAccountEmailService accountEmails)
         {
             _audit = audit;
+            _accountEmails = accountEmails;
             _context = context;
             _logger = logger;
             _environment = environment;
@@ -80,16 +83,24 @@ namespace EduConnect.Web.Controllers
             }
 
             // Check verification status
-            if (user.VerificationStatus == "Pending")
+            if (user.VerificationStatus == VerificationStatuses.EmailPending)
             {
                 ModelState.AddModelError("",
-                    "Your account is pending " +
-                    "verification by ITC. " +
-                    "Please wait for approval.");
+                    "Confirm your email first. We sent a link to " +
+                    "your Adamson inbox when you registered.");
+                ViewBag.ResendVerificationEmail = user.Email;
                 return View(model);
             }
 
-            if (user.VerificationStatus == "Rejected")
+            if (user.VerificationStatus == VerificationStatuses.Pending)
+            {
+                ModelState.AddModelError("",
+                    "Your email is confirmed. Your account is " +
+                    "waiting for verification by ITC.");
+                return View(model);
+            }
+
+            if (user.VerificationStatus == VerificationStatuses.Rejected)
             {
                 ModelState.AddModelError("",
                     "Your account was not verified. " +
@@ -119,8 +130,18 @@ namespace EduConnect.Web.Controllers
                 return View(model);
             }
 
-            // Update last login
+            if (user.MustChangePassword && user.TempPasswordExpiresAt < DateTime.Now)
+            {
+                ModelState.AddModelError("",
+                    "Your temporary password has expired. " +
+                    "Please contact ITC to send you a new one.");
+                return View(model);
+            }
+
+            // Update last login. Logging in with the password we emailed
+            // proves the address works.
             user.LastLogin = DateTime.Now;
+            user.EmailConfirmedAt ??= DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Store session
@@ -140,6 +161,9 @@ namespace EduConnect.Web.Controllers
             if (ProgramCompletion.NeedsProgram(user.Role.RoleName, user.ProgramID))
                 HttpContext.Session.SetString(ProgramCompletion.SessionKey, "1");
 
+            if (user.MustChangePassword)
+                HttpContext.Session.SetString(PasswordChangeRequired.SessionKey, "1");
+
             // Identifies this login to the browser-presence script in _Layout.
             // A fresh login gets a fresh key, so a stale presence record left
             // by an earlier login can never log this one straight back out.
@@ -151,6 +175,9 @@ namespace EduConnect.Web.Controllers
             _logger.LogInformation(
                 "User {Email} logged in at {Time}",
                 user.Email, DateTime.Now);
+
+            if (user.MustChangePassword)
+                return RedirectToAction(nameof(SetPassword));
 
             return RedirectToDashboard();
         }
@@ -189,10 +216,25 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(u =>
                     u.Email == model.Email);
 
+            // An unconfirmed registration whose link has expired gives the
+            // address back, so someone who typed another student's email
+            // can't hold it forever.
+            if (existingUser != null &&
+                existingUser.VerificationStatus == VerificationStatuses.EmailPending &&
+                !await _accountEmails.HasLiveVerificationAsync(existingUser.UserID))
+            {
+                _context.Users.Remove(existingUser);
+                await _context.SaveChangesAsync();
+                existingUser = null;
+            }
+
             if (existingUser != null)
             {
                 ModelState.AddModelError(nameof(RegisterViewModel.EmailUser),
-                    "Email is already registered.");
+                    existingUser.VerificationStatus == VerificationStatuses.EmailPending
+                        ? "This email is already registered and waiting to be confirmed. " +
+                          "Check your inbox, or resend the link from the login page."
+                        : "Email is already registered.");
                 model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
                 return View(model);
             }
@@ -245,7 +287,8 @@ namespace EduConnect.Web.Controllers
                 .HashPassword(model.Password);
             // ─── End hash ──────────────────────────
 
-            // Create user with Pending status
+            // The student confirms their email before ITC sees the account
+            // (ConfirmEmail moves it to Pending).
             var user = new User
             {
                 FirstName = model.FirstName,
@@ -255,7 +298,7 @@ namespace EduConnect.Web.Controllers
                 StudentID = model.StudentID,
                 RoleID = pendingRole.RoleID,
                 IsActive = false,
-                VerificationStatus = "Pending",
+                VerificationStatus = VerificationStatuses.EmailPending,
                 CreatedAt = DateTime.Now
             };
 
@@ -273,28 +316,171 @@ namespace EduConnect.Web.Controllers
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "New registration pending: {Email}",
+                "New registration awaiting email confirmation: {Email}",
                 user.Email);
 
-            // Notify all admins of the new pending student
-            var adminIds = await _context.Users
-                .Where(u => u.Role.RoleName == RoleNames.Administrator && u.IsActive)
-                .Select(u => u.UserID)
-                .ToListAsync();
-            if (adminIds.Count > 0)
+            try
             {
-                await _notificationService.SendToManyAsync(
-                    adminIds,
-                    "NewPendingStudent",
-                    $"New student pending approval: {user.FirstName} {user.LastName}",
-                    "/Admin/PendingVerifications");
+                await _accountEmails.SendVerificationAsync(user);
+                TempData["Pending"] =
+                    $"Almost done! We sent a confirmation link to {user.Email}. " +
+                    "Click it within 24 hours, then ITC will verify your account.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    "Verification email failed for {Email}: {Error}",
+                    user.Email, ex.Message);
+                TempData["Pending"] =
+                    "Registration saved, but we couldn't send the confirmation " +
+                    "email. Try logging in to resend it.";
+            }
+            return RedirectToAction("Login");
+        }
+
+        // ─── GET: /Account/ConfirmEmail ────────
+        [HttpGet]
+        public async Task<IActionResult> ConfirmEmail(string token)
+        {
+            var user = await _accountEmails.ConfirmAsync(token);
+
+            if (user == null)
+            {
+                TempData["Error"] =
+                    "This confirmation link is invalid or has expired. " +
+                    "Enter your email to get a new one.";
+                return RedirectToAction(nameof(ResendVerification));
             }
 
+            if (user.VerificationStatus == VerificationStatuses.EmailPending)
+            {
+                user.VerificationStatus = VerificationStatuses.Pending;
+                user.EmailConfirmedAt = DateTime.Now;
+                user.UpdatedAt = DateTime.Now;
+            }
+            await _context.SaveChangesAsync();
+
+            if (user.VerificationStatus == VerificationStatuses.Pending)
+            {
+                // Only now does the registration reach ITC's queue.
+                var adminIds = await _context.Users
+                    .Where(u => u.Role.RoleName == RoleNames.Administrator && u.IsActive)
+                    .Select(u => u.UserID)
+                    .ToListAsync();
+                if (adminIds.Count > 0)
+                {
+                    await _notificationService.SendToManyAsync(
+                        adminIds,
+                        "NewPendingStudent",
+                        $"New student pending approval: {user.FirstName} {user.LastName}",
+                        "/Admin/PendingVerifications");
+                }
+            }
+
+            _logger.LogInformation("Email confirmed: {Email}", user.Email);
+
             TempData["Pending"] =
-                "Registration submitted! ITC will " +
-                "verify your account within " +
-                "1-2 business days.";
+                "Email confirmed! ITC will verify your " +
+                "account within 1-2 business days.";
             return RedirectToAction("Login");
+        }
+
+        // ─── GET: /Account/ResendVerification ──
+        [HttpGet]
+        public IActionResult ResendVerification(string? email)
+        {
+            return View(new ResendVerificationViewModel { Email = email ?? "" });
+        }
+
+        // ─── POST: /Account/ResendVerification ─
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [EnableRateLimiting("auth")]
+        public async Task<IActionResult> ResendVerification(
+            ResendVerificationViewModel model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == model.Email);
+
+            // Same answer whatever the address, so it can't be used to
+            // find out who has registered.
+            if (user != null && user.VerificationStatus == VerificationStatuses.EmailPending)
+            {
+                try
+                {
+                    await _accountEmails.SendVerificationAsync(user);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        "Verification email failed for {Email}: {Error}",
+                        user.Email, ex.Message);
+                }
+            }
+
+            TempData["Success"] =
+                "If that email is waiting to be confirmed, " +
+                "a new link is on its way.";
+            return RedirectToAction("Login");
+        }
+
+        // ─── GET: /Account/SetPassword ─────────
+        [HttpGet]
+        public IActionResult SetPassword()
+        {
+            if (HttpContext.Session.GetString("UserID") == null)
+                return RedirectToAction("Login");
+
+            if (HttpContext.Session.GetString(PasswordChangeRequired.SessionKey) != "1")
+                return RedirectToDashboard();
+
+            return View(new SetPasswordViewModel());
+        }
+
+        // ─── POST: /Account/SetPassword ────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetPassword(SetPasswordViewModel model)
+        {
+            var userIdStr = HttpContext.Session.GetString("UserID");
+            if (userIdStr == null)
+                return RedirectToAction("Login");
+
+            if (!ModelState.IsValid)
+                return View(model);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.UserID == int.Parse(userIdStr));
+            if (user == null)
+            {
+                HttpContext.Session.Clear();
+                return RedirectToAction("Login");
+            }
+
+            if (BCrypt.Net.BCrypt.Verify(model.NewPassword, user.PasswordHash))
+            {
+                ModelState.AddModelError(nameof(SetPasswordViewModel.NewPassword),
+                    "Choose a password different from the temporary one.");
+                return View(model);
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+            user.MustChangePassword = false;
+            user.TempPasswordExpiresAt = null;
+            user.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            HttpContext.Session.Remove(PasswordChangeRequired.SessionKey);
+
+            _logger.LogInformation(
+                "User {UserID} replaced their temporary password.",
+                user.UserID);
+
+            TempData["Success"] = "Password set. Welcome to EduConnect!";
+            return RedirectToDashboard();
         }
 
         // ─── GET: /Account/Logout ──────────────
@@ -641,9 +827,12 @@ namespace EduConnect.Web.Controllers
             // Set new password
             user.PasswordHash = BCrypt.Net.BCrypt
                 .HashPassword(model.NewPassword);
+            user.MustChangePassword = false;
+            user.TempPasswordExpiresAt = null;
             user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
+            HttpContext.Session.Remove(PasswordChangeRequired.SessionKey);
 
             _logger.LogInformation(
                 "User {UserID} changed their password.",
@@ -881,6 +1070,11 @@ namespace EduConnect.Web.Controllers
             // Update password
             resetToken.User.PasswordHash = newHash;
             resetToken.User.UpdatedAt = DateTime.Now;
+
+            // They chose this password themselves, so any temporary one
+            // is replaced.
+            resetToken.User.MustChangePassword = false;
+            resetToken.User.TempPasswordExpiresAt = null;
 
             // Mark token as used
             resetToken.IsUsed = true;

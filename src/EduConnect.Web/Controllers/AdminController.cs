@@ -16,6 +16,7 @@ namespace EduConnect.Web.Controllers
         private readonly IHierarchyService _hierarchy;
         private readonly IPlacementService _placement;
         private readonly IAuditService _audit;
+        private readonly IAccountEmailService _accountEmails;
 
         public AdminController(
             ApplicationDbContext context,
@@ -23,8 +24,10 @@ namespace EduConnect.Web.Controllers
             ILogger<AdminController> logger,
             IHierarchyService hierarchy,
             IPlacementService placement,
-            IAuditService audit)
+            IAuditService audit,
+            IAccountEmailService accountEmails)
         {
+            _accountEmails = accountEmails;
             _context = context;
             _emailService = emailService;
             _logger = logger;
@@ -218,6 +221,14 @@ namespace EduConnect.Web.Controllers
             {
                 TempData["Error"] =
                     "User not found.";
+                return RedirectToAction("PendingUsers");
+            }
+
+            // A registration reaches ITC only once its email is confirmed.
+            if (user.VerificationStatus == VerificationStatuses.EmailPending)
+            {
+                TempData["Error"] =
+                    "This student hasn't confirmed their email yet.";
                 return RedirectToAction("PendingUsers");
             }
 
@@ -635,9 +646,8 @@ namespace EduConnect.Web.Controllers
             if (!IsAdmin())
                 return RedirectToAction("Login", "Account");
 
-            // Require password for new users
-            if (string.IsNullOrWhiteSpace(model.Password))
-                ModelState.AddModelError("Password", "Password is required when creating a user.");
+            // The system issues the first password; the form has none.
+            ModelState.Remove(nameof(AdminUserFormViewModel.Password));
 
             // Check email uniqueness
             if (await _context.Users.AnyAsync(u => u.Email == model.Email))
@@ -657,17 +667,17 @@ namespace EduConnect.Web.Controllers
                 FirstName = model.FirstName,
                 LastName = model.LastName,
                 Email = model.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password ?? ""),
                 // Only students have a student number.
                 StudentID = roleName == RoleNames.Student || roleName == RoleNames.StudentPending
                     ? model.StudentID : null,
                 RoleID = model.RoleID,
                 IsActive = model.IsActive,
-                VerificationStatus = "Verified",
+                VerificationStatus = VerificationStatuses.Verified,
                 VerifiedByID = adminID,
                 VerifiedAt = DateTime.Now,
                 CreatedAt = DateTime.Now
             };
+            var temporaryPassword = _accountEmails.IssueTemporaryPassword(user);
 
             if (roleName != null)
             {
@@ -693,42 +703,77 @@ namespace EduConnect.Web.Controllers
                 newValues: await AuditSnapshotAsync(user));
             await _context.SaveChangesAsync();
 
-            // Send welcome email (fire-and-forget)
+            // The email carries the only copy of the password, so a failure
+            // is reported rather than swallowed.
             try
             {
-                var emailBody = $@"
-        <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;'>
-            <div style='background:#0d6efd;padding:30px;text-align:center;border-radius:8px 8px 0 0;'>
-                <h1 style='color:white;margin:0;'>EduConnect</h1>
-            </div>
-            <div style='background:#f8f9fa;padding:30px;border-radius:0 0 8px 8px;'>
-                <h2 style='color:#198754;'>✅ Account Created!</h2>
-                <p>Hi {user.FirstName},</p>
-                <p>An EduConnect account has been created for you by the administrator.
-                   You can log in using your email address.</p>
-                <div style='text-align:center;margin:30px 0;'>
-                    <a href='{GetBaseUrl()}/Account/Login'
-                       style='background:#0d6efd;color:white;padding:14px 30px;
-                              text-decoration:none;border-radius:6px;font-weight:bold;'>
-                        Login to EduConnect
-                    </a>
-                </div>
-            </div>
-        </div>";
-
-                await _emailService.SendEmailAsync(
-                    user.Email,
-                    $"{user.FirstName} {user.LastName}",
-                    "EduConnect — Account Created",
-                    emailBody);
+                await _accountEmails.SendTemporaryPasswordAsync(user, temporaryPassword);
+                TempData["Success"] =
+                    $"{user.FirstName} {user.LastName}'s account has been created. " +
+                    $"Their temporary password was emailed to {user.Email}.";
             }
             catch (Exception ex)
             {
-                _logger.LogError("Welcome email failed: {Error}", ex.Message);
+                _logger.LogError("Account email failed for {Email}: {Error}", user.Email, ex.Message);
+                TempData["Error"] =
+                    $"{user.FirstName} {user.LastName}'s account was created, but the email " +
+                    "with their temporary password could not be sent. Use Resend login " +
+                    "details on Edit User to try again.";
+            }
+            return RedirectToAction("Users");
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Admin/ResendCredentials/{id}
+        //  Issue and email a new temporary password
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendCredentials(int id)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserID == id);
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Users");
             }
 
-            TempData["Success"] = $"{user.FirstName} {user.LastName}'s account has been created.";
-            return RedirectToAction("Users");
+            // Self-registered students not yet approved sign in with their
+            // own password once ITC verifies them.
+            if (user.VerificationStatus != VerificationStatuses.Verified)
+            {
+                TempData["Error"] = "Only verified accounts can be sent login details.";
+                return RedirectToAction(nameof(EditUser), new { id });
+            }
+
+            var temporaryPassword = _accountEmails.IssueTemporaryPassword(user);
+
+            // Never the password itself.
+            _audit.Record("ResendCredentials", AuditArea.Users, user.UserID,
+                $"Sent a new temporary password to {user.FirstName} {user.LastName} ({user.Email}).");
+
+            try
+            {
+                await _accountEmails.SendTemporaryPasswordAsync(user, temporaryPassword);
+            }
+            catch (Exception ex)
+            {
+                // Nothing saved: the old password still works.
+                _logger.LogError("Account email failed for {Email}: {Error}", user.Email, ex.Message);
+                TempData["Error"] =
+                    "The email could not be sent, so the password was not changed. Try again later.";
+                return RedirectToAction(nameof(EditUser), new { id });
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] =
+                $"A new temporary password was emailed to {user.Email}. " +
+                "Their previous password no longer works.";
+            return RedirectToAction(nameof(EditUser), new { id });
         }
 
         // ═══════════════════════════════════════
@@ -763,7 +808,9 @@ namespace EduConnect.Web.Controllers
                 CollegeID = user.CollegeID,
                 DepartmentID = user.DepartmentID,
                 ProgramID = user.ProgramID,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                CanResendCredentials = user.VerificationStatus == VerificationStatuses.Verified,
+                MustChangePassword = user.MustChangePassword
             };
             await PopulateUserFormAsync(model);
 
@@ -840,8 +887,14 @@ namespace EduConnect.Web.Controllers
                 user.VerificationStatus = "Verified";
             user.UpdatedAt = DateTime.Now;
 
+            // A password the admin types is one the admin knows, so the user
+            // must replace it on their next login.
             if (!string.IsNullOrWhiteSpace(model.Password))
+            {
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
+                user.MustChangePassword = true;
+                user.TempPasswordExpiresAt = DateTime.Now.Add(AccountEmailService.TempPasswordLifetime);
+            }
 
             await SetSchoolWideAsync(user, model.CanPostSchoolWide);
 

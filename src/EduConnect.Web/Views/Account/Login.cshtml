@@ -64,12 +64,31 @@
                         </div>
                     }
 
+                    <!-- Registration progress -->
+                    @if (TempData["Pending"] != null)
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-envelope-check me-2"></i>
+                            @TempData["Pending"]
+                        </div>
+                    }
+
                     <!-- Validation Summary -->
                     @if (!ViewData.ModelState.IsValid)
                     {
                         <div class="alert alert-danger">
                             <i class="bi bi-exclamation-circle me-2"></i>
                             @Html.ValidationSummary(false)
+                            @if (ViewBag.ResendVerificationEmail is string resendEmail)
+                            {
+                                <form asp-action="ResendVerification" method="post" class="mt-2">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Email" value="@resendEmail" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-send me-1"></i> Resend confirmation link
+                                    </button>
+                                </form>
+                            }
                         </div>
                     }
 

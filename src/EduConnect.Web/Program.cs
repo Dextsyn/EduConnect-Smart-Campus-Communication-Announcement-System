@@ -18,6 +18,7 @@ builder.Services.AddScoped<EduConnect.Web.Services.IPlacementService, EduConnect
 builder.Services.AddScoped<EduConnect.Web.Services.IAudienceService, EduConnect.Web.Services.AudienceService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IApprovalService, EduConnect.Web.Services.ApprovalService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IAuditService, EduConnect.Web.Services.AuditService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IAccountEmailService, EduConnect.Web.Services.AccountEmailService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
@@ -166,6 +167,23 @@ app.Use(async (context, next) =>
     {
         context.Session.Clear();
         context.Response.Redirect("/Account/Login");
+        return;
+    }
+
+    await next();
+});
+
+// A user who logged in with a temporary password is sent to choose their
+// own first (PasswordChangeRequired has the rules).
+app.Use(async (context, next) =>
+{
+    if (EduConnect.Web.Services.PasswordChangeRequired.ShouldRedirect(
+            context.Session.GetString(EduConnect.Web.Services.PasswordChangeRequired.SessionKey),
+            context.Request.Method,
+            context.Request.Path,
+            context.Request.Headers.Accept.ToString()))
+    {
+        context.Response.Redirect(EduConnect.Web.Services.PasswordChangeRequired.SetPasswordPath);
         return;
     }
 

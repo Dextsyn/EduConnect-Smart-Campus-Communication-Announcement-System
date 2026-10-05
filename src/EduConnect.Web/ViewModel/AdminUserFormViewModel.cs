@@ -44,6 +44,10 @@ namespace EduConnect.Web.ViewModels
 
         public bool IsActive { get; set; } = true;
 
+        // Edit only, for the "Resend login details" section.
+        public bool CanResendCredentials { get; set; }
+        public bool MustChangePassword { get; set; }
+
         // Populated by the controller for the dropdowns
         public List<SelectListItem> Roles { get; set; } = new();
         public List<College> Hierarchy { get; set; } = new();

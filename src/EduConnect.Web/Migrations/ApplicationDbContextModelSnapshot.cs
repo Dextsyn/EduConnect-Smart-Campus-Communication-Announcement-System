@@ -547,6 +547,40 @@ namespace EduConnect.Web.Migrations
                     b.ToTable("DepartmentTags");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.EmailVerificationToken", b =>
+                {
+                    b.Property<int>("TokenID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TokenID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("TokenID");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("EmailVerificationTokens");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Event", b =>
                 {
                     b.Property<int>("EventID")
@@ -1394,6 +1428,9 @@ namespace EduConnect.Web.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1409,6 +1446,9 @@ namespace EduConnect.Web.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -1432,6 +1472,9 @@ namespace EduConnect.Web.Migrations
                     b.Property<string>("Suffix")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("TempPasswordExpiresAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1679,6 +1722,17 @@ namespace EduConnect.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.EmailVerificationToken", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.Event", b =>

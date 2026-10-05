@@ -42,6 +42,8 @@ namespace EduConnect.Web.Data
         // Auth & Security
         public DbSet<PasswordResetToken> PasswordResetTokens
         { get; set; }
+        public DbSet<EmailVerificationToken> EmailVerificationTokens
+        { get; set; }
 
         // Organizations
         public DbSet<Organization> Organizations { get; set; }
@@ -350,6 +352,17 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.UserID)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── EmailVerificationTokens ───────────
+            modelBuilder.Entity<EmailVerificationToken>(entity =>
+            {
+                entity.HasKey(e => e.TokenID);
+                entity.HasIndex(e => e.TokenHash);
+                entity.HasOne(e => e.User)
+                      .WithMany()
+                      .HasForeignKey(e => e.UserID)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ─── Organizations ─────────────────────

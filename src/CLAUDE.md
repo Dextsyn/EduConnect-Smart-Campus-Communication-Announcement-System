@@ -44,9 +44,12 @@ private bool IsAdmin() =>
 ### Roles & User Lifecycle
 
 Roles stored in the `Roles` table. Key flow:
-1. Student registers (choosing college → department → program; program required) → `VerificationStatus = "Pending"`, `RoleID = "Student Pending"`, `IsActive = false`
-2. Admin approves → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`
-3. Admin can reject with a reason, or toggle `IsActive` at any time
+1. Student registers (choosing college → department → program; program required) → `VerificationStatus = "EmailPending"`, `RoleID = "Student Pending"`, `IsActive = false`, and a 24h confirmation link is emailed (`IAccountEmailService`; only the token's SHA-256 is stored in `EmailVerificationTokens`). Re-registering over an unconfirmed row whose link expired replaces it.
+2. Student clicks the link (`/Account/ConfirmEmail`) → `VerificationStatus = "Pending"`; only now does it reach ITC's queue and notify admins
+3. Admin approves → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`
+4. Admin can reject with a reason, or toggle `IsActive` at any time
+
+Status values are constants in `VerificationStatuses.cs`. Accounts created on Admin → Add User have no password field: `IAccountEmailService` generates a 12-character temporary password, emails it, and sets `MustChangePassword` + `TempPasswordExpiresAt` (72h). Login refuses an expired one; otherwise the session flag `PasswordChangeRequired.SessionKey` sends every page load to `/Account/SetPassword` until the user picks their own (middleware in `Program.cs`, runs before the ProgramCompletion one). A password an admin types on Edit User is temporary too. Edit User's "Resend login details" (`AdminController.ResendCredentials`) issues a new one; if the email fails, nothing is saved.
 
 Named roles (constants in `RoleNames.cs` — never compare a literal): `Administrator`, `Dean`, `Chairperson`, `Faculty`, `Staff`, `Student`, `Student Pending`
 
@@ -72,7 +75,7 @@ The App Service runs with `WEBSITE_TIME_ZONE=Singapore Standard Time` (UTC+8, sa
 
 `IAuditService` / `AuditService` — queues an `AuditLogs` row (actor from the session, IP, summary, old/new JSON) on the shared `DbContext`; the caller's next `SaveChangesAsync` writes it with the change. Used for user changes (approve, reject, create, edit, delete, bulk move, a student's first program pick) and Academic Structure changes; shown at `/Admin/AuditLog`. Deleting a user nulls `UserID` on their rows (`ActorName` keeps who it was) instead of deleting them.
 
-`IEmailService` / `EmailService` — sends HTML email via Gmail SMTP (MailKit). Credentials are in `appsettings.json` under `EmailSettings`. In Development, SSL cert validation is skipped. Email is fire-and-forget (failures are logged but don't break the request).
+`IEmailService` / `EmailService` — sends HTML email via Gmail SMTP (MailKit). Credentials are in `appsettings.json` under `EmailSettings`. In Development, SSL cert validation is skipped. Email is fire-and-forget (failures are logged but don't break the request), except that Add User tells the admin when the temporary-password email fails. Links in account emails use the `AppBaseUrl` setting, falling back to the request host.
 
 `IBlobStorageService` / `BlobStorageService` — uploads a byte array to an Azure Blob Storage container and returns the blob's public URL. Reads the connection string from the `AzureBlobStorage` configuration key; **never hardcode it** — it lives in user-secrets locally and as an App Service application setting in production. Currently used for event QR codes (container `qrcodes`, which has Blob-level public read access). Throws `InvalidOperationException` if the key is missing.
 

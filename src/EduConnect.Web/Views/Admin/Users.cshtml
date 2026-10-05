@@ -116,6 +116,10 @@
                             selected="@(ViewBag.FilterStatus == "Rejected")">
                         Rejected
                     </option>
+                    <option value="@VerificationStatuses.EmailPending"
+                            selected="@(ViewBag.FilterStatus == VerificationStatuses.EmailPending)">
+                        Email not confirmed
+                    </option>
                 </select>
             </div>
 
@@ -353,6 +357,14 @@
                                         <span class="badge bg-warning
                                                                  text-dark">
                                             Pending
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == VerificationStatuses.EmailPending)
+                                    {
+                                        <span class="badge bg-light text-dark border"
+                                              title="Registered but hasn't clicked the confirmation link yet">
+                                            Email not confirmed
                                         </span>
                                     }
                                     else if (user.VerificationStatus

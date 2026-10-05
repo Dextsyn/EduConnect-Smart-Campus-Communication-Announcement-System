@@ -1,3 +1,4 @@
+using EduConnect.Web.Data;
 using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Session;
+using Microsoft.Extensions.Configuration;
 
 namespace EduConnect.Tests
 {
@@ -57,14 +59,34 @@ namespace EduConnect.Tests
         }
     }
 
+    // A real AccountEmailService that mails through the given fake.
+    public static class TestAccountEmails
+    {
+        public const string BaseUrl = "https://educonnect.test";
+
+        public static AccountEmailService Create(ApplicationDbContext context, IEmailService email, HttpContext http) =>
+            new(context, email,
+                new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AppBaseUrl"] = BaseUrl })
+                    .Build(),
+                new HttpContextAccessor { HttpContext = http });
+    }
+
     // Records addresses instead of sending mail.
     public sealed class FakeEmailService : IEmailService
     {
         public List<string> Sent { get; } = new();
+        public List<string> Bodies { get; } = new();
+
+        // Set to make every send fail, like an SMTP outage.
+        public bool Fail { get; set; }
 
         public Task SendEmailAsync(string toEmail, string toName, string subject, string htmlBody)
         {
+            if (Fail)
+                throw new InvalidOperationException("SMTP unavailable");
             Sent.Add(toEmail);
+            Bodies.Add(htmlBody);
             return Task.CompletedTask;
         }
     }
