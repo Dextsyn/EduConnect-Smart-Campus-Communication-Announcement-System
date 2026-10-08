@@ -21,6 +21,10 @@ namespace EduConnect.Web.Services
         public College? College { get; set; }
         public bool CanTargetCollege { get; set; }
         public bool CanTargetDepartments { get; set; }
+
+        // Targeting the college makes the post a Dean-level matter
+        // (Chairpersons and Faculty; a Dean's own post doesn't need one).
+        public bool CollegeNeedsDean { get; set; }
     }
 
     public record TargetSelection(
@@ -63,6 +67,10 @@ namespace EduConnect.Web.Services
 
         // True when the announcement has at least one tag or target.
         Task<bool> HasAudienceAsync(int announcementId);
+
+        // True when the announcement targets a whole college, which makes
+        // it a Dean-level matter (see AudienceService.IsDeanLevel).
+        Task<bool> IsDeanLevelAsync(int announcementId);
 
         // Tag names (minus tags that are now colleges) plus target names,
         // for the details page.

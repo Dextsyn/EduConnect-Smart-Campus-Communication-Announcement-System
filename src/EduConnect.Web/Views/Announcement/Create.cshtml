@@ -223,14 +223,39 @@
                     @await Html.PartialAsync("_TargetPicker", Model)
                     @if (roleName == RoleNames.Chairperson)
                     {
+                        var collegeTicked = Model.TargetCollegeIDs.Any();
                         <div class="form-check mt-3">
                             <input class="form-check-input" type="checkbox" name="RequiresDeanApproval" value="true"
-                                   id="RequiresDeanApproval" @(Model.RequiresDeanApproval ? "checked" : "") />
+                                   id="RequiresDeanApproval"
+                                   @(Model.RequiresDeanApproval || collegeTicked ? "checked" : "")
+                                   @(collegeTicked ? "disabled" : "") />
                             <label class="form-check-label small" for="RequiresDeanApproval">
                                 Dean-level matter — send to the Dean for final approval instead of publishing
                             </label>
                             <span asp-validation-for="RequiresDeanApproval" class="text-danger small d-block"></span>
                         </div>
+                        <script>
+                            // Reaching the whole college always needs the Dean, so the
+                            // toggle is on and locked while the college is ticked, and
+                            // back to the author's own choice when it isn't. (The server
+                            // applies the same rule; a disabled box isn't posted.)
+                            (function () {
+                                const toggle = document.getElementById('RequiresDeanApproval');
+                                let chosen = @(Model.RequiresDeanApproval ? "true" : "false");
+                                // The main button says where the post actually goes.
+                                const label = () => {
+                                    const text = document.querySelector('#btnPublish span');
+                                    if (text) text.textContent = toggle.checked ? 'Send to the Dean' : 'Publish Now';
+                                };
+                                toggle.addEventListener('change', () => { chosen = toggle.checked; label(); });
+                                document.addEventListener('deanlevelchange', e => {
+                                    toggle.disabled = e.detail.deanLevel;
+                                    toggle.checked = e.detail.deanLevel || chosen;
+                                    label();
+                                });
+                                document.addEventListener('DOMContentLoaded', label);
+                            })();
+                        </script>
                     }
                     @foreach (var tag in Model.AvailableTags)
                     {
@@ -268,9 +293,9 @@
                 else
                 {
                     <button type="submit" name="action" value="publish"
-                            class="btn btn-primary">
+                            class="btn btn-primary" id="btnPublish">
                         <i class="bi bi-broadcast me-2"></i>
-                        Publish Now
+                        <span>Publish Now</span>
                     </button>
                     <button type="submit" name="action" value="draft"
                             class="btn btn-outline-primary">

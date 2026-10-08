@@ -87,11 +87,25 @@ namespace EduConnect.Web.Services
                     .OrderBy(p => p.Name)
                     .ToList();
 
+            // Chairpersons and Faculty may reach their whole college too,
+            // but that makes the post a Dean-level matter (IsDeanLevel).
             options.College = college;
-            options.CanTargetCollege = isDean;
-            options.CanTargetDepartments = isDean || author.Role == RoleNames.Chairperson;
+            options.CanTargetCollege = true;
+            options.CanTargetDepartments = true;
+            options.CollegeNeedsDean = !isDean;
             return options;
         }
+
+        // A post that reaches a whole college is a Dean-level matter: when
+        // a Chairperson or Faculty member writes it, a Dean of the college
+        // gives the final approval. Worked out from the targets each time,
+        // so removing the college target removes the requirement.
+        public static bool IsDeanLevel(TargetSelection selection) =>
+            selection.CollegeIDs.Count > 0;
+
+        public Task<bool> IsDeanLevelAsync(int announcementId) =>
+            _context.AnnouncementTargets.AnyAsync(t =>
+                t.AnnouncementID == announcementId && t.CollegeID != null);
 
         public async Task<HierarchyResult> ValidateTargetsAsync(int authorId, TargetSelection selection,
             TargetSelection? keep = null)
@@ -124,10 +138,9 @@ namespace EduConnect.Web.Services
                 return HierarchyResult.Fail(college == null
                     ? "You are not placed in a college yet, so you can only post to tags. " +
                       "Ask your administrator to place you."
-                    : "You can only post to your own " +
-                      (options.CanTargetCollege ? "college." :
-                       options.CanTargetDepartments ? "department and its programs." :
-                       "department's programs."));
+                    : options.CollegeNeedsDean
+                        ? "You can only post to your own department and its programs, or your whole college."
+                        : "You can only post to your own college.");
 
             return HierarchyResult.Success;
         }

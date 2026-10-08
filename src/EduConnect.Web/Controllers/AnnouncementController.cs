@@ -436,6 +436,19 @@ namespace EduConnect.Web.Controllers
 
             await PopulateAudienceAsync(model, userID);
 
+            // Chairpersons and Faculty start from their own department;
+            // they can untick it or pick something else.
+            if (IsFaculty() || GetRoleName() == RoleNames.Chairperson)
+            {
+                var ownDepartment = await _context.Users
+                    .Where(u => u.UserID == userID)
+                    .Select(u => u.DepartmentID)
+                    .FirstOrDefaultAsync();
+                if (model.TargetOptions.College?.Departments.Any(d =>
+                        d.DepartmentID == ownDepartment && !d.IsImplicit) == true)
+                    model.TargetDepartmentIDs = new List<int> { ownDepartment!.Value };
+            }
+
             ViewBag.IsFaculty = IsFaculty();
             return View(model);
         }
@@ -507,7 +520,11 @@ namespace EduConnect.Web.Controllers
                     "Choose at least one audience: a program, department, college or tag.");
 
             // A Chairperson can hand a Dean-level post to the college's Deans
-            // for final approval instead of publishing it.
+            // for final approval instead of publishing it. One that reaches
+            // the whole college always is one.
+            if (GetRoleName() == RoleNames.Chairperson && AudienceService.IsDeanLevel(SelectionOf(model)))
+                model.RequiresDeanApproval = true;
+
             ApprovalRouting? deanRouting = null;
             if (GetRoleName() == RoleNames.Chairperson && model.RequiresDeanApproval)
             {
@@ -907,6 +924,29 @@ namespace EduConnect.Web.Controllers
                 ModelState.AddModelError("SelectedTagIDs",
                     "Choose at least one audience: a program, department, college or tag.");
 
+            // Newly reaching the whole college makes a Chairperson's post a
+            // Dean-level matter. An approved draft goes to the Dean; a
+            // published one can't be widened after the fact. (Faculty posts
+            // are routed when submitted; other statuses already reach the
+            // Dean through Submit.)
+            ApprovalRouting? deanRouting = null;
+            var addsCollege = SelectionOf(model).CollegeIDs.Except(existing.CollegeIDs).Any();
+            if (GetRoleName() == RoleNames.Chairperson && addsCollege)
+            {
+                if (announcement.Status == "Published")
+                {
+                    ModelState.AddModelError("SelectedTagIDs",
+                        "This announcement is already published, so it can't be widened to the whole college: " +
+                        "that needs the Dean's approval first. Post a new announcement for the college instead.");
+                }
+                else if (announcement.ApprovalStatus == "Approved")
+                {
+                    deanRouting = await _approval.RouteAsync(userID, deanOnly: true);
+                    if (!deanRouting.Ok)
+                        ModelState.AddModelError("SelectedTagIDs", deanRouting.Error!);
+                }
+            }
+
             if (!ModelState.IsValid)
             {
                 model.ExistingPhotoURL =
@@ -1004,6 +1044,12 @@ namespace EduConnect.Web.Controllers
                 announcement.RejectionReason = null;
             }
 
+            if (deanRouting != null)
+            {
+                announcement.ApprovalStatus = "PendingDean";
+                announcement.SubmittedAt = DateTime.Now;
+            }
+
             // Derive FeedType from the selected category
             var category = await _context.AnnouncementCategories
                 .FindAsync(model.CategoryID);
@@ -1054,6 +1100,19 @@ namespace EduConnect.Web.Controllers
                 await PopulateAudienceAsync(model, userID);
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
+            }
+
+            if (deanRouting != null)
+            {
+                await NotifyReviewersAsync(announcement, deanRouting.Reviewers,
+                    $"Announcement pending your approval: {announcement.Title}",
+                    "EduConnect: Announcement Pending Your Approval",
+                    "A Chairperson has sent you an announcement for final approval");
+                await ReviewQueueChangedAsync(announcement, "submitted");
+
+                TempData["Success"] =
+                    "Saved and sent to the Dean for final approval, since it now reaches the whole college.";
+                return RedirectToAction("MyAnnouncements");
             }
 
             TempData["Success"] =
@@ -1315,10 +1374,14 @@ namespace EduConnect.Web.Controllers
             ViewBag.Role = roleName;
             ViewBag.AudienceNames = await _audience.GetAudienceNamesAsync(id);
 
-            // Escalation needs an active Dean in the author's college.
+            // Escalation needs an active Dean in the author's college; a
+            // post reaching the whole college must be escalated.
             if (roleName == RoleNames.Chairperson)
+            {
                 ViewBag.CanEscalate =
                     (await _approval.RouteAsync(announcement.AuthorID, deanOnly: true)).Ok;
+                ViewBag.MustEscalate = await _audience.IsDeanLevelAsync(id);
+            }
 
             return announcement;
         }
@@ -1352,7 +1415,11 @@ namespace EduConnect.Web.Controllers
             if (roleName == RoleNames.Chairperson)
             {
                 // A Dean-level matter goes on to the Dean; otherwise the
-                // Chairperson's approval is final.
+                // Chairperson's approval is final. A post reaching the whole
+                // college is always one, whatever the checkbox said.
+                if (await _audience.IsDeanLevelAsync(id))
+                    escalateToDean = true;
+
                 if (escalateToDean)
                 {
                     var routing = await _approval.RouteAsync(announcement.AuthorID, deanOnly: true);

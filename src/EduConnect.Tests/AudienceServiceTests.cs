@@ -161,11 +161,11 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task Options_Chairperson_OwnDepartmentOnly()
+        public async Task Options_Chairperson_OwnDepartmentAndCollege()
         {
             var o = await Service.GetTargetOptionsAsync(_chair.UserID);
 
-            Assert.False(o.CanTargetCollege);
+            Assert.True(o.CanTargetCollege);
             Assert.True(o.CanTargetDepartments);
             var dept = Assert.Single(o.College!.Departments);
             Assert.Equal("IT&IS", dept.Name);
@@ -173,13 +173,15 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task Options_Faculty_ProgramsOnly()
+        public async Task Options_Faculty_OwnDepartmentAndCollege()
         {
             var o = await Service.GetTargetOptionsAsync(_faculty.UserID);
 
-            Assert.False(o.CanTargetCollege);
-            Assert.False(o.CanTargetDepartments);
-            Assert.Equal(new[] { "BSIS", "BSIT" }, o.College!.Departments.Single().Programs.Select(p => p.Name).OrderBy(n => n));
+            Assert.True(o.CanTargetCollege);
+            Assert.True(o.CanTargetDepartments);
+            var dept = Assert.Single(o.College!.Departments);
+            Assert.Equal("IT&IS", dept.Name);
+            Assert.Equal(new[] { "BSIS", "BSIT" }, dept.Programs.Select(p => p.Name).OrderBy(n => n));
         }
 
         [Fact]
@@ -210,20 +212,39 @@ namespace EduConnect.Tests
             Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(p: new[] { _bscs.ProgramID }))).Ok);
 
         [Fact]
-        public async Task Validate_FacultyDepartment_Fails() =>
-            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(d: new[] { _itis.DepartmentID }))).Ok);
+        public async Task Validate_FacultyOwnDepartment_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(d: new[] { _itis.DepartmentID }))).Ok);
 
         [Fact]
-        public async Task Validate_FacultyCollege_Fails() =>
-            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+        public async Task Validate_FacultyOtherDepartment_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(d: new[] { _cs.DepartmentID }))).Ok);
+
+        [Fact]
+        public async Task Validate_FacultyOwnCollege_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task Validate_FacultyOtherCollege_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_faculty.UserID, Sel(c: new[] { _cos.CollegeID }))).Ok);
 
         [Fact]
         public async Task Validate_ChairpersonOwnDepartment_Ok() =>
             Assert.True((await Service.ValidateTargetsAsync(_chair.UserID, Sel(d: new[] { _itis.DepartmentID }))).Ok);
 
         [Fact]
-        public async Task Validate_ChairpersonCollege_Fails() =>
-            Assert.False((await Service.ValidateTargetsAsync(_chair.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+        public async Task Validate_ChairpersonOwnCollege_Ok() =>
+            Assert.True((await Service.ValidateTargetsAsync(_chair.UserID, Sel(c: new[] { _ccit.CollegeID }))).Ok);
+
+        [Fact]
+        public async Task Validate_ChairpersonOtherCollege_Fails() =>
+            Assert.False((await Service.ValidateTargetsAsync(_chair.UserID, Sel(c: new[] { _cos.CollegeID }))).Ok);
+
+        [Fact]
+        public void DeanLevel_IsAnyCollegeTarget()
+        {
+            Assert.True(AudienceService.IsDeanLevel(Sel(c: new[] { _ccit.CollegeID }, p: new[] { _bsit.ProgramID })));
+            Assert.False(AudienceService.IsDeanLevel(Sel(d: new[] { _itis.DepartmentID }, p: new[] { _bsit.ProgramID })));
+        }
 
         [Fact]
         public async Task Validate_DeanCollegeAndOtherDepartmentsProgram_Ok() =>
@@ -324,26 +345,27 @@ namespace EduConnect.Tests
         [Fact]
         public async Task Validate_ExistingOutOfScopeTarget_AllowedWhenKept() =>
             Assert.True((await Service.ValidateTargetsAsync(_chair.UserID,
-                Sel(c: new[] { _ccit.CollegeID }),
-                keep: Sel(c: new[] { _ccit.CollegeID }))).Ok);
+                Sel(c: new[] { _cos.CollegeID }),
+                keep: Sel(c: new[] { _cos.CollegeID }))).Ok);
 
         [Fact]
         public async Task Validate_NewOutOfScopeTarget_StillFailsWhenOthersKept() =>
             Assert.False((await Service.ValidateTargetsAsync(_chair.UserID,
-                Sel(c: new[] { _ccit.CollegeID }, p: new[] { _bscs.ProgramID }),
-                keep: Sel(c: new[] { _ccit.CollegeID }))).Ok);
+                Sel(c: new[] { _cos.CollegeID }, p: new[] { _bscs.ProgramID }),
+                keep: Sel(c: new[] { _cos.CollegeID }))).Ok);
 
         [Fact]
         public async Task OutOfScopeTargets_ListsOnlyWhatTheAuthorCannotPick()
         {
-            var a = _db.AddAnnouncement(_chair, "Old college post");
+            var a = _db.AddAnnouncement(_chair, "Old cross-college post");
+            _db.Target(a, c: _cos);
             _db.Target(a, c: _ccit);
             _db.Target(a, d: _itis);
 
             var kept = await Service.GetOutOfScopeTargetsAsync(_chair.UserID, a.AnnouncementID);
 
             var only = Assert.Single(kept);
-            Assert.Equal(("College", _ccit.CollegeID, "CCIT"), (only.Level, only.ID, only.Name));
+            Assert.Equal(("College", _cos.CollegeID, "COS"), (only.Level, only.ID, only.Name));
         }
 
         [Fact]
