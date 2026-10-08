@@ -197,6 +197,14 @@ namespace EduConnect.Web.Controllers
                 return View(model);
             }
 
+            if (await PersonInput.IsStudentNumberTakenAsync(_context.Users, model.StudentID!))
+            {
+                ModelState.AddModelError(nameof(RegisterViewModel.StudentID),
+                    PersonInput.StudentNumberTaken);
+                model.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
+                return View(model);
+            }
+
             // ─── STEP 7 — Handle ID Photo Upload ──
            /* string? schoolIDPhotoURL = null;
             if (model.SchoolIDPhoto != null &&
@@ -250,6 +258,7 @@ namespace EduConnect.Web.Controllers
             {
                 FirstName = model.FirstName,
                 LastName = model.LastName,
+                Suffix = PersonInput.NormalizeSuffix(model.Suffix),
                 Email = model.Email,
                 PasswordHash = hashedPassword,
                 StudentID = model.StudentID,
@@ -423,13 +432,6 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login");
             }
 
-            // ─── Suffix allow-list validation ─────
-            var allowedSuffixes = new[] { "", "Jr.", "Sr.", "II", "III", "IV", "V" };
-            if (model.Suffix != null && !allowedSuffixes.Contains(model.Suffix))
-            {
-                ModelState.AddModelError("Suffix", "Invalid suffix value.");
-            }
-
             // A student without a program chooses one here; once chosen it
             // is locked and only the admin changes it.
             var hadProgram = user.ProgramID != null;
@@ -535,7 +537,7 @@ namespace EduConnect.Web.Controllers
             }
 
             // Update editable fields only
-            user.Suffix = string.IsNullOrWhiteSpace(model.Suffix) ? null : model.Suffix;
+            user.Suffix = PersonInput.NormalizeSuffix(model.Suffix);
             user.UpdatedAt = DateTime.Now;
 
             if (!hadProgram && user.ProgramID != null)

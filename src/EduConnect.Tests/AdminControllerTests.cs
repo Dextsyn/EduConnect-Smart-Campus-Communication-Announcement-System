@@ -180,6 +180,157 @@ namespace EduConnect.Tests
             Assert.True((await new HierarchyService(_db.NewContext()).SetCollegeActiveAsync(oldCollege.CollegeID, false)).Ok);
         }
 
+        private AdminUserFormViewModel NewStudentForm(string studentId)
+        {
+            var (college, dept) = Placement();
+            var program = _db.AddProgram(dept, "BSIT");
+            var role = _db.AddUser(RoleNames.Student).RoleID;
+            return new AdminUserFormViewModel
+            {
+                FirstName = "Juan",
+                LastName = "Dela Cruz",
+                Email = "juan@test.local",
+                Password = "secret123",
+                StudentID = studentId,
+                RoleID = role,
+                ProgramID = program.ProgramID,
+                IsActive = true
+            };
+        }
+
+        [Fact]
+        public async Task AddUser_TakenStudentNumber_IsRefused()
+        {
+            var form = NewStudentForm("202300001");
+            var existing = _db.AddUser(RoleNames.Student);
+            existing.StudentID = "202300001";
+            _db.Context.SaveChanges();
+            var controller = Controller();
+
+            var result = await controller.AddUser(form);
+
+            Assert.IsType<ViewResult>(result);
+            Assert.Equal(PersonInput.StudentNumberTaken,
+                controller.ModelState[nameof(AdminUserFormViewModel.StudentID)]!.Errors.Single().ErrorMessage);
+            Assert.False(_db.NewContext().Users.Any(u => u.Email == "juan@test.local"));
+        }
+
+        [Fact]
+        public async Task AddUser_SavesSuffix()
+        {
+            var form = NewStudentForm("202300001");
+            form.Suffix = "Jr.";
+
+            await Controller().AddUser(form);
+
+            Assert.Equal("Jr.", _db.NewContext().Users.Single(u => u.Email == "juan@test.local").Suffix);
+        }
+
+        [Fact]
+        public async Task AddUser_NonStudent_IgnoresAndDropsStudentNumber()
+        {
+            var (college, dept) = Placement();
+            var faculty = _db.AddUser(RoleNames.Faculty);
+            var controller = Controller();
+            // The binder's verdict on a field the form hid for this role.
+            controller.ModelState.AddModelError(nameof(AdminUserFormViewModel.StudentID), PersonInput.StudentNumberError);
+
+            var result = await controller.AddUser(new AdminUserFormViewModel
+            {
+                FirstName = "Ana", LastName = "Reyes", Email = "ana@test.local", Password = "secret123",
+                StudentID = "12", RoleID = faculty.RoleID,
+                CollegeID = college.CollegeID, DepartmentID = dept.DepartmentID, IsActive = true
+            });
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.Null(_db.NewContext().Users.Single(u => u.Email == "ana@test.local").StudentID);
+        }
+
+        [Fact]
+        public async Task EditUser_UnchangedLegacyName_StillSaves()
+        {
+            var staff = _db.AddUser(RoleNames.Staff);
+            staff.FirstName = "J0hn";
+            _db.Context.SaveChanges();
+            var controller = Controller();
+            controller.ModelState.AddModelError(nameof(AdminUserFormViewModel.FirstName), PersonInput.NameError);
+            var form = FormFor(staff, canPostSchoolWide: false);
+            form.IsActive = false;
+
+            var result = await controller.EditUser(staff.UserID, form);
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.False(Saved(staff).IsActive);
+        }
+
+        [Fact]
+        public async Task EditUser_ChangedInvalidName_IsRefused()
+        {
+            var staff = _db.AddUser(RoleNames.Staff);
+            var controller = Controller();
+            controller.ModelState.AddModelError(nameof(AdminUserFormViewModel.FirstName), PersonInput.NameError);
+            var form = FormFor(staff, canPostSchoolWide: false);
+            form.FirstName = "J0hn";
+
+            var result = await controller.EditUser(staff.UserID, form);
+
+            Assert.IsType<ViewResult>(result);
+            Assert.Equal("Test", Saved(staff).FirstName);
+        }
+
+        [Fact]
+        public async Task EditUser_NonStudent_ClearsStudentNumber()
+        {
+            var (college, _) = Placement();
+            var dean = _db.AddUser(RoleNames.Dean, college.CollegeID);
+            dean.StudentID = "20165555";
+            _db.Context.SaveChanges();
+            var form = FormFor(dean, canPostSchoolWide: false);
+            form.StudentID = dean.StudentID;
+
+            await Controller().EditUser(dean.UserID, form);
+
+            Assert.Null(Saved(dean).StudentID);
+        }
+
+        [Fact]
+        public async Task EditUser_TakenStudentNumber_IsRefused()
+        {
+            var (college, dept) = Placement();
+            var program = _db.AddProgram(dept, "BSIT");
+            var other = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, program.ProgramID);
+            other.StudentID = "202300001";
+            var student = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, program.ProgramID);
+            student.StudentID = "202300002";
+            _db.Context.SaveChanges();
+            var controller = Controller();
+            var form = FormFor(student, canPostSchoolWide: false);
+            form.StudentID = "202300001";
+
+            var result = await controller.EditUser(student.UserID, form);
+
+            Assert.IsType<ViewResult>(result);
+            Assert.Equal("202300002", Saved(student).StudentID);
+        }
+
+        [Fact]
+        public async Task EditUser_KeepsOwnStudentNumberAndSavesSuffix()
+        {
+            var (college, dept) = Placement();
+            var program = _db.AddProgram(dept, "BSIT");
+            var student = _db.AddUser(RoleNames.Student, college.CollegeID, dept.DepartmentID, program.ProgramID);
+            student.StudentID = "202300002";
+            _db.Context.SaveChanges();
+            var form = FormFor(student, canPostSchoolWide: false);
+            form.StudentID = "202300002";
+            form.Suffix = "III";
+
+            var result = await Controller().EditUser(student.UserID, form);
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("III", Saved(student).Suffix);
+        }
+
         [Fact]
         public async Task EditUser_ShowsSchoolWidePermission()
         {

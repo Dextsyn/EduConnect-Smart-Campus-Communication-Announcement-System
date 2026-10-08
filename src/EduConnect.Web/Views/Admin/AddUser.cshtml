@@ -32,16 +32,28 @@
 
             <div class="row g-3">
 
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label asp-for="FirstName" class="form-label fw-semibold">First Name</label>
                     <input asp-for="FirstName" class="form-control" placeholder="First name" />
                     <span asp-validation-for="FirstName" class="text-danger small"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-8 col-md-4">
                     <label asp-for="LastName" class="form-label fw-semibold">Last Name</label>
                     <input asp-for="LastName" class="form-control" placeholder="Last name" />
                     <span asp-validation-for="LastName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-4 col-md-3">
+                    <label asp-for="Suffix" class="form-label fw-semibold">Suffix</label>
+                    <select asp-for="Suffix" class="form-select">
+                        <option value="">None</option>
+                        @foreach (var suffix in PersonInput.Suffixes)
+                        {
+                            <option value="@suffix">@suffix</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Suffix" class="text-danger small"></span>
                 </div>
 
                 <div class="col-12">
@@ -58,9 +70,11 @@
 
                 <div class="col-12" id="studentIdField">
                     <label asp-for="StudentID" class="form-label fw-semibold">
-                        Student ID <span class="text-muted fw-normal"></span>
+                        Student Number <span class="text-muted fw-normal">(optional)</span>
                     </label>
-                    <input asp-for="StudentID" class="form-control" placeholder="e.g. 2021-12345" />
+                    <input asp-for="StudentID" class="form-control" inputmode="numeric" autocomplete="off"
+                           maxlength="9" placeholder="e.g. 202312345" />
+                    <span asp-validation-for="StudentID" class="text-danger small"></span>
                 </div>
 
                 <div class="col-md-6">

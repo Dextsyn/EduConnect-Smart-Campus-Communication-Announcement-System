@@ -60,6 +60,35 @@ namespace EduConnect.Web.Controllers
             return text.Length > 0 ? text : "—";
         }
 
+        // Student number rules on Add / Edit User. Only students have one,
+        // so for anyone else whatever the (hidden) field held is dropped
+        // along with its errors. An unchanged number is left alone, so an
+        // account saved before the rules can still be edited.
+        private async Task CheckStudentNumberAsync(AdminUserFormViewModel model,
+            string? roleName, int? exceptUserId, string? storedStudentId = null)
+        {
+            const string key = nameof(AdminUserFormViewModel.StudentID);
+
+            if (!PersonInput.IsStudentRole(roleName))
+            {
+                ModelState.Remove(key);
+                model.StudentID = null;
+                return;
+            }
+
+            if (model.StudentID == null)
+                return;
+
+            if (exceptUserId != null && model.StudentID == storedStudentId)
+            {
+                ModelState.Remove(key);
+                return;
+            }
+
+            if (await PersonInput.IsStudentNumberTakenAsync(_context.Users, model.StudentID, exceptUserId))
+                ModelState.AddModelError(key, PersonInput.StudentNumberTaken);
+        }
+
         // The fields an EditUser audit row compares.
         private async Task<Dictionary<string, string?>> AuditSnapshotAsync(User user)
         {
@@ -77,7 +106,7 @@ namespace EduConnect.Web.Controllers
 
             return new Dictionary<string, string?>
             {
-                ["Name"] = $"{user.FirstName} {user.LastName}",
+                ["Name"] = $"{user.FirstName} {user.LastName}{(user.Suffix == null ? "" : " " + user.Suffix)}",
                 ["Email"] = user.Email,
                 ["Student ID"] = user.StudentID,
                 ["Role"] = role,
@@ -650,17 +679,19 @@ namespace EduConnect.Web.Controllers
             if (roleName == null)
                 ModelState.AddModelError("RoleID", "Choose a valid role.");
 
+            await CheckStudentNumberAsync(model, roleName, exceptUserId: null);
+
             var adminID = int.Parse(HttpContext.Session.GetString("UserID"));
 
             var user = new User
             {
                 FirstName = model.FirstName,
                 LastName = model.LastName,
+                Suffix = PersonInput.NormalizeSuffix(model.Suffix),
                 Email = model.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password ?? ""),
                 // Only students have a student number.
-                StudentID = roleName == RoleNames.Student || roleName == RoleNames.StudentPending
-                    ? model.StudentID : null,
+                StudentID = PersonInput.IsStudentRole(roleName) ? model.StudentID : null,
                 RoleID = model.RoleID,
                 IsActive = model.IsActive,
                 VerificationStatus = "Verified",
@@ -754,6 +785,7 @@ namespace EduConnect.Web.Controllers
                 UserID = user.UserID,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
+                Suffix = user.Suffix,
                 Email = user.Email,
                 StudentID = user.StudentID,
                 RoleID = user.RoleID,
@@ -788,6 +820,29 @@ namespace EduConnect.Web.Controllers
             if (!string.IsNullOrWhiteSpace(model.Password) && model.Password.Length < 6)
                 ModelState.AddModelError("Password", "Password must be at least 6 characters.");
 
+            var stored = await _context.Users
+                .Where(u => u.UserID == id)
+                .Select(u => new { u.FirstName, u.LastName, u.StudentID })
+                .FirstOrDefaultAsync();
+
+            // Accounts saved before the name rules may not meet them; an
+            // admin can still edit the rest of the account and only has to
+            // fix a name when they change it.
+            if (stored != null)
+            {
+                if (model.FirstName == stored.FirstName)
+                    ModelState.Remove(nameof(AdminUserFormViewModel.FirstName));
+                if (model.LastName == stored.LastName)
+                    ModelState.Remove(nameof(AdminUserFormViewModel.LastName));
+            }
+
+            var roleName = await _context.Roles
+                .Where(r => r.RoleID == model.RoleID)
+                .Select(r => r.RoleName)
+                .FirstOrDefaultAsync();
+
+            await CheckStudentNumberAsync(model, roleName, exceptUserId: id, stored?.StudentID);
+
             if (!ModelState.IsValid)
             {
                 await PopulateUserFormAsync(model);
@@ -806,10 +861,6 @@ namespace EduConnect.Web.Controllers
 
             var before = await AuditSnapshotAsync(user);
 
-            var roleName = await _context.Roles
-                .Where(r => r.RoleID == model.RoleID)
-                .Select(r => r.RoleName)
-                .FirstOrDefaultAsync();
             if (roleName == null)
             {
                 ModelState.AddModelError("RoleID", "Choose a valid role.");
@@ -832,8 +883,10 @@ namespace EduConnect.Web.Controllers
 
             user.FirstName = model.FirstName;
             user.LastName = model.LastName;
+            user.Suffix = PersonInput.NormalizeSuffix(model.Suffix);
             user.Email = model.Email;
-            user.StudentID = model.StudentID;
+            // Only students have a student number.
+            user.StudentID = PersonInput.IsStudentRole(roleName) ? model.StudentID : null;
             user.RoleID = model.RoleID;
             user.IsActive = model.IsActive;
             if (model.IsActive && user.VerificationStatus != "Verified")

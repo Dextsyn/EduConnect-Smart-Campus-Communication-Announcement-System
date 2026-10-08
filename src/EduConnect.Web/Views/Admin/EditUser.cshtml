@@ -32,16 +32,28 @@
 
             <div class="row g-3">
 
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label asp-for="FirstName" class="form-label fw-semibold">First Name</label>
                     <input asp-for="FirstName" class="form-control" />
                     <span asp-validation-for="FirstName" class="text-danger small"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-8 col-md-4">
                     <label asp-for="LastName" class="form-label fw-semibold">Last Name</label>
                     <input asp-for="LastName" class="form-control" />
                     <span asp-validation-for="LastName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-4 col-md-3">
+                    <label asp-for="Suffix" class="form-label fw-semibold">Suffix</label>
+                    <select asp-for="Suffix" class="form-select">
+                        <option value="">None</option>
+                        @foreach (var suffix in PersonInput.Suffixes)
+                        {
+                            <option value="@suffix">@suffix</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Suffix" class="text-danger small"></span>
                 </div>
 
                 <div class="col-12">
@@ -59,11 +71,13 @@
                     <span asp-validation-for="Password" class="text-danger small"></span>
                 </div>
 
-                <div class="col-12">
+                <div class="col-12" id="studentIdField">
                     <label asp-for="StudentID" class="form-label fw-semibold">
-                        Student ID <span class="text-muted fw-normal">(optional)</span>
+                        Student Number <span class="text-muted fw-normal">(optional)</span>
                     </label>
-                    <input asp-for="StudentID" class="form-control" />
+                    <input asp-for="StudentID" class="form-control" inputmode="numeric" autocomplete="off"
+                           maxlength="9" placeholder="e.g. 202312345" />
+                    <span asp-validation-for="StudentID" class="text-danger small"></span>
                 </div>
 
                 <div class="col-md-6">
@@ -103,4 +117,29 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        // As on the server, a value left as it was loaded passes the
+        // pattern rules, so an account saved before the name and student
+        // number rules can still be edited without fixing those fields.
+        (function () {
+            const regex = $.validator.methods.regex;
+            $.validator.methods.regex = function (value, element, params) {
+                return value === element.defaultValue || regex.call(this, value, element, params);
+            };
+        })();
+
+        // Only students have a student number. Hiding the field also takes
+        // it out of client-side validation; the server drops it for other roles.
+        (function () {
+            const role = document.getElementById('RoleID');
+            const field = document.getElementById('studentIdField');
+            const students = @Json.Serialize(new[] { RoleNames.Student, RoleNames.StudentPending });
+            function refresh() {
+                const opt = role.options[role.selectedIndex];
+                field.hidden = !(opt && students.includes(opt.text.trim()));
+            }
+            role.addEventListener('change', refresh);
+            refresh();
+        })();
+    </script>
 }

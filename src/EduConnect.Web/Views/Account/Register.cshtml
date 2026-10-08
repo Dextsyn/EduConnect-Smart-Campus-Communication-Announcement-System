@@ -100,22 +100,42 @@
                             </div>
                         </div>
 
-                        <!-- Student ID -->
-                        <div class="mb-3">
-                            <label asp-for="StudentID"
-                                   class="form-label fw-semibold">
-                                Student ID
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="bi bi-card-text"></i>
-                                </span>
-                                <input asp-for="StudentID"
-                                       class="form-control"
-                                       placeholder="e.g. 202100123" />
+                        <!-- Suffix + Student Number -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-4">
+                                <label asp-for="Suffix"
+                                       class="form-label fw-semibold">
+                                    Suffix
+                                </label>
+                                <select asp-for="Suffix" class="form-select">
+                                    <option value="">None</option>
+                                    @foreach (var suffix in PersonInput.Suffixes)
+                                    {
+                                        <option value="@suffix">@suffix</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Suffix"
+                                      class="text-danger small"></span>
                             </div>
-                            <span asp-validation-for="StudentID"
-                                  class="text-danger small"></span>
+                            <div class="col-8">
+                                <label asp-for="StudentID"
+                                       class="form-label fw-semibold">
+                                    Student Number
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-card-text"></i>
+                                    </span>
+                                    <input asp-for="StudentID"
+                                           class="form-control"
+                                           inputmode="numeric"
+                                           autocomplete="off"
+                                           maxlength="9"
+                                           placeholder="e.g. 202312345" />
+                                </div>
+                                <span asp-validation-for="StudentID"
+                                      class="text-danger small"></span>
+                            </div>
                         </div>
 
                         <!-- Add after Student ID field -->
@@ -304,6 +324,26 @@
             input.addEventListener('input', check);
             input.addEventListener('change', check);
             check();
+        })();
+
+        // Same rules as the server (PersonInput). This page doesn't load
+        // jQuery Validation, so the browser's own validity check shows them.
+        (function () {
+            const rules = [
+                ['FirstName', @Json.Serialize(PersonInput.NamePattern), @Json.Serialize(PersonInput.NameError), true],
+                ['LastName', @Json.Serialize(PersonInput.NamePattern), @Json.Serialize(PersonInput.NameError), true],
+                ['StudentID', @Json.Serialize(PersonInput.StudentNumberPattern), @Json.Serialize(PersonInput.StudentNumberError), false]
+            ];
+            for (const [id, pattern, message, isName] of rules) {
+                const input = document.getElementById(id);
+                const re = new RegExp(pattern);
+                const check = () => {
+                    const v = isName ? input.value.trim().replace(/\s+/g, ' ') : input.value.trim();
+                    input.setCustomValidity(v && !re.test(v) ? message : '');
+                };
+                input.addEventListener('input', check);
+                check();
+            }
         })();
 
         // Toggle password visibility
