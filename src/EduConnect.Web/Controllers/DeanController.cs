@@ -102,27 +102,9 @@ namespace EduConnect.Web.Controllers
                 .CountAsync();
 
             // ─── Pending Announcements ─────────
-            // The same set as the review queue: what this viewer can approve.
-            var reviewable = _approval.ReviewableBy(viewer);
-            ViewBag.PendingCount = await reviewable.CountAsync();
-
-            var pending = await reviewable
-                .OrderBy(a => a.SubmittedAt)
-                .Take(PendingShown)
-                .Select(a => new PendingAnnouncementRow
-                {
-                    AnnouncementID = a.AnnouncementID,
-                    Title = a.Title,
-                    AuthorName = a.Author.FirstName + " " + a.Author.LastName,
-                    CategoryName = a.Category.CategoryName,
-                    SubmittedAt = a.SubmittedAt
-                })
-                .ToListAsync();
-
-            foreach (var row in pending)
-                row.Audience = await _audience.GetAudienceNamesAsync(row.AnnouncementID);
-
-            ViewBag.PendingAnnouncements = pending;
+            var pending = await PendingAsync(viewer);
+            ViewBag.Pending = pending;
+            ViewBag.PendingAnnouncements = pending.Rows;
 
             // ─── Recent Published ───────────────
             ViewBag.RecentAnnouncements = await _context
@@ -136,6 +118,49 @@ namespace EduConnect.Web.Controllers
                 .ToListAsync();
 
             return View();
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Dean/Pending
+        //  The Pending Announcements card alone, re-fetched by the
+        //  dashboard when a live update says the queue changed
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> Pending()
+        {
+            if (!IsDean())
+                return Unauthorized();
+
+            var viewer = await _audience.GetViewerAsync(GetUserID());
+            return PartialView("_PendingAnnouncements", await PendingAsync(viewer));
+        }
+
+        // The same set as the review queue: what this viewer can approve,
+        // oldest first.
+        private async Task<PendingAnnouncementsViewModel> PendingAsync(Viewer viewer)
+        {
+            var reviewable = _approval.ReviewableBy(viewer);
+
+            var rows = await reviewable
+                .OrderBy(a => a.SubmittedAt)
+                .Take(PendingShown)
+                .Select(a => new PendingAnnouncementRow
+                {
+                    AnnouncementID = a.AnnouncementID,
+                    Title = a.Title,
+                    AuthorName = a.Author.FirstName + " " + a.Author.LastName,
+                    CategoryName = a.Category.CategoryName,
+                    SubmittedAt = a.SubmittedAt
+                })
+                .ToListAsync();
+
+            foreach (var row in rows)
+                row.Audience = await _audience.GetAudienceNamesAsync(row.AnnouncementID);
+
+            return new PendingAnnouncementsViewModel
+            {
+                Rows = rows,
+                Count = await reviewable.CountAsync()
+            };
         }
 
     }

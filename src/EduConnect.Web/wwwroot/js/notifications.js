@@ -13,6 +13,10 @@
         .withAutomaticReconnect()
         .build();
 
+    // Shared with page scripts that listen for their own live updates
+    // (e.g. the dashboard's ReviewQueueChanged), so there is one connection.
+    window.ecHub = connection;
+
     connection.on('ReceiveNotification', function (notif) {
         incrementBadge();
         prependItem(notif);

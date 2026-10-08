@@ -4,10 +4,8 @@
     ViewData["Title"] = dashboardLabel;
     var userName = Context.Session
         .GetString("UserName");
-    var pendingList = ViewBag.PendingAnnouncements
-        as List<EduConnect.Web.ViewModels.PendingAnnouncementRow>
-        ?? new List<EduConnect.Web.ViewModels.PendingAnnouncementRow>();
-    int pendingCount = ViewBag.PendingCount ?? 0;
+    var pending = ViewBag.Pending as EduConnect.Web.ViewModels.PendingAnnouncementsViewModel
+        ?? new EduConnect.Web.ViewModels.PendingAnnouncementsViewModel();
     var recentList =
         ViewBag.RecentAnnouncements as
         List<EduConnect.Web.Models.Announcement>
@@ -109,71 +107,37 @@
 </div>
 
 <!-- ─── PENDING ANNOUNCEMENTS ────────── -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white border-0 pt-3
-                d-flex justify-content-between align-items-center">
-        <h6 class="fw-bold mb-0">
-            <i class="bi bi-hourglass-split me-2 text-primary"></i>
-            Pending Announcements
-            @if (pendingCount > 0)
-            {
-                <span class="badge bg-warning text-dark ms-1">@pendingCount</span>
-            }
-        </h6>
-        @if (pendingCount > pendingList.Count)
-        {
-            <a href="/Announcement/ReviewQueue" class="btn btn-sm btn-outline-primary">
-                View all
-            </a>
-        }
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-    <div class="card-body p-0">
-        @if (!pendingList.Any())
-        {
-            <div class="ec-empty">
-                <i class="bi bi-check2-circle"></i>
-                Nothing is waiting for your approval
-            </div>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">Title</th>
-                            <th>Submitted by</th>
-                            <th>Category</th>
-                            <th>Submitted</th>
-                            <th>Audience</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in pendingList)
-                        {
-                            <tr>
-                                <td class="ps-3 align-middle fw-semibold small">@p.Title</td>
-                                <td class="align-middle small text-muted">@p.AuthorName</td>
-                                <td class="align-middle small">@(p.CategoryName ?? "—")</td>
-                                <td class="align-middle small text-muted">
-                                    @(p.SubmittedAt?.ToString("MMM dd, yyyy h:mm tt") ?? "—")
-                                </td>
-                                <td class="align-middle small text-muted">
-                                    @(p.Audience.Any() ? string.Join(", ", p.Audience) : "—")
-                                </td>
-                                <td class="align-middle text-end pe-3">
-                                    <a href="/Announcement/Review/@p.AnnouncementID"
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye me-1"></i>Review
-                                    </a>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div id="pendingCard" aria-live="polite">
+    <partial name="_PendingAnnouncements" model="pending" />
+</div>
+
+<!-- Review side panel: full width on phones, a column on wider screens -->
+<div class="offcanvas offcanvas-end ec-review-panel" tabindex="-1"
+     id="reviewPanel" aria-labelledby="reviewPanelTitle">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title fw-bold" id="reviewPanelTitle">
+            <i class="bi bi-hourglass-split me-2 text-primary"></i>Review Announcement
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body bg-light">
+        <div id="reviewPanelNotice" class="alert alert-warning d-none" role="alert"></div>
+        <div id="reviewPanelBody"></div>
     </div>
 </div>
 
@@ -292,3 +256,89 @@
     </div>
 </div>
 
+
+@section Scripts {
+<script>
+    // Pending Announcements: "View" opens the review in a side panel so the
+    // reviewer stays on the dashboard; Approve / Reject post as usual and
+    // come back here. Live updates (ReviewQueueChanged over the shared
+    // notification hub) refresh the list when anyone's action changes it.
+    (function () {
+        const panelEl = document.getElementById('reviewPanel');
+        const panel   = new bootstrap.Offcanvas(panelEl);
+        const body    = document.getElementById('reviewPanelBody');
+        const notice  = document.getElementById('reviewPanelNotice');
+        const card    = document.getElementById('pendingCard');
+        const me      = document.body.dataset.userId;
+        let openId = null;
+
+        card.addEventListener('click', async e => {
+            const link = e.target.closest('[data-review-open]');
+            // Ctrl/Shift/middle click still opens the full page in a new tab.
+            if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+
+            const id = link.dataset.reviewOpen;
+            openId = id;
+            notice.classList.add('d-none');
+            body.innerHTML = '<div class="text-center text-muted py-5">' +
+                '<span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>';
+            panel.show();
+
+            let html = null;
+            try {
+                const res = await fetch('/Announcement/ReviewPanel/' + encodeURIComponent(id) +
+                    '?returnUrl=' + encodeURIComponent(location.pathname));
+                if (res.ok) html = await res.text();
+            } catch { /* shown below */ }
+            if (openId !== id) return;   // closed, or another one opened meanwhile
+
+            if (html === null) {
+                body.replaceChildren();
+                lockPanel('This announcement is no longer waiting for your review.');
+                refreshList();
+                return;
+            }
+            body.innerHTML = html;
+        });
+
+        panelEl.addEventListener('hidden.bs.offcanvas', () => {
+            openId = null;
+            body.replaceChildren();
+        });
+
+        async function refreshList() {
+            try {
+                const res = await fetch('/Dean/Pending');
+                if (res.ok) card.innerHTML = await res.text();
+            } catch { /* keep the list we have */ }
+        }
+
+        // Someone else decided: say who, and stop this reviewer acting on it.
+        function lockPanel(message) {
+            notice.textContent = message;
+            notice.classList.remove('d-none');
+            body.querySelectorAll('button, textarea, input[type=checkbox]')
+                .forEach(el => el.disabled = true);
+        }
+
+        const verbs = {
+            approved:  'approved',
+            rejected:  'rejected',
+            escalated: 'sent to the Dean'
+        };
+
+        if (window.ecHub) {
+            window.ecHub.on('ReviewQueueChanged', e => {
+                refreshList();
+                if (openId === null || String(e.announcementId) !== openId || String(e.byUserId) === me)
+                    return;
+                if (e.change === 'withdrawn')
+                    lockPanel('The author withdrew this announcement.');
+                else if (verbs[e.change])
+                    lockPanel((e.byName || 'Another reviewer') + ' just ' + verbs[e.change] + ' this announcement.');
+            });
+        }
+    })();
+</script>
+}

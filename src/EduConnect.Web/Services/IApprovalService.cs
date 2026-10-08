@@ -19,5 +19,10 @@ namespace EduConnect.Web.Services
         // PendingChair in the Chairperson's department, or PendingDean in
         // the Dean's college. Empty for everyone else.
         IQueryable<Announcement> ReviewableBy(Viewer reviewer);
+
+        // Everyone who could review this author's posts at some step: the
+        // active Chairpersons of their department and Deans of their
+        // college. Their review queues change when one of the posts does.
+        Task<List<int>> ReviewerIdsAsync(int authorId);
     }
 }
