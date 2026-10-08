@@ -21,6 +21,7 @@ namespace EduConnect.Web.ViewModels
 
         // Editable fields
         [MaxLength(10)]
+        [NameSuffix]
         public string? Suffix { get; set; }
 
         [DataType(DataType.Upload)]

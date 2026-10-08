@@ -5,13 +5,30 @@ namespace EduConnect.Web.ViewModels
 {
     public class RegisterViewModel : IPlacementForm
     {
+        private string _firstName, _lastName;
+        private string? _studentId;
+
         [Required(ErrorMessage = "First name is required")]
-        [MaxLength(100)]
-        public string FirstName { get; set; }
+        [MaxLength(50)]
+        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        public string FirstName
+        {
+            get => _firstName;
+            set => _firstName = PersonInput.NormalizeName(value)!;
+        }
 
         [Required(ErrorMessage = "Last name is required")]
-        [MaxLength(100)]
-        public string LastName { get; set; }
+        [MaxLength(50)]
+        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        public string LastName
+        {
+            get => _lastName;
+            set => _lastName = PersonInput.NormalizeName(value)!;
+        }
+
+        [MaxLength(10)]
+        [NameSuffix]
+        public string? Suffix { get; set; }
 
         // Only Adamson accounts can register: the student types the part
         // before the domain and the domain is fixed. A pasted full Adamson
@@ -50,9 +67,13 @@ namespace EduConnect.Web.ViewModels
             "Passwords do not match")]
         public string ConfirmPassword { get; set; }
 
-        [Required(ErrorMessage = "Student ID is required")]
-        [MaxLength(50)]
-        public string StudentID { get; set; }
+        [Required(ErrorMessage = "Student number is required")]
+        [RegularExpression(PersonInput.StudentNumberPattern, ErrorMessage = PersonInput.StudentNumberError)]
+        public string? StudentID
+        {
+            get => _studentId;
+            set => _studentId = PersonInput.NormalizeStudentNumber(value);
+        }
 
         // College and department are derived from the program by
         // IPlacementService; only ProgramID is required.

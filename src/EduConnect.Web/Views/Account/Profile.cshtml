@@ -139,12 +139,10 @@
                                class="form-label fw-semibold">Name Suffix</label>
                         <select asp-for="Suffix" class="form-select">
                             <option value="">None</option>
-                            <option value="Jr.">Jr.</option>
-                            <option value="Sr.">Sr.</option>
-                            <option value="II">II</option>
-                            <option value="III">III</option>
-                            <option value="IV">IV</option>
-                            <option value="V">V</option>
+                            @foreach (var suffix in PersonInput.Suffixes)
+                            {
+                                <option value="@suffix">@suffix</option>
+                            }
                         </select>
                         <span asp-validation-for="Suffix"
                               class="text-danger small"></span>

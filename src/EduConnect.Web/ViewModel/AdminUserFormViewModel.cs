@@ -8,13 +8,30 @@ namespace EduConnect.Web.ViewModels
     {
         public int UserID { get; set; }
 
+        private string _firstName, _lastName;
+        private string? _studentId;
+
         [Required(ErrorMessage = "First name is required")]
         [MaxLength(50)]
-        public string FirstName { get; set; }
+        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        public string FirstName
+        {
+            get => _firstName;
+            set => _firstName = PersonInput.NormalizeName(value)!;
+        }
 
         [Required(ErrorMessage = "Last name is required")]
         [MaxLength(50)]
-        public string LastName { get; set; }
+        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        public string LastName
+        {
+            get => _lastName;
+            set => _lastName = PersonInput.NormalizeName(value)!;
+        }
+
+        [MaxLength(10)]
+        [NameSuffix]
+        public string? Suffix { get; set; }
 
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress(ErrorMessage = "Invalid email format")]
@@ -26,8 +43,13 @@ namespace EduConnect.Web.ViewModels
         [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
         public string? Password { get; set; }
 
-        [MaxLength(50)]
-        public string? StudentID { get; set; }
+        // Students only. Optional here, but 9 digits when given.
+        [RegularExpression(PersonInput.StudentNumberPattern, ErrorMessage = PersonInput.StudentNumberError)]
+        public string? StudentID
+        {
+            get => _studentId;
+            set => _studentId = PersonInput.NormalizeStudentNumber(value);
+        }
 
         [Required(ErrorMessage = "Role is required")]
         public int RoleID { get; set; }

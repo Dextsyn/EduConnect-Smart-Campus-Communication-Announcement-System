@@ -129,7 +129,11 @@ namespace EduConnect.Tests
             var student = _db.AddUser(RoleNames.Student);
             _session.SetString("UserID", student.UserID.ToString());
 
-            var result = await Controller().Profile(new ProfileViewModel { ProgramID = bsit.ProgramID, Suffix = "Esq." });
+            var controller = Controller();
+            // The binder's verdict on [NameSuffix].
+            controller.ModelState.AddModelError(nameof(ProfileViewModel.Suffix), PersonInput.SuffixError);
+
+            var result = await controller.Profile(new ProfileViewModel { ProgramID = bsit.ProgramID, Suffix = "Esq." });
 
             var model = Assert.IsType<ProfileViewModel>(Assert.IsType<ViewResult>(result).Model);
             Assert.True(model.CanEditProgram);
@@ -146,6 +150,27 @@ namespace EduConnect.Tests
 
             Assert.IsType<ViewResult>(result);
             Assert.True(controller.ModelState.ContainsKey("Placement"));
+        }
+
+        [Fact]
+        public async Task Register_TakenStudentNumber_IsRefused()
+        {
+            var existing = _db.AddUser(RoleNames.Student);
+            existing.StudentID = "202300001";
+            _db.Context.SaveChanges();
+            var controller = Controller();
+
+            var result = await controller.Register(new RegisterViewModel
+            {
+                FirstName = "Juan", LastName = "Dela Cruz", EmailUser = "juan.delacruz",
+                Password = "secret123", ConfirmPassword = "secret123",
+                StudentID = "202300001", ProgramID = 1
+            });
+
+            Assert.IsType<ViewResult>(result);
+            Assert.Equal(PersonInput.StudentNumberTaken,
+                controller.ModelState[nameof(RegisterViewModel.StudentID)]!.Errors.Single().ErrorMessage);
+            Assert.Equal(1, _db.NewContext().Users.Count());
         }
 
         [Theory]
