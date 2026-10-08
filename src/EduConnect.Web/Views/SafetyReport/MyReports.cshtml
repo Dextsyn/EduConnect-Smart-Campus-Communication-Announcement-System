@@ -1,6 +1,9 @@
 @model List<EduConnect.Web.Models.IncidentReport>
 @{
     ViewData["Title"] = "My Safety Reports";
+    var sanctions = ViewData["Sanctions"] as List<EduConnect.Web.Models.ReportingSanction>
+        ?? new List<EduConnect.Web.Models.ReportingSanction>();
+    var now = DateTime.Now;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -17,6 +20,113 @@
         <i class="bi bi-plus-circle me-1"></i>New Report
     </a>
 </div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (sanctions.Any())
+{
+    <h6 class="fw-bold mb-2">
+        <i class="bi bi-flag me-1 text-danger"></i>False-report decisions
+    </h6>
+    <div class="row g-3 mb-4">
+        @foreach (var s in sanctions)
+        {
+            var active = s.IsActiveSuspensionAt(now);
+            <div class="col-12">
+                <div class="card border-0 shadow-sm border-start border-4 @(s.IsRevoked ? "border-secondary" : "border-danger")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                            <div>
+                                <div class="fw-semibold">
+                                    @(s.Type == EduConnect.Web.Models.ReportingSanction.Warning ? "Warning" : "Suspension")
+                                    · Report #@s.ReportID
+                                </div>
+                                <div class="text-muted small">
+                                    @s.IssuedAt.ToString("MMM dd, yyyy h:mm tt")
+                                    @if (s.EndsAt != null)
+                                    {
+                                        <span>· @(active ? "until" : "ended") @s.EndsAt.Value.ToString("MMM dd, yyyy h:mm tt")</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (s.IsRevoked)
+                            {
+                                <span class="badge bg-secondary">Revoked</span>
+                            }
+                            else if (active)
+                            {
+                                <span class="badge text-bg-danger">Suspended now</span>
+                            }
+                        </div>
+
+                        <div class="small mb-2">
+                            <span class="fw-semibold">What staff found:</span>
+                            <span class="text-break">@s.Reason</span>
+                        </div>
+                        @if (s.ReferredToOsa && !s.IsRevoked)
+                        {
+                            <div class="small text-danger mb-2">Referred to the Office of Student Affairs.</div>
+                        }
+
+                        @if (s.IsRevoked)
+                        {
+                            <div class="p-2 bg-light rounded small">
+                                <span class="fw-semibold">Revoked:</span> <span class="text-break">@s.RevokeReason</span>
+                            </div>
+                        }
+                        else if (s.AppealPending)
+                        {
+                            <div class="p-2 bg-light rounded small">
+                                <i class="bi bi-hourglass-split me-1"></i>
+                                Appeal sent @s.AppealedAt!.Value.ToString("MMM dd, yyyy") — waiting for an administrator.
+                            </div>
+                        }
+                        else if (s.AppealUpheldAt != null)
+                        {
+                            <div class="p-2 bg-light rounded small">
+                                <span class="fw-semibold">Appeal reviewed:</span> the decision stands.
+                                @if (!string.IsNullOrWhiteSpace(s.AppealUpheldNote))
+                                {
+                                    <span class="text-break">@s.AppealUpheldNote</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <details>
+                                <summary class="small text-primary">Appeal this decision</summary>
+                                <form method="post" action="/SafetyReport/Appeal/@s.SanctionID" class="mt-2">
+                                    @Html.AntiForgeryToken()
+                                    <label for="appeal_@s.SanctionID" class="form-label small fw-semibold">
+                                        Why should it be reversed? You can appeal once.
+                                    </label>
+                                    <textarea id="appeal_@s.SanctionID" name="appealText" class="form-control mb-2"
+                                              rows="3" maxlength="2000" required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Send Appeal</button>
+                                </form>
+                            </details>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <h6 class="fw-bold mb-2">Reports</h6>
+}
 
 @if (!Model.Any())
 {

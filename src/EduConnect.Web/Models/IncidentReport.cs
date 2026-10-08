@@ -30,7 +30,11 @@ namespace EduConnect.Web.Models
         [MaxLength(20)]
         public string Status { get; set; } = "Pending";
         // Values: Pending, Investigating,
-        //         Resolved, Dismissed
+        //         Resolved, Dismissed, False report
+
+        // Set only through IReportingSanctionService.MarkFalseAsync, and
+        // left only when an Administrator revokes that decision.
+        public const string FalseReport = "False report";
 
         public int? HandledByID { get; set; }
 

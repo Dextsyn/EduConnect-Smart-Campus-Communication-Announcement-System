@@ -5,7 +5,7 @@
     ViewData["Title"] = "Activity Log";
     var f = Model.Filter;
     var buildings = new[] { "SV", "ST", "OZ", "CS", "CT", "Other" };
-    var statuses = new[] { "Pending", "Investigating", "Resolved", "Dismissed" };
+    var statuses = new[] { "Pending", "Investigating", "Resolved", "Dismissed", "False report" };
 
     // Same filters, different scope or page.
     Dictionary<string, string> Route(string scope, int page)

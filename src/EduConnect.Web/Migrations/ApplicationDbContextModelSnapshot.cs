@@ -1216,6 +1216,92 @@ namespace EduConnect.Web.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.ReportingSanction", b =>
+                {
+                    b.Property<int>("SanctionID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SanctionID"));
+
+                    b.Property<string>("AppealText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("AppealUpheldAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("AppealUpheldByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AppealUpheldNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("AppealedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("IssuedByID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IssuedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("ReferredToOsa")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ReportID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReportStatusBefore")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RevokeReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RevokedByID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Strike")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("SanctionID");
+
+                    b.HasIndex("AppealUpheldByID");
+
+                    b.HasIndex("IssuedByID");
+
+                    b.HasIndex("ReportID")
+                        .IsUnique();
+
+                    b.HasIndex("RevokedByID");
+
+                    b.HasIndex("UserID", "IssuedAt");
+
+                    b.ToTable("ReportingSanctions");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Role", b =>
                 {
                     b.Property<int>("RoleID")
@@ -1939,6 +2025,46 @@ namespace EduConnect.Web.Migrations
                         .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.ReportingSanction", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.User", "AppealUpheldBy")
+                        .WithMany()
+                        .HasForeignKey("AppealUpheldByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduConnect.Web.Models.User", "IssuedBy")
+                        .WithMany()
+                        .HasForeignKey("IssuedByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduConnect.Web.Models.IncidentReport", "Report")
+                        .WithMany()
+                        .HasForeignKey("ReportID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "RevokedBy")
+                        .WithMany()
+                        .HasForeignKey("RevokedByID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppealUpheldBy");
+
+                    b.Navigation("IssuedBy");
+
+                    b.Navigation("Report");
+
+                    b.Navigation("RevokedBy");
 
                     b.Navigation("User");
                 });

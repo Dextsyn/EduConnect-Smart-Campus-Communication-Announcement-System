@@ -54,6 +54,8 @@ namespace EduConnect.Web.Data
         { get; set; }
         public DbSet<IncidentReportActivity> IncidentReportActivities
         { get; set; }
+        public DbSet<ReportingSanction> ReportingSanctions
+        { get; set; }
 
         // Study Groups
         public DbSet<StudyGroup> StudyGroups { get; set; }
@@ -429,6 +431,39 @@ namespace EduConnect.Web.Data
                       .HasForeignKey(e => e.ActorID)
                       .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(e => new { e.ActorID, e.CreatedAt });
+            });
+
+            // ─── ReportingSanctions ────────────────
+            // A sanction is a disciplinary record: it blocks deleting the
+            // student, the report, or the staff and admins who acted on it
+            // (Restrict), rather than vanishing with them.
+            modelBuilder.Entity<ReportingSanction>(entity =>
+            {
+                entity.HasKey(e => e.SanctionID);
+                entity.HasOne(e => e.User)
+                      .WithMany()
+                      .HasForeignKey(e => e.UserID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Report)
+                      .WithMany()
+                      .HasForeignKey(e => e.ReportID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.IssuedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.IssuedByID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.RevokedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.RevokedByID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.AppealUpheldBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.AppealUpheldByID)
+                      .OnDelete(DeleteBehavior.Restrict);
+                // One sanction per false report.
+                entity.HasIndex(e => e.ReportID).IsUnique();
+                // Strike counting and the active-suspension check.
+                entity.HasIndex(e => new { e.UserID, e.IssuedAt });
             });
 
             // ─── StudyGroups ───────────────────────

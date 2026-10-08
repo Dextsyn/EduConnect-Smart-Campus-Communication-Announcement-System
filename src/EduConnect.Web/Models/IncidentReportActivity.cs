@@ -13,6 +13,8 @@ namespace EduConnect.Web.Models
         public const string Received = "Received";
         public const string StatusChanged = "StatusChanged";
         public const string NoteUpdated = "NoteUpdated";
+        public const string MarkedFalse = "MarkedFalse";
+        public const string FalseReversed = "FalseReversed";
 
         [Key]
         public int ActivityID { get; set; }
@@ -46,6 +48,8 @@ namespace EduConnect.Web.Models
             Received      => "Report received",
             StatusChanged => $"{FromStatus} → {ToStatus}",
             NoteUpdated   => "Note updated",
+            MarkedFalse   => "Marked as a false report",
+            FalseReversed => $"False-report decision reversed → {ToStatus}",
             _             => Action
         };
 

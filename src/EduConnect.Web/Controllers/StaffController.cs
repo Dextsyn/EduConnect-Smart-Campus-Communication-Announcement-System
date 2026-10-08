@@ -11,17 +11,23 @@ namespace EduConnect.Web.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly IReportingSanctionService _sanctions;
 
         // The statuses staff can set, in the order the form offers them.
+        // "False report" is set only through MarkFalse.
         public static readonly IReadOnlyList<string> ReportStatuses =
             new[] { "Pending", "Investigating", "Resolved", "Dismissed" };
 
+        public const string FalseReport = IncidentReport.FalseReport;
+
         public StaffController(
             ApplicationDbContext context,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IReportingSanctionService sanctions)
         {
             _context = context;
             _notificationService = notificationService;
+            _sanctions = sanctions;
         }
 
         private bool IsStaffOrAdmin()
@@ -29,6 +35,9 @@ namespace EduConnect.Web.Controllers
             var role = HttpContext.Session.GetString("RoleName");
             return role == RoleNames.Staff || role == RoleNames.Administrator;
         }
+
+        private bool IsAdmin() =>
+            HttpContext.Session.GetString("RoleName") == RoleNames.Administrator;
 
         private int GetUserID() =>
             int.Parse(HttpContext.Session.GetString("UserID")!);
@@ -74,7 +83,82 @@ namespace EduConnect.Web.Controllers
 
             if (report == null) return NotFound();
 
+            ViewBag.FalseReportPreview = await _sanctions.PreviewFalseReportAsync(id);
+            ViewBag.Sanction = await _context.ReportingSanctions
+                .FirstOrDefaultAsync(s => s.ReportID == id);
             return View(report);
+        }
+
+        // POST /Staff/MarkFalse/{id}
+        // Any staff member can find a report knowingly false; the strike
+        // ladder decides the warning or suspension (IReportingSanctionService).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkFalse(int id, string? reason)
+        {
+            if (!IsStaffOrAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var result = await _sanctions.MarkFalseAsync(id, reason ?? "", GetUserID());
+            if (result.Ok)
+                TempData["Success"] = "Report marked as false. The reporter has been notified.";
+            else
+                TempData["Error"] = result.Error;
+
+            return RedirectToAction("ReportDetails", new { id });
+        }
+
+        // GET /Staff/Sanctions
+        // Every false-report sanction, open appeals first. Staff see them;
+        // only an Administrator decides appeals and revokes.
+        public async Task<IActionResult> Sanctions()
+        {
+            if (!IsStaffOrAdmin())
+                return RedirectToAction("Login", "Account");
+
+            var sanctions = await _context.ReportingSanctions
+                .Include(s => s.User)
+                .Include(s => s.RevokedBy)
+                .Include(s => s.AppealUpheldBy)
+                .ToListAsync();
+
+            ViewBag.IsAdmin = IsAdmin();
+            return View(sanctions
+                .OrderByDescending(s => s.AppealPending)
+                .ThenByDescending(s => s.IssuedAt)
+                .ToList());
+        }
+
+        // POST /Staff/RevokeSanction/{id}   (Administrator)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RevokeSanction(int id, string? reason)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Sanctions");
+
+            var result = await _sanctions.RevokeAsync(id, reason ?? "", GetUserID());
+            if (result.Ok)
+                TempData["Success"] = "Sanction revoked. The student has been notified.";
+            else
+                TempData["Error"] = result.Error;
+            return RedirectToAction("Sanctions");
+        }
+
+        // POST /Staff/UpholdAppeal/{id}   (Administrator)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpholdAppeal(int id, string? note)
+        {
+            if (!IsAdmin())
+                return RedirectToAction("Sanctions");
+
+            var result = await _sanctions.UpholdAppealAsync(id, note, GetUserID());
+            if (result.Ok)
+                TempData["Success"] = "Appeal decided: the sanction stands. The student has been notified.";
+            else
+                TempData["Error"] = result.Error;
+            return RedirectToAction("Sanctions");
         }
 
         // POST /Staff/UpdateStatus/{id}
@@ -94,6 +178,15 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(r => r.ReportID == id);
 
             if (report == null) return NotFound();
+
+            // Undoing a false-report decision lifts the student's sanction,
+            // so it goes through an Administrator (Sanctions page).
+            if (report.Status == FalseReport)
+            {
+                TempData["Error"] =
+                    "This report was marked as false. Only an Administrator can reverse that, from the Sanctions page.";
+                return RedirectToAction("ReportDetails", new { id });
+            }
 
             var note = string.IsNullOrWhiteSpace(resolution)
                 ? null
