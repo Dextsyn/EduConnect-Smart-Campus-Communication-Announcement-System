@@ -33,11 +33,38 @@
             <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" name="TargetCollegeIDs"
                        value="@college.CollegeID" id="tc_@college.CollegeID"
+                       @(options.CollegeNeedsDean ? "data-dean-level" : "")
                        @(Model.TargetCollegeIDs.Contains(college.CollegeID) ? "checked" : "") />
                 <label class="form-check-label fw-semibold" for="tc_@college.CollegeID">
                     Everyone in @college.Name
                 </label>
             </div>
+            @if (options.CollegeNeedsDean)
+            {
+                var isChair = Context.Session.GetString("RoleName") == RoleNames.Chairperson;
+                <div id="deanLevelNotice" class="alert alert-warning small py-2 mb-2"
+                     role="status" @(Model.TargetCollegeIDs.Contains(college.CollegeID) ? "" : "hidden")>
+                    <i class="bi bi-info-circle me-1"></i>
+                    Reaching the whole college makes this a Dean-level matter:
+                    @(isChair
+                        ? "it goes to the Dean for final approval instead of being published."
+                        : "after your Chairperson approves it, the Dean gives the final approval.")
+                </div>
+                <script>
+                    // Show the notice while the college is ticked; pages may
+                    // listen for "deanlevelchange" (Create's Dean toggle does).
+                    (function () {
+                        const box = document.getElementById('tc_@college.CollegeID');
+                        const notice = document.getElementById('deanLevelNotice');
+                        box.addEventListener('change', () => {
+                            notice.hidden = !box.checked;
+                            box.dispatchEvent(new CustomEvent('deanlevelchange', {
+                                bubbles: true, detail: { deanLevel: box.checked }
+                            }));
+                        });
+                    })();
+                </script>
+            }
         }
         @foreach (var dept in college.Departments)
         {

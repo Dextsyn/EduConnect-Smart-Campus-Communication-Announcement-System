@@ -313,6 +313,168 @@ namespace EduConnect.Tests
                 _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Title);
         }
 
+        // ─── College target = Dean-level ───────
+
+        private AnnouncementFormViewModel CollegePost(string title = "College notice") => new()
+        {
+            Title = title,
+            Body = "Body",
+            CategoryID = _db.CategoryID(),
+            Priority = 1,
+            TargetCollegeIDs = new List<int> { _ccit.CollegeID }
+        };
+
+        private Announcement Saved(string title) =>
+            _db.NewContext().Announcements.Single(a => a.Title == title);
+
+        [Fact]
+        public async Task CreateForm_DefaultsToTheAuthorsDepartment()
+        {
+            foreach (var author in new[] { _faculty, _chair })
+            {
+                var view = Assert.IsType<ViewResult>(await As(author).Create());
+
+                var model = Assert.IsType<AnnouncementFormViewModel>(view.Model);
+                Assert.Equal(new[] { _itis.DepartmentID }, model.TargetDepartmentIDs);
+            }
+        }
+
+        [Fact]
+        public async Task Create_ChairCollegeTarget_GoesToTheDeanWithoutTheToggle()
+        {
+            await As(_chair).Create(CollegePost());
+
+            var saved = Saved("College notice");
+            Assert.Equal("PendingDean", saved.ApprovalStatus);
+            Assert.Equal("Draft", saved.Status);
+            Assert.Contains(_notes.Sent, n => n.UserId == _dean.UserID);
+        }
+
+        [Fact]
+        public async Task Create_ChairCollegeTargetWithoutDean_IsRefused()
+        {
+            _dean.IsActive = false;
+            _db.Context.SaveChanges();
+
+            var result = await As(_chair).Create(CollegePost());
+
+            Assert.IsType<ViewResult>(result);
+            Assert.False(_db.NewContext().Announcements.Any(a => a.Title == "College notice"));
+        }
+
+        [Fact]
+        public async Task CollegePostByFaculty_GoesChairThenDean()
+        {
+            await As(_faculty).Create(CollegePost());
+            var post = Saved("College notice");
+
+            await As(_faculty).Submit(post.AnnouncementID);
+            Assert.Equal("PendingChair", Saved("College notice").ApprovalStatus);
+
+            // The Chairperson's approval can't be final: it goes on to the Dean.
+            await As(_chair).Approve(post.AnnouncementID);
+            var afterChair = Saved("College notice");
+            Assert.Equal("PendingDean", afterChair.ApprovalStatus);
+            Assert.Equal(_chair.UserID, afterChair.ChairApprovedByID);
+            Assert.Null(afterChair.ApprovedByID);
+
+            await As(_dean).Approve(post.AnnouncementID);
+            Assert.Equal("Approved", Saved("College notice").ApprovalStatus);
+        }
+
+        [Fact]
+        public async Task Approve_ChairOnCollegePostWithoutDean_StaysPending()
+        {
+            await As(_faculty).Create(CollegePost());
+            var post = Saved("College notice");
+            await As(_faculty).Submit(post.AnnouncementID);
+            _dean.IsActive = false;
+            _db.Context.SaveChanges();
+
+            var controller = As(_chair);
+            await controller.Approve(post.AnnouncementID);
+
+            Assert.Equal("PendingChair", Saved("College notice").ApprovalStatus);
+            Assert.NotNull(controller.TempData["Error"]);
+        }
+
+        [Fact]
+        public async Task FacultyRemovingTheCollege_ChairApprovalIsFinalAgain()
+        {
+            await As(_faculty).Create(CollegePost());
+            var post = Saved("College notice");
+            await As(_faculty).Edit(new AnnouncementFormViewModel
+            {
+                AnnouncementID = post.AnnouncementID,
+                Title = "College notice",
+                Body = "Body",
+                CategoryID = _db.CategoryID(),
+                TargetDepartmentIDs = new() { _itis.DepartmentID }
+            });
+
+            await As(_faculty).Submit(post.AnnouncementID);
+            await As(_chair).Approve(post.AnnouncementID);
+
+            Assert.Equal("Approved", Saved("College notice").ApprovalStatus);
+        }
+
+        [Fact]
+        public async Task ReviewPanel_CollegePost_ShowsTheChairItMustGoToTheDean()
+        {
+            await As(_faculty).Create(CollegePost());
+            var post = Saved("College notice");
+            await As(_faculty).Submit(post.AnnouncementID);
+
+            var controller = As(_chair);
+            await controller.ReviewPanel(post.AnnouncementID);
+
+            Assert.Equal(true, controller.ViewBag.MustEscalate);
+        }
+
+        private Announcement ChairDraft(string status, string approval)
+        {
+            var post = _db.AddAnnouncement(_chair, "Chair draft");
+            post.Status = status;
+            post.ApprovalStatus = approval;
+            post.PublishedAt = status == "Published" ? DateTime.Now : null;
+            _db.Context.SaveChanges();
+            _db.Target(post, d: _itis);
+            return post;
+        }
+
+        private AnnouncementFormViewModel EditToCollege(Announcement post) => new()
+        {
+            AnnouncementID = post.AnnouncementID,
+            Title = post.Title,
+            Body = "Body",
+            CategoryID = _db.CategoryID(),
+            TargetCollegeIDs = new() { _ccit.CollegeID }
+        };
+
+        [Fact]
+        public async Task Edit_ChairAddsCollegeToApprovedDraft_SendsItToTheDean()
+        {
+            var post = ChairDraft("Draft", "Approved");
+
+            await As(_chair).Edit(EditToCollege(post));
+
+            Assert.Equal("PendingDean", Saved("Chair draft").ApprovalStatus);
+            Assert.Contains(_notes.Sent, n => n.UserId == _dean.UserID);
+        }
+
+        [Fact]
+        public async Task Edit_ChairAddsCollegeToPublishedPost_IsRefused()
+        {
+            var post = ChairDraft("Published", "Approved");
+
+            var result = await As(_chair).Edit(EditToCollege(post));
+
+            Assert.IsType<ViewResult>(result);
+            Assert.False(_db.NewContext().AnnouncementTargets.Any(t =>
+                t.AnnouncementID == post.AnnouncementID && t.CollegeID != null));
+            Assert.Equal("Published", Saved("Chair draft").Status);
+        }
+
         // ─── Review from the dashboard ─────────
 
         private AnnouncementController WithUrl(AnnouncementController controller)

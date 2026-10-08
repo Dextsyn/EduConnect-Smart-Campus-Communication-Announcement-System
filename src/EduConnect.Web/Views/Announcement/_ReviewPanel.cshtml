@@ -61,22 +61,35 @@
                     {
                         <input type="hidden" name="returnUrl" value="@returnUrl" />
                     }
+                    @{ var mustEscalate = role == RoleNames.Chairperson && ViewBag.MustEscalate == true; }
                     @if (role == RoleNames.Chairperson)
                     {
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="escalateToDean" value="true"
-                                   id="escalateToDean_@Model.AnnouncementID" @(ViewBag.CanEscalate == true ? "" : "disabled") />
+                                   id="escalateToDean_@Model.AnnouncementID"
+                                   @(mustEscalate ? "checked" : "")
+                                   @(ViewBag.CanEscalate == true && !mustEscalate ? "" : "disabled") />
                             <label class="form-check-label small" for="escalateToDean_@Model.AnnouncementID">
                                 This is a Dean-level matter — send it to the Dean for final approval
                             </label>
-                            @if (ViewBag.CanEscalate != true)
+                            @if (mustEscalate)
+                            {
+                                <div class="form-text">
+                                    It reaches the whole college, so the Dean gives the final approval.
+                                    @if (ViewBag.CanEscalate != true)
+                                    {
+                                        <span class="text-danger">Your college has no Dean to send it to yet.</span>
+                                    }
+                                </div>
+                            }
+                            else if (ViewBag.CanEscalate != true)
                             {
                                 <div class="form-text">Your college has no Dean to send it to.</div>
                             }
                         </div>
                     }
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-check2 me-2"></i>Approve
+                        <i class="bi bi-check2 me-2"></i>@(mustEscalate ? "Approve and send to the Dean" : "Approve")
                     </button>
                 </form>
             </div>
