@@ -1,6 +1,7 @@
 using EduConnect.Web;
 using EduConnect.Web.Controllers;
 using EduConnect.Web.Models;
+using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -30,10 +31,14 @@ namespace EduConnect.Tests
             return controller;
         }
 
+        private ReportingSanctionService Sanctions() =>
+            new(_db.Context, new FakeNotificationService(), new FakeEmailService(),
+                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = FakeSession.HttpContextWith(_session) }));
+
         private StaffController Staff(User staff)
         {
             LogIn(staff, RoleNames.Staff);
-            return Wire(new StaffController(_db.Context, _notes));
+            return Wire(new StaffController(_db.Context, _notes, Sanctions()));
         }
 
         private SafetyReportController Reporting(User user)
@@ -41,7 +46,7 @@ namespace EduConnect.Tests
             LogIn(user, RoleNames.Student);
             return Wire(new SafetyReportController(
                 _db.Context, null!, new FakeNotificationService(), new FakeEmailService(),
-                NullLogger<SafetyReportController>.Instance, new FakeBlobStorage()));
+                NullLogger<SafetyReportController>.Instance, new FakeBlobStorage(), Sanctions()));
         }
 
         private static IFormFile PhotoFile()
@@ -305,7 +310,7 @@ namespace EduConnect.Tests
         {
             var student = _db.AddUser(RoleNames.Student);
             LogIn(student, RoleNames.Student);
-            var controller = Wire(new StaffController(_db.Context, _notes));
+            var controller = Wire(new StaffController(_db.Context, _notes, Sanctions()));
 
             var result = await controller.Activity(new StaffActivityFilterViewModel());
 

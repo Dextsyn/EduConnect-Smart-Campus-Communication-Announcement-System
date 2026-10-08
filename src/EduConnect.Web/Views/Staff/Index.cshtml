@@ -59,6 +59,7 @@
                     <option value="Investigating" selected="@(filter.Status == "Investigating" ? "selected" : null)">Investigating</option>
                     <option value="Resolved" selected="@(filter.Status == "Resolved" ? "selected" : null)">Resolved</option>
                     <option value="Dismissed" selected="@(filter.Status == "Dismissed" ? "selected" : null)">Dismissed</option>
+                    <option value="False report" selected="@(filter.Status == "False report" ? "selected" : null)">False report</option>
                 </select>
             </div>
             <div class="col-12 col-sm-4">
@@ -126,6 +127,8 @@
                                             "Investigating" => ("bg-primary",           "Investigating"),
                                             "Resolved"      => ("bg-success",           "Resolved"),
                                             "Dismissed"     => ("bg-secondary",         "Dismissed"),
+                                            EduConnect.Web.Models.IncidentReport.FalseReport
+                                                            => ("bg-danger",            "False report"),
                                             _               => ("bg-light text-dark",   r.Status)
                                         };
                                     }

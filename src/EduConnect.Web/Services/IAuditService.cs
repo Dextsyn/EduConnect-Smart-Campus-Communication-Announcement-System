@@ -7,8 +7,9 @@ namespace EduConnect.Web.Services
         public const string Colleges = "Colleges";
         public const string Departments = "Departments";
         public const string Programs = "Programs";
+        public const string SafetyReports = "Safety Reports";
 
-        public static readonly string[] All = { Users, Colleges, Departments, Programs };
+        public static readonly string[] All = { Users, Colleges, Departments, Programs, SafetyReports };
     }
 
     // Who-did-what records for user and academic-structure changes.

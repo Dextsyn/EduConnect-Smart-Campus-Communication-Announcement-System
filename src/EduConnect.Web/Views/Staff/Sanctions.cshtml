@@ -1,0 +1,154 @@
+@model List<EduConnect.Web.Models.ReportingSanction>
+@{
+    ViewData["Title"] = "Report Sanctions";
+    bool isAdmin = ViewBag.IsAdmin == true;
+    var now = DateTime.Now;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-flag me-2 text-danger"></i>Report Sanctions
+        </h4>
+        <small class="text-muted">
+            Warnings and suspensions from false safety reports. Open appeals are listed first.
+            @(isAdmin ? "" : "Only an Administrator can decide appeals or revoke a sanction.")
+        </small>
+    </div>
+    <a href="/Staff" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back to Reports
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="small text-muted mb-3">
+    Ladder (false reports in the last 12 months): 1st — warning · 2nd — 7-day suspension ·
+    3rd and later — 30-day suspension and referral to the Office of Student Affairs (contact OSA directly).
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="ec-empty">
+            <i class="bi bi-check2-circle"></i>
+            No false-report sanctions
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var s in Model)
+        {
+            var active = s.IsActiveSuspensionAt(now);
+            <div class="col-12">
+                <div class="card border-0 shadow-sm @(s.AppealPending ? "border-start border-4 border-warning" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+                            <div>
+                                <div class="fw-semibold">
+                                    @s.User.FirstName @s.User.LastName
+                                    <span class="text-muted fw-normal small">@(s.User.StudentID ?? "")</span>
+                                </div>
+                                <div class="small text-muted">
+                                    @(s.Type == EduConnect.Web.Models.ReportingSanction.Warning ? "Warning" : "Suspension")
+                                    · strike @s.Strike
+                                    · <a href="/Staff/ReportDetails/@s.ReportID">report #@s.ReportID</a>
+                                    · by @(s.IssuedByName ?? "—") on @s.IssuedAt.ToString("MMM dd, yyyy h:mm tt")
+                                    @if (s.EndsAt != null)
+                                    {
+                                        <span>· @(active ? "until" : "ended") @s.EndsAt.Value.ToString("MMM dd, yyyy h:mm tt")</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="d-flex gap-1 flex-wrap">
+                                @if (s.ReferredToOsa && !s.IsRevoked)
+                                {
+                                    <span class="badge text-bg-danger">Refer to OSA</span>
+                                }
+                                @if (s.IsRevoked)
+                                {
+                                    <span class="badge bg-secondary">Revoked</span>
+                                }
+                                else if (active)
+                                {
+                                    <span class="badge bg-dark">Suspended now</span>
+                                }
+                                @if (s.AppealPending)
+                                {
+                                    <span class="badge bg-warning text-dark">Appeal open</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="small mb-2"><span class="fw-semibold">Reason:</span> <span class="text-break">@s.Reason</span></div>
+
+                        @if (s.AppealedAt != null)
+                        {
+                            <div class="p-2 bg-light rounded small mb-2">
+                                <span class="fw-semibold">Appeal (@s.AppealedAt.Value.ToString("MMM dd, yyyy")):</span>
+                                <span class="text-break" style="white-space: pre-line;">@s.AppealText</span>
+                            </div>
+                        }
+                        @if (s.IsRevoked)
+                        {
+                            <div class="small text-muted">
+                                Revoked by @(s.RevokedBy == null ? "—" : $"{s.RevokedBy.FirstName} {s.RevokedBy.LastName}")
+                                on @s.RevokedAt!.Value.ToString("MMM dd, yyyy"): @s.RevokeReason
+                            </div>
+                        }
+                        else if (s.AppealUpheldAt != null)
+                        {
+                            <div class="small text-muted">
+                                Appeal upheld by @(s.AppealUpheldBy == null ? "—" : $"{s.AppealUpheldBy.FirstName} {s.AppealUpheldBy.LastName}")
+                                on @s.AppealUpheldAt.Value.ToString("MMM dd, yyyy")@(string.IsNullOrWhiteSpace(s.AppealUpheldNote) ? "" : ": " + s.AppealUpheldNote)
+                            </div>
+                        }
+
+                        @if (isAdmin && !s.IsRevoked)
+                        {
+                            <div class="row g-2 mt-1">
+                                @if (s.AppealPending)
+                                {
+                                    <div class="col-12 col-md-6">
+                                        <form method="post" action="/Staff/UpholdAppeal/@s.SanctionID">
+                                            @Html.AntiForgeryToken()
+                                            <label for="uphold_@s.SanctionID" class="form-label small fw-semibold mb-1">Keep the sanction</label>
+                                            <input id="uphold_@s.SanctionID" name="note" class="form-control form-control-sm mb-2"
+                                                   placeholder="Note for the student (optional)" />
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Uphold</button>
+                                        </form>
+                                    </div>
+                                }
+                                <div class="col-12 col-md-6">
+                                    <form method="post" action="/Staff/RevokeSanction/@s.SanctionID"
+                                          onsubmit="return confirm('Revoke this sanction? It stops counting, any suspension ends now, and the report returns to its earlier status.');">
+                                        @Html.AntiForgeryToken()
+                                        <label for="revoke_@s.SanctionID" class="form-label small fw-semibold mb-1">Revoke (the report wasn't false)</label>
+                                        <input id="revoke_@s.SanctionID" name="reason" class="form-control form-control-sm mb-2"
+                                               placeholder="Reason, shown to the student" required />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

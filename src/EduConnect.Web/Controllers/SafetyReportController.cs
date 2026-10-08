@@ -15,6 +15,7 @@ namespace EduConnect.Web.Controllers
         private readonly IEmailService _emailService;
         private readonly ILogger<SafetyReportController> _logger;
         private readonly IBlobStorageService _blobStorageService;
+        private readonly IReportingSanctionService _sanctions;
 
         public SafetyReportController(
             ApplicationDbContext context,
@@ -22,7 +23,8 @@ namespace EduConnect.Web.Controllers
             INotificationService notificationService,
             IEmailService emailService,
             ILogger<SafetyReportController> logger,
-            IBlobStorageService blobStorageService)
+            IBlobStorageService blobStorageService,
+            IReportingSanctionService sanctions)
         {
             _context = context;
             _environment = environment;
@@ -30,6 +32,7 @@ namespace EduConnect.Web.Controllers
             _emailService = emailService;
             _logger = logger;
             _blobStorageService = blobStorageService;
+            _sanctions = sanctions;
         }
 
         private bool IsLoggedIn() =>
@@ -50,10 +53,14 @@ namespace EduConnect.Web.Controllers
         }
 
         // GET /SafetyReport/Submit
-        public IActionResult Submit()
+        public async Task<IActionResult> Submit()
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
+
+            if (await _sanctions.GetActiveSuspensionAsync(GetUserID()) is { } suspension)
+                return View("Suspended", suspension);
+
             return View();
         }
 
@@ -64,6 +71,10 @@ namespace EduConnect.Web.Controllers
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
+
+            // Enforced here, not just by hiding the form.
+            if (await _sanctions.GetActiveSuspensionAsync(GetUserID()) is { } suspension)
+                return View("Suspended", suspension);
 
             if (model.Photo == null || model.Photo.Length == 0)
                 ModelState.AddModelError("Photo", "Please attach a photo of the issue.");
@@ -158,7 +169,31 @@ namespace EduConnect.Web.Controllers
                 .OrderByDescending(r => r.ReportedAt)
                 .ToListAsync();
 
+            // Shown even while suspended: a suspension only stops new reports.
+            ViewData["Sanctions"] = await _context.ReportingSanctions
+                .Where(s => s.UserID == userID)
+                .OrderByDescending(s => s.IssuedAt)
+                .ToListAsync();
+
             return View(reports);
+        }
+
+        // POST /SafetyReport/Appeal/{id}
+        // One appeal per sanction; an Administrator decides it.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Appeal(int id, string? appealText)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var result = await _sanctions.AppealAsync(id, GetUserID(), appealText ?? "");
+            if (result.Ok)
+                TempData["Success"] = "Your appeal was sent. An administrator will review it.";
+            else
+                TempData["Error"] = result.Error;
+
+            return RedirectToAction("MyReports");
         }
 
         private async Task DispatchNotificationsAsync(IncidentReport report)

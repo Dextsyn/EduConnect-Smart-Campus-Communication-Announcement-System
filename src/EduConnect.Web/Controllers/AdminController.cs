@@ -957,6 +957,11 @@ namespace EduConnect.Web.Controllers
                 .AnyAsync(r => r.ReportedByID == id || r.HandledByID == id);
             var hasOrgAnnouncements = await _context.OrgAnnouncements
                 .AnyAsync(a => a.PostedByID == id);
+            // False-report sanctions are disciplinary records: kept for the
+            // student who received one and the staff who acted on it.
+            var hasSanctions = await _context.ReportingSanctions
+                .AnyAsync(s => s.UserID == id || s.IssuedByID == id ||
+                               s.RevokedByID == id || s.AppealUpheldByID == id);
 
             if (user.Announcements.Any() ||
                 user.OrganizedEvents.Any() ||
@@ -964,12 +969,13 @@ namespace EduConnect.Web.Controllers
                 hasApprovedAnnouncements ||
                 hasCreatedStudyGroups ||
                 hasIncidentReports ||
-                hasOrgAnnouncements)
+                hasOrgAnnouncements ||
+                hasSanctions)
             {
                 TempData["Error"] =
                     $"Cannot delete {user.FirstName} {user.LastName} — " +
                     "this user has content records (announcements, events, study groups, " +
-                    "incident reports, or approvals) that prevent deletion.";
+                    "incident reports, report sanctions, or approvals) that prevent deletion.";
                 return RedirectToAction("Users");
             }
 

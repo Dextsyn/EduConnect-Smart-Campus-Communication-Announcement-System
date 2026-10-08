@@ -1,14 +1,9 @@
 @model EduConnect.Web.Models.IncidentReport
 @{
     ViewData["Title"] = $"Report #{Model.ReportID}";
-    var (badgeClass, badgeLabel) = Model.Status switch
-    {
-        "Pending"       => ("ec-chip ec-chip-gold",     "Pending"),
-        "Investigating" => ("ec-chip ec-chip-academic", "Investigating"),
-        "Resolved"      => ("badge text-bg-success",    "Resolved"),
-        "Dismissed"     => ("ec-chip ec-chip-neutral",  "Dismissed"),
-        _               => ("bg-light text-dark",       Model.Status)
-    };
+    var isFalse = Model.Status == EduConnect.Web.Models.IncidentReport.FalseReport;
+    var preview = ViewBag.FalseReportPreview as EduConnect.Web.Services.FalseReportPreview;
+    var sanction = ViewBag.Sanction as EduConnect.Web.Models.ReportingSanction;
 }
 
 <!-- Header -->
@@ -20,7 +15,7 @@
         </h4>
         <small class="text-muted">
             <span class="badge bg-secondary me-1">@Model.IncidentType</span>
-            <span class="@badgeClass">@badgeLabel</span>
+            <partial name="_ReportStatusChip" model="Model.Status" />
         </small>
     </div>
     <a href="/Staff" class="btn btn-outline-secondary btn-sm">
@@ -32,6 +27,13 @@
 {
     <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
         <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 }
@@ -129,6 +131,40 @@
             </div>
         }
 
+        @if (isFalse)
+        {
+            <div class="card border-0 shadow-sm border-start border-danger border-4">
+                <div class="card-body p-4">
+                    <h6 class="text-danger text-uppercase fw-bold mb-2 small">
+                        <i class="bi bi-flag-fill me-1"></i>Marked as a false report
+                    </h6>
+                    @if (sanction != null)
+                    {
+                        <p class="small mb-2">
+                            <strong>@(sanction.Type == EduConnect.Web.Models.ReportingSanction.Warning
+                                ? "Warning"
+                                : $"Suspended until {sanction.EndsAt:MMM dd, yyyy h:mm tt}")</strong>
+                            · strike @sanction.Strike in 12 months
+                            @if (sanction.ReferredToOsa)
+                            {
+                                <span class="badge text-bg-danger ms-1">Refer to OSA</span>
+                            }
+                        </p>
+                        <p class="small text-muted mb-2">Issued by @(sanction.IssuedByName ?? "—") on @sanction.IssuedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-2">No warning or suspension was given (the reporter isn't a student, or the report was filed anonymously).</p>
+                    }
+                    <p class="small mb-0">
+                        Only an Administrator can reverse this, from
+                        <a href="/Staff/Sanctions">Report Sanctions</a>.
+                    </p>
+                </div>
+            </div>
+        }
+        else
+        {
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
                 <h6 class="text-muted text-uppercase fw-bold mb-3 small">
@@ -177,6 +213,41 @@
                 </form>
             </div>
         </div>
+        }
+
+        @if (preview?.CanMark == true)
+        {
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body p-4">
+                    <h6 class="text-danger text-uppercase fw-bold mb-2 small">
+                        <i class="bi bi-flag me-1"></i>Mark as false report
+                    </h6>
+                    <p class="small text-muted mb-2">
+                        Only for a report filed <strong>knowingly</strong> false, not one that
+                        was mistaken or made in good faith.
+                    </p>
+                    <div class="alert @(preview.Sanctions ? "alert-warning" : "alert-secondary") small py-2">
+                        @preview.Summary
+                    </div>
+                    <form asp-action="MarkFalse" asp-route-id="@Model.ReportID" method="post"
+                          onsubmit="return confirm('Mark report #@Model.ReportID as a false report? @(preview.Sanctions ? "The reporter will be sanctioned and notified." : "The reporter will be notified.")');">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label for="falseReason" class="form-label fw-semibold small">
+                                Why is it false? <span class="text-danger">*</span>
+                            </label>
+                            <textarea id="falseReason" name="reason" class="form-control" rows="3" required
+                                      placeholder="What staff found. The reporter will see this."></textarea>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-outline-danger fw-semibold">
+                                <i class="bi bi-flag me-2"></i>Mark as False Report
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
 
     </div>
 </div>
