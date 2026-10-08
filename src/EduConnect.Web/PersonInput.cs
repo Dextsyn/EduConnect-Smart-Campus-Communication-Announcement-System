@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using EduConnect.Web.Models;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +48,17 @@ namespace EduConnect.Web
 
         public static string? NormalizeSuffix(string? value) =>
             string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        // Lower-case without accents, for name search: "Peña" -> "pena".
+        public static string FoldForSearch(string? value)
+        {
+            var decomposed = (value ?? "").Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(decomposed.Length);
+            foreach (var c in decomposed)
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                    sb.Append(char.ToLowerInvariant(c));
+            return sb.ToString().Normalize(NormalizationForm.FormC);
+        }
 
         public static bool IsStudentRole(string? roleName) =>
             roleName is RoleNames.Student or RoleNames.StudentPending;
