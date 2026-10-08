@@ -74,24 +74,46 @@ namespace EduConnect.Web.Controllers
         // Organizer, or a Dean / Chairperson whose college /
         // department the organizer is placed in. Requires
         // Event.Organizer to be loaded.
-        private async Task<bool> CanScanRegistration(
-            EventRegistration registration)
+        private Task<bool> CanScanRegistration(
+            EventRegistration registration) =>
+            CanScanEvent(registration.Event);
+
+        // Same rule for an event; requires Event.Organizer to be loaded.
+        private async Task<bool> CanScanEvent(Event ev)
         {
             var userID = GetUserID();
             var roleName = GetRoleName();
 
-            if (registration.Event.OrganizerID == userID)
+            if (ev.OrganizerID == userID)
                 return true;
 
             var me = await _context.Users
                 .Where(u => u.UserID == userID)
                 .Select(u => new { u.CollegeID, u.DepartmentID })
                 .FirstOrDefaultAsync();
-            var organizer = registration.Event.Organizer;
+            var organizer = ev.Organizer;
 
             return me != null && EventAccess.ManagesEventsOf(roleName,
                 me.CollegeID, me.DepartmentID,
                 organizer.CollegeID, organizer.DepartmentID);
+        }
+
+        // The events CanScanEvent allows, as a query.
+        private async Task<IQueryable<Event>> ScannableEventsAsync()
+        {
+            var userID = GetUserID();
+            var roleName = GetRoleName();
+            var me = await _context.Users
+                .Where(u => u.UserID == userID)
+                .Select(u => new { u.CollegeID, u.DepartmentID })
+                .FirstOrDefaultAsync();
+            var collegeID = roleName == RoleNames.Dean ? me?.CollegeID : null;
+            var departmentID = roleName == RoleNames.Chairperson ? me?.DepartmentID : null;
+
+            return _context.Events.Where(e =>
+                e.OrganizerID == userID ||
+                (collegeID != null && e.Organizer.CollegeID == collegeID) ||
+                (departmentID != null && e.Organizer.DepartmentID == departmentID));
         }
 
         private bool IsCreator(Event ev) =>
@@ -1612,7 +1634,7 @@ namespace EduConnect.Web.Controllers
             if (!CanScan())
                 return RedirectToAction("Index");
 
-            var events = await _context.Events
+            var events = await (await ScannableEventsAsync())
                 .Where(e =>
                     e.StartDateTime.Date >= DateTime.Today &&
                     e.Status != "Cancelled")
@@ -1674,6 +1696,89 @@ namespace EduConnect.Web.Controllers
                 startDateTime   = registration.Event.StartDateTime
                                     .ToString("MMMM dd, yyyy · h:mm tt"),
                 location        = registration.Event.Location ?? "Online"
+            });
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Event/SearchRegistrants?eventId=5&q=juan
+        //  Scanner manual lookup: one event's registrants by name or
+        //  student number. Every word must match part of the name, in any
+        //  order, ignoring case and accents ("pena" finds "Peña").
+        // ═══════════════════════════════════════
+        private const int LookupMinLength = 2;
+        private const int LookupMaxResults = 10;
+
+        public async Task<IActionResult> SearchRegistrants(int eventId, string? q)
+        {
+            if (!IsLoggedIn())
+                return Json(new { error = "unauthorized" });
+
+            if (!CanScan())
+                return Json(new { error = "forbidden" });
+
+            var ev = await _context.Events
+                .Include(e => e.Organizer)
+                .FirstOrDefaultAsync(e => e.EventID == eventId);
+
+            if (ev == null)
+                return Json(new { error = "not_found" });
+
+            if (!await CanScanEvent(ev))
+                return Json(new { error = "forbidden" });
+
+            var words = PersonInput.FoldForSearch(q)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (string.Join("", words).Length < LookupMinLength)
+                return Json(new { results = Array.Empty<object>() });
+
+            // An event's registrants are few enough to match here, which
+            // keeps accent folding the same on every database.
+            var registrants = await _context.EventRegistrations
+                .Where(r => r.EventID == eventId)
+                .Select(r => new
+                {
+                    r.RegistrationID,
+                    r.UserID,
+                    r.Status,
+                    r.User.FirstName,
+                    r.User.LastName,
+                    r.User.Suffix,
+                    r.User.StudentID
+                })
+                .ToListAsync();
+
+            var matches = registrants
+                .Select(r => new
+                {
+                    Row = r,
+                    Name = $"{r.FirstName} {r.LastName}{(r.Suffix == null ? "" : " " + r.Suffix)}"
+                })
+                .Where(m =>
+                {
+                    var name = PersonInput.FoldForSearch(m.Name);
+                    return words.All(w => name.Contains(w)) ||
+                           (words.Length == 1 && m.Row.StudentID != null &&
+                            m.Row.StudentID.StartsWith(words[0]));
+                })
+                .OrderBy(m => m.Row.LastName)
+                .ThenBy(m => m.Row.FirstName)
+                .ThenBy(m => m.Row.StudentID)
+                .Take(LookupMaxResults)
+                .ToList();
+
+            var placements = await _placement.GetPlacementLabelsAsync(
+                matches.Select(m => m.Row.UserID));
+
+            return Json(new
+            {
+                results = matches.Select(m => new
+                {
+                    registrationID = m.Row.RegistrationID,
+                    name = m.Name,
+                    studentID = m.Row.StudentID ?? "—",
+                    placement = placements.GetValueOrDefault(m.Row.UserID, "—"),
+                    status = m.Row.Status
+                })
             });
         }
 
