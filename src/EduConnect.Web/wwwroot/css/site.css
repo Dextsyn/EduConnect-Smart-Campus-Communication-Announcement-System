@@ -210,6 +210,9 @@ a:hover { color: var(--ec-navy); }
 }
 .ec-drawer .btn-close { filter: invert(1); }
 
+/* ── Review side panel (Dean / Chairperson dashboard) ── */
+.ec-review-panel { width: min(640px, 100vw) !important; }
+
 /* ── Main content shell ── */
 .ec-main { padding: 1.5rem; min-height: calc(100vh - var(--ec-topbar-h)); margin-top: var(--ec-topbar-h); }
 @media (min-width: 992px) {

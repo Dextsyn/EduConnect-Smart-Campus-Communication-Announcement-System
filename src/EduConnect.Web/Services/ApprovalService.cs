@@ -55,6 +55,25 @@ namespace EduConnect.Web.Services
                 : "Your department has no Chairperson and your college has no Dean to review this. Contact your administrator.");
         }
 
+        public async Task<List<int>> ReviewerIdsAsync(int authorId)
+        {
+            var author = await _context.Users
+                .Where(u => u.UserID == authorId)
+                .Select(u => new { u.CollegeID, u.DepartmentID })
+                .FirstOrDefaultAsync();
+            if (author == null)
+                return new List<int>();
+
+            return await _context.Users
+                .Where(u => u.IsActive &&
+                    ((u.Role.RoleName == RoleNames.Chairperson &&
+                      author.DepartmentID != null && u.DepartmentID == author.DepartmentID) ||
+                     (u.Role.RoleName == RoleNames.Dean &&
+                      author.CollegeID != null && u.CollegeID == author.CollegeID)))
+                .Select(u => u.UserID)
+                .ToListAsync();
+        }
+
         public IQueryable<Announcement> ReviewableBy(Viewer reviewer)
         {
             var departmentId = reviewer.DepartmentID;

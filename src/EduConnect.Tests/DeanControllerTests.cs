@@ -54,6 +54,34 @@ namespace EduConnect.Tests
             Assert.Empty(deanRows);
         }
 
+        [Fact]
+        public async Task Pending_ReturnsTheListForLiveRefresh()
+        {
+            var ccit = _db.AddCollege("CCIT");
+            var itis = _db.AddDepartment(ccit, "IT&IS");
+            var faculty = _db.AddUser(RoleNames.Faculty, ccit.CollegeID, itis.DepartmentID);
+            var chair = _db.AddUser(RoleNames.Chairperson, ccit.CollegeID, itis.DepartmentID);
+            var post = _db.AddAnnouncement(faculty, "Needs the chair");
+            post.Status = "Draft";
+            post.ApprovalStatus = "PendingChair";
+            _db.Context.SaveChanges();
+
+            var session = new FakeSession();
+            session.SetString("UserID", chair.UserID.ToString());
+            session.SetString("RoleName", RoleNames.Chairperson);
+            var controller = new DeanController(_db.Context, NullLogger<DeanController>.Instance, new AudienceService(_db.Context), new ApprovalService(_db.Context))
+            {
+                ControllerContext = new ControllerContext { HttpContext = FakeSession.HttpContextWith(session) }
+            };
+
+            var view = Assert.IsType<PartialViewResult>(await controller.Pending());
+
+            Assert.Equal("_PendingAnnouncements", view.ViewName);
+            var model = Assert.IsType<PendingAnnouncementsViewModel>(view.Model);
+            Assert.Equal(1, model.Count);
+            Assert.Equal("Needs the chair", Assert.Single(model.Rows).Title);
+        }
+
         private async Task<List<PendingAnnouncementRow>> PendingFor(EduConnect.Web.Models.User user, string role)
         {
             var session = new FakeSession();

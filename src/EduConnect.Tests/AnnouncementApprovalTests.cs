@@ -313,6 +313,121 @@ namespace EduConnect.Tests
                 _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).Title);
         }
 
+        // ─── Review from the dashboard ─────────
+
+        private AnnouncementController WithUrl(AnnouncementController controller)
+        {
+            controller.Url = new FakeUrlHelper();
+            return controller;
+        }
+
+        [Fact]
+        public async Task Approve_SecondReviewer_IsToldItWasAlreadyHandled()
+        {
+            var secondChair = _db.AddUser(RoleNames.Chairperson, _ccit.CollegeID, _itis.DepartmentID);
+            SetStatus("PendingChair");
+            await As(_chair).Approve(_post.AnnouncementID);
+            _notes.Sent.Clear();
+
+            var late = As(secondChair);
+            await late.Approve(_post.AnnouncementID);
+
+            Assert.Contains("already", (string)late.TempData["Error"]!);
+            Assert.Equal(_chair.UserID,
+                _db.NewContext().Announcements.Single(a => a.AnnouncementID == _post.AnnouncementID).ApprovedByID);
+            Assert.Empty(_notes.Sent);
+        }
+
+        [Fact]
+        public async Task Reject_AfterAnotherReviewerApproved_ChangesNothing()
+        {
+            var secondChair = _db.AddUser(RoleNames.Chairperson, _ccit.CollegeID, _itis.DepartmentID);
+            SetStatus("PendingChair");
+            await As(_chair).Approve(_post.AnnouncementID);
+
+            var late = As(secondChair);
+            await late.Reject(_post.AnnouncementID, "Too late");
+
+            Assert.Equal("Approved", StatusNow());
+            Assert.Contains("already", (string)late.TempData["Error"]!);
+        }
+
+        [Fact]
+        public async Task Approve_WithReturnUrl_GoesBackThere()
+        {
+            SetStatus("PendingChair");
+
+            var result = await WithUrl(As(_chair)).Approve(_post.AnnouncementID, returnUrl: "/Dean");
+
+            Assert.Equal("/Dean", Assert.IsType<RedirectResult>(result).Url);
+        }
+
+        [Fact]
+        public async Task Reject_WithoutReason_FromDashboard_StaysPendingAndGoesBack()
+        {
+            SetStatus("PendingChair");
+
+            var controller = WithUrl(As(_chair));
+            var result = await controller.Reject(_post.AnnouncementID, " ", returnUrl: "/Dean");
+
+            Assert.Equal("/Dean", Assert.IsType<RedirectResult>(result).Url);
+            Assert.Equal("PendingChair", StatusNow());
+            Assert.NotNull(controller.TempData["Error"]);
+        }
+
+        [Fact]
+        public async Task Submit_SignalsTheReviewersQueues()
+        {
+            await As(_faculty).Submit(_post.AnnouncementID);
+
+            Assert.Contains(_notes.Signals, s => s.UserId == _chair.UserID && s.EventName == "ReviewQueueChanged");
+            Assert.Contains(_notes.Signals, s => s.UserId == _dean.UserID);
+            Assert.DoesNotContain(_notes.Signals, s => s.UserId == _otherChair.UserID);
+        }
+
+        [Fact]
+        public async Task Approve_SignalsEveryReviewerOfThePost()
+        {
+            var secondChair = _db.AddUser(RoleNames.Chairperson, _ccit.CollegeID, _itis.DepartmentID);
+            SetStatus("PendingChair");
+
+            await As(_chair).Approve(_post.AnnouncementID);
+
+            Assert.Contains(_notes.Signals, s => s.UserId == secondChair.UserID && s.EventName == "ReviewQueueChanged");
+            Assert.Contains(_notes.Signals, s => s.UserId == _dean.UserID);
+        }
+
+        [Fact]
+        public async Task Delete_PendingPost_SignalsTheReviewers()
+        {
+            SetStatus("PendingChair");
+
+            await As(_faculty).Delete(_post.AnnouncementID);
+
+            Assert.Contains(_notes.Signals, s => s.UserId == _chair.UserID);
+        }
+
+        [Fact]
+        public async Task ReviewPanel_ReviewableItem_ReturnsThePanel()
+        {
+            SetStatus("PendingChair");
+
+            var result = await As(_chair).ReviewPanel(_post.AnnouncementID);
+
+            var view = Assert.IsType<PartialViewResult>(result);
+            Assert.Equal("_ReviewPanel", view.ViewName);
+            Assert.Equal(_post.AnnouncementID, Assert.IsType<Announcement>(view.Model).AnnouncementID);
+        }
+
+        [Fact]
+        public async Task ReviewPanel_NotReviewableByThisUser_IsNotFound()
+        {
+            SetStatus("PendingChair");
+
+            Assert.IsType<NotFoundResult>(await As(_otherChair).ReviewPanel(_post.AnnouncementID));
+            Assert.IsType<NotFoundResult>(await As(_dean).ReviewPanel(_post.AnnouncementID));
+        }
+
         [Fact]
         public async Task Edit_DeansOwnApprovedDraft_StaysEditable()
         {

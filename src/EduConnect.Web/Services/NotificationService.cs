@@ -83,5 +83,9 @@ namespace EduConnect.Web.Services
                         sentAt = n.SentAt
                     })));
         }
+
+        public Task SignalAsync(IEnumerable<int> userIds, string eventName, object payload) =>
+            _hub.Clients.Groups(userIds.Distinct().Select(id => $"user-{id}").ToList())
+                .SendAsync(eventName, payload);
     }
 }

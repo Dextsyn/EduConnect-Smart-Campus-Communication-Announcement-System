@@ -22,6 +22,14 @@
     </div>
 }
 
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
 <div class="card shadow-sm">
     <div class="card-body p-0">
         @if (announcements == null || !((IEnumerable<dynamic>)announcements).Any())

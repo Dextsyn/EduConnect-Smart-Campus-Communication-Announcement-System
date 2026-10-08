@@ -4,6 +4,8 @@ using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
+using System.Linq.Expressions;
 
 namespace EduConnect.Web.Controllers
 {
@@ -155,6 +157,24 @@ namespace EduConnect.Web.Controllers
                     $"<p><a href='https://localhost:7135/Announcement/Review/" +
                     $"{announcement.AnnouncementID}'>Click here to review</a></p>");
             }
+        }
+
+        // Tells the open dashboards of everyone who reviews this author's
+        // posts that their pending list changed, so it refreshes live. A
+        // reviewer looking at this post sees who acted on it.
+        private async Task ReviewQueueChangedAsync(Announcement announcement, string change)
+        {
+            var reviewerIds = await _approval.ReviewerIdsAsync(announcement.AuthorID);
+            if (reviewerIds.Count == 0)
+                return;
+
+            await _notificationService.SignalAsync(reviewerIds, "ReviewQueueChanged", new
+            {
+                announcementId = announcement.AnnouncementID,
+                change,
+                byUserId = GetUserID(),
+                byName = HttpContext.Session.GetString("UserName")
+            });
         }
 
         private async Task NotifyAuthorAsync(Announcement announcement, string type,
@@ -662,6 +682,7 @@ namespace EduConnect.Web.Controllers
                     $"Announcement pending your approval: {announcement.Title}",
                     "EduConnect: Announcement Pending Your Approval",
                     "A Chairperson has sent you an announcement for final approval");
+                await ReviewQueueChangedAsync(announcement, "submitted");
                 TempData["Success"] = "Sent to the Dean for final approval.";
                 return RedirectToAction("MyAnnouncements");
             }
@@ -1080,9 +1101,15 @@ namespace EduConnect.Web.Controllers
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
 
+            var wasPending = announcement.ApprovalStatus is "PendingChair" or "PendingDean";
+
             announcement.Status = "Archived";
             announcement.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
+
+            // An archived post is withdrawn from review.
+            if (wasPending)
+                await ReviewQueueChangedAsync(announcement, "withdrawn");
 
             TempData["Success"] =
                 "Announcement archived successfully!";
@@ -1190,6 +1217,7 @@ namespace EduConnect.Web.Controllers
                 $"New announcement pending your review: {announcement.Title}",
                 "EduConnect: Announcement Pending Review",
                 "A new announcement requires your review");
+            await ReviewQueueChangedAsync(announcement, "submitted");
 
             TempData["Success"] = "Announcement submitted for review.";
             return RedirectToAction("MyAnnouncements");
@@ -1237,10 +1265,42 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
-            var roleName = GetRoleName();
-            if (roleName != RoleNames.Chairperson && roleName != RoleNames.Dean)
+            if (!IsReviewer())
                 return RedirectToAction("Index");
 
+            var announcement = await LoadForReviewAsync(id);
+            if (announcement == null)
+                return RedirectToAction("ReviewQueue");
+
+            return View(announcement);
+        }
+
+        // ═══════════════════════════════════════
+        //  GET: /Announcement/ReviewPanel/{id}
+        //  The same review, as a fragment for the dashboard's side panel
+        // ═══════════════════════════════════════
+        public async Task<IActionResult> ReviewPanel(int id, string? returnUrl = null)
+        {
+            if (!IsLoggedIn() || !IsReviewer())
+                return NotFound();
+
+            var announcement = await LoadForReviewAsync(id);
+            if (announcement == null)
+                return NotFound();
+
+            ViewData["InPanel"] = true;
+            ViewData["ReturnUrl"] = returnUrl != null && Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+            return PartialView("_ReviewPanel", announcement);
+        }
+
+        private bool IsReviewer() =>
+            GetRoleName() is RoleNames.Chairperson or RoleNames.Dean;
+
+        // The announcement as _ReviewPanel shows it, if this reviewer may
+        // act on it now; sets what the panel needs besides the model.
+        private async Task<Announcement?> LoadForReviewAsync(int id)
+        {
+            var roleName = GetRoleName();
             var viewer = await _audience.GetViewerAsync(GetUserID());
 
             var announcement = await _approval.ReviewableBy(viewer)
@@ -1250,7 +1310,7 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(a => a.AnnouncementID == id);
 
             if (announcement == null)
-                return RedirectToAction("ReviewQueue");
+                return null;
 
             ViewBag.Role = roleName;
             ViewBag.AudienceNames = await _audience.GetAudienceNamesAsync(id);
@@ -1260,7 +1320,7 @@ namespace EduConnect.Web.Controllers
                 ViewBag.CanEscalate =
                     (await _approval.RouteAsync(announcement.AuthorID, deanOnly: true)).Ok;
 
-            return View(announcement);
+            return announcement;
         }
 
         // ═══════════════════════════════════════
@@ -1269,7 +1329,7 @@ namespace EduConnect.Web.Controllers
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Approve(int id, bool escalateToDean = false)
+        public async Task<IActionResult> Approve(int id, bool escalateToDean = false, string? returnUrl = null)
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
@@ -1285,13 +1345,12 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(a => a.AnnouncementID == id);
 
             if (announcement == null)
-                return RedirectToAction("ReviewQueue");
+                return await AlreadyHandledAsync(id, returnUrl);
+
+            var now = DateTime.Now;
 
             if (roleName == RoleNames.Chairperson)
             {
-                announcement.ChairApprovedByID = userID;
-                announcement.ChairApprovedAt = DateTime.Now;
-
                 // A Dean-level matter goes on to the Dean; otherwise the
                 // Chairperson's approval is final.
                 if (escalateToDean)
@@ -1300,26 +1359,40 @@ namespace EduConnect.Web.Controllers
                     if (!routing.Ok)
                     {
                         TempData["Error"] = routing.Error;
-                        return RedirectToAction("Review", new { id });
+                        return BackTo(returnUrl, "Review", new { id });
                     }
 
-                    announcement.ApprovalStatus = "PendingDean";
-                    await _context.SaveChangesAsync();
+                    if (!await DecideAsync(id, "PendingChair", s => s
+                            .SetProperty(a => a.ApprovalStatus, "PendingDean")
+                            .SetProperty(a => a.ChairApprovedByID, userID)
+                            .SetProperty(a => a.ChairApprovedAt, now)))
+                        return await AlreadyHandledAsync(id, returnUrl);
 
                     await NotifyReviewersAsync(announcement, routing.Reviewers,
                         $"Announcement forwarded for your review: {announcement.Title}",
                         "EduConnect: Announcement Pending Your Approval",
                         "An announcement approved by the Chairperson now needs your final approval");
+                    await ReviewQueueChangedAsync(announcement, "escalated");
 
                     TempData["Success"] = "Approved and sent to the Dean for final approval.";
-                    return RedirectToAction("ReviewQueue");
+                    return BackTo(returnUrl, "ReviewQueue");
                 }
-            }
 
-            announcement.ApprovalStatus = "Approved";
-            announcement.ApprovedByID = userID;
-            announcement.ApprovedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
+                if (!await DecideAsync(id, "PendingChair", s => s
+                        .SetProperty(a => a.ApprovalStatus, "Approved")
+                        .SetProperty(a => a.ChairApprovedByID, userID)
+                        .SetProperty(a => a.ChairApprovedAt, now)
+                        .SetProperty(a => a.ApprovedByID, userID)
+                        .SetProperty(a => a.ApprovedAt, now)))
+                    return await AlreadyHandledAsync(id, returnUrl);
+            }
+            else if (!await DecideAsync(id, "PendingDean", s => s
+                         .SetProperty(a => a.ApprovalStatus, "Approved")
+                         .SetProperty(a => a.ApprovedByID, userID)
+                         .SetProperty(a => a.ApprovedAt, now)))
+            {
+                return await AlreadyHandledAsync(id, returnUrl);
+            }
 
             var approvedBy = roleName == RoleNames.Chairperson ? "the Chairperson" : "the Dean";
             await NotifyAuthorAsync(announcement,
@@ -1329,9 +1402,10 @@ namespace EduConnect.Web.Controllers
                 $"<p>Your announcement <strong>{announcement.Title}</strong> has been approved by {approvedBy}. " +
                 "You can now publish it.</p>" +
                 "<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>Go to My Announcements</a></p>");
+            await ReviewQueueChangedAsync(announcement, "approved");
 
             TempData["Success"] = "Announcement approved. The author has been notified.";
-            return RedirectToAction("ReviewQueue");
+            return BackTo(returnUrl, "ReviewQueue");
         }
 
         // ═══════════════════════════════════════
@@ -1340,7 +1414,7 @@ namespace EduConnect.Web.Controllers
         // ═══════════════════════════════════════
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Reject(int id, string rejectionReason)
+        public async Task<IActionResult> Reject(int id, string rejectionReason, string? returnUrl = null)
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
@@ -1352,7 +1426,7 @@ namespace EduConnect.Web.Controllers
             if (string.IsNullOrWhiteSpace(rejectionReason))
             {
                 TempData["Error"] = "A rejection reason is required.";
-                return RedirectToAction("Review", new { id });
+                return BackTo(returnUrl, "Review", new { id });
             }
 
             var viewer = await _audience.GetViewerAsync(GetUserID());
@@ -1361,14 +1435,18 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(a => a.AnnouncementID == id);
 
             if (announcement == null)
-                return RedirectToAction("ReviewQueue");
+                return await AlreadyHandledAsync(id, returnUrl);
 
-            announcement.ApprovalStatus = "Rejected";
-            if (roleName == RoleNames.Chairperson)
-                announcement.ChairRejectionReason = rejectionReason;
-            else
-                announcement.RejectionReason = rejectionReason;
-            await _context.SaveChangesAsync();
+            var reason = rejectionReason.Trim();
+            var decided = roleName == RoleNames.Chairperson
+                ? await DecideAsync(id, "PendingChair", s => s
+                    .SetProperty(a => a.ApprovalStatus, "Rejected")
+                    .SetProperty(a => a.ChairRejectionReason, reason))
+                : await DecideAsync(id, "PendingDean", s => s
+                    .SetProperty(a => a.ApprovalStatus, "Rejected")
+                    .SetProperty(a => a.RejectionReason, reason));
+            if (!decided)
+                return await AlreadyHandledAsync(id, returnUrl);
 
             var rejectedBy = roleName == RoleNames.Chairperson ? "the Chairperson" : "the Dean";
             await NotifyAuthorAsync(announcement,
@@ -1376,13 +1454,59 @@ namespace EduConnect.Web.Controllers
                 $"Your announcement was rejected by {rejectedBy}",
                 "EduConnect: Announcement Rejected",
                 $"<p>Your announcement <strong>{announcement.Title}</strong> was rejected by {rejectedBy}.</p>" +
-                $"<p><strong>Reason:</strong> {System.Net.WebUtility.HtmlEncode(rejectionReason)}</p>" +
+                $"<p><strong>Reason:</strong> {System.Net.WebUtility.HtmlEncode(reason)}</p>" +
                 "<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
                 "Go to My Announcements to revise and resubmit</a></p>");
+            await ReviewQueueChangedAsync(announcement, "rejected");
 
             TempData["Success"] = "Announcement rejected. The author has been notified.";
-            return RedirectToAction("ReviewQueue");
+            return BackTo(returnUrl, "ReviewQueue");
         }
+
+        // Records a reviewer's decision only if the announcement is still
+        // at fromStatus, in one UPDATE: when two reviewers act at once,
+        // exactly one decision lands and the other is told.
+        private async Task<bool> DecideAsync(int id, string fromStatus,
+            Expression<Func<SetPropertyCalls<Announcement>, SetPropertyCalls<Announcement>>> decision) =>
+            await _context.Announcements
+                .Where(a => a.AnnouncementID == id &&
+                            a.ApprovalStatus == fromStatus &&
+                            a.Status != "Archived")
+                .ExecuteUpdateAsync(decision) == 1;
+
+        // Why a reviewer's action found nothing to act on.
+        private async Task<IActionResult> AlreadyHandledAsync(int id, string? returnUrl)
+        {
+            var current = await _context.Announcements
+                .Where(a => a.AnnouncementID == id)
+                .Select(a => new
+                {
+                    a.Status,
+                    a.ApprovalStatus,
+                    ApprovedBy = a.ApprovedBy == null ? null
+                        : a.ApprovedBy.FirstName + " " + a.ApprovedBy.LastName
+                })
+                .FirstOrDefaultAsync();
+
+            TempData["Error"] =
+                current == null ? "Announcement not found." :
+                current.Status == "Archived" ? "The author withdrew this announcement." :
+                current.ApprovalStatus == "Approved"
+                    ? "This announcement was already approved" +
+                      (current.ApprovedBy == null ? "." : $" by {current.ApprovedBy}.") :
+                current.ApprovalStatus == "Rejected" ? "This announcement was already rejected by another reviewer." :
+                current.ApprovalStatus == "PendingDean" ? "This announcement was already sent to the Dean." :
+                "This announcement isn't waiting for your review.";
+
+            return BackTo(returnUrl, "ReviewQueue");
+        }
+
+        // Back to the page the reviewer came from (the dashboard's panel
+        // passes it), or else the given action.
+        private IActionResult BackTo(string? returnUrl, string action, object? routeValues = null) =>
+            returnUrl != null && Url.IsLocalUrl(returnUrl)
+                ? Redirect(returnUrl)
+                : RedirectToAction(action, routeValues);
 
         // ═══════════════════════════════════════
         //  POST: /Announcement/Publish/{id}

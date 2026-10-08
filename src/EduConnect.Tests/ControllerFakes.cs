@@ -55,6 +55,14 @@ namespace EduConnect.Tests
             foreach (var id in userIds) Sent.Add((id, type));
             return Task.CompletedTask;
         }
+
+        public List<(int UserId, string EventName, object Payload)> Signals { get; } = new();
+
+        public Task SignalAsync(IEnumerable<int> userIds, string eventName, object payload)
+        {
+            foreach (var id in userIds) Signals.Add((id, eventName, payload));
+            return Task.CompletedTask;
+        }
     }
 
     // Records addresses instead of sending mail.
