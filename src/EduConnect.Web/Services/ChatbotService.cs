@@ -23,6 +23,9 @@ namespace EduConnect.Web.Services
         // AISummary is NVARCHAR(255) — keep generated summaries safely inside that.
         private const int MaxSummaryLength = 250;
 
+        // How many of the latest announcements "summarize" offers.
+        private const int SummaryCandidates = 6;
+
         public ChatbotService(
             ApplicationDbContext context,
             IConfiguration config,
@@ -192,16 +195,25 @@ namespace EduConnect.Web.Services
 
         private async Task<string> HandleSummarizeIntentAsync(int userId, string roleName, string userMessage)
         {
+            // Only the latest few, taken after the audience filter so the cap
+            // never lets in an announcement the user isn't targeted for.
             var query = await BuildVisibleAnnouncementsQueryAsync(userId, roleName);
             var candidates = await query
                 .OrderByDescending(a => a.PublishedAt)
-                .Take(30)
+                .ThenByDescending(a => a.AnnouncementID)
+                .Take(SummaryCandidates)
                 .ToListAsync();
 
             if (!candidates.Any())
                 return "There are no announcements available for you to summarize right now.";
 
-            var target = ResolveSummaryTarget(candidates, userMessage);
+            // An explicit ID (what a menu chip sends) is looked up in the same
+            // scoped query, so a chip still works after newer posts push it
+            // out of the latest few.
+            var target = RequestedAnnouncementId(userMessage) is int id
+                ? candidates.FirstOrDefault(a => a.AnnouncementID == id)
+                  ?? await query.FirstOrDefaultAsync(a => a.AnnouncementID == id)
+                : ResolveSummaryTarget(candidates, userMessage);
 
             if (target == null)
             {
@@ -210,7 +222,7 @@ namespace EduConnect.Web.Services
                 var sb = new StringBuilder();
                 sb.AppendLine("Which announcement would you like me to summarize? Tap one:");
                 sb.AppendLine();
-                foreach (var a in candidates.Take(6))
+                foreach (var a in candidates)
                     sb.AppendLine($"- [{a.Title}](summarize:{a.AnnouncementID})");
                 return sb.ToString().TrimEnd();
             }
@@ -221,18 +233,16 @@ namespace EduConnect.Web.Services
         }
 
 
+        private static int? RequestedAnnouncementId(string userMessage)
+        {
+            var idMatch = Regex.Match(userMessage ?? "", @"(?:/Announcement/Details/|announcement\s*#?\s*)(\d+)",
+                RegexOptions.IgnoreCase);
+            return idMatch.Success && int.TryParse(idMatch.Groups[1].Value, out var id) ? id : null;
+        }
+
         private static Announcement? ResolveSummaryTarget(List<Announcement> candidates, string userMessage)
         {
-            var message = userMessage ?? "";
-            var lower = message.ToLowerInvariant();
-
-            var idMatch = Regex.Match(message, @"(?:/Announcement/Details/|announcement\s*#?\s*)(\d+)",
-                RegexOptions.IgnoreCase);
-            if (idMatch.Success && int.TryParse(idMatch.Groups[1].Value, out var id))
-            {
-                var byId = candidates.FirstOrDefault(a => a.AnnouncementID == id);
-                if (byId != null) return byId;
-            }
+            var lower = (userMessage ?? "").ToLowerInvariant();
 
             var byTitle = candidates
                 .Where(a => !string.IsNullOrWhiteSpace(a.Title) &&
