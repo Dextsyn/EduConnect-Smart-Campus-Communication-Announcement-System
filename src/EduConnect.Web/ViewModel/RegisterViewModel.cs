@@ -56,8 +56,7 @@ namespace EduConnect.Web.ViewModels
         public string Email => (EmailUser + EmailDomain).ToLowerInvariant();
 
         [Required(ErrorMessage = "Password is required")]
-        [MinLength(8, ErrorMessage =
-            "Password must be at least 8 characters")]
+        [RegularExpression(PersonInput.PasswordPattern, ErrorMessage = PersonInput.PasswordError)]
         [DataType(DataType.Password)]
         public string Password { get; set; }
 

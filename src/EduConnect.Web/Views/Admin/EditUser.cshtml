@@ -68,6 +68,7 @@
                     </label>
                     <input asp-for="Password" type="password" class="form-control"
                            placeholder="Leave blank to keep existing password" />
+                    <div class="form-text">If you set one: @PersonInput.PasswordHint</div>
                     <span asp-validation-for="Password" class="text-danger small"></span>
                 </div>
 

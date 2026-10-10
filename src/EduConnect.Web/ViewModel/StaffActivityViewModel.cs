@@ -29,8 +29,12 @@ namespace EduConnect.Web.ViewModels
         public int DismissedCount { get; set; }
         public int ActionCount { get; set; }
 
+        // One per report: its latest entry matching the filters.
         public List<IncidentReportActivity> Rows { get; set; } = new();
         public int TotalRows { get; set; }
+
+        // ReportID → how many entries matched (shown as "N updates").
+        public Dictionary<int, int> UpdateCounts { get; set; } = new();
 
         public int PageCount =>
             Math.Max(1, (TotalRows + PageSize - 1) / PageSize);

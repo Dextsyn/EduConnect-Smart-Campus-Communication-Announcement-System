@@ -270,9 +270,41 @@ namespace EduConnect.Tests
                 new StaffActivityFilterViewModel { Scope = StaffActivityFilterViewModel.All });
             var model = (StaffActivityViewModel)result.Model!;
 
-            Assert.Equal(2, model.Rows.Count);
+            // One row for the report: its latest action, with both entries counted.
+            var row = Assert.Single(model.Rows);
+            Assert.Equal(IncidentReportActivity.StatusChanged, row.Action);
+            Assert.Equal("Dismissed", row.ToStatus);
+            Assert.Equal(2, model.UpdateCounts[reportId]);
             Assert.Equal(1, model.ReceivedCount);
             Assert.Equal(1, model.DismissedCount);
+        }
+
+        [Fact]
+        public async Task Activity_ManyChangesToOneReport_ShowAsOneRow()
+        {
+            var me = _db.AddUser(RoleNames.Staff);
+            var busy = AddReport();
+            var quiet = AddReport();
+            var controller = Staff(me);
+
+            await controller.UpdateStatus(busy.ReportID, "Investigating", "Checking");
+            await controller.UpdateStatus(busy.ReportID, "Resolved", "Fixed");
+            await controller.UpdateStatus(busy.ReportID, "Resolved", "Fixed, bulb replaced");
+            await controller.UpdateStatus(quiet.ReportID, "Dismissed", "Duplicate");
+
+            var model = (StaffActivityViewModel)((ViewResult)await controller.Activity(
+                new StaffActivityFilterViewModel())).Model!;
+
+            Assert.Equal(2, model.Rows.Count);
+            Assert.Equal(2, model.TotalRows);
+            var busyRow = model.Rows.Single(r => r.ReportID == busy.ReportID);
+            Assert.Equal(IncidentReportActivity.NoteUpdated, busyRow.Action);   // the latest
+            Assert.Equal(3, model.UpdateCounts[busy.ReportID]);
+            Assert.Equal(1, model.UpdateCounts[quiet.ReportID]);
+            Assert.Equal(1, model.ResolvedCount);    // reports, not status changes
+            Assert.Equal(2, model.ActionCount);      // reports worked on
+            // The full trail stays on the report itself.
+            Assert.Equal(3, _db.NewContext().IncidentReportActivities.Count(a => a.ReportID == busy.ReportID));
         }
 
         [Fact]
