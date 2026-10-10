@@ -816,10 +816,6 @@ namespace EduConnect.Web.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == model.Email && u.UserID != id))
                 ModelState.AddModelError("Email", "A user with this email already exists.");
 
-            // Password validation only when provided
-            if (!string.IsNullOrWhiteSpace(model.Password) && model.Password.Length < 6)
-                ModelState.AddModelError("Password", "Password must be at least 6 characters.");
-
             var stored = await _context.Users
                 .Where(u => u.UserID == id)
                 .Select(u => new { u.FirstName, u.LastName, u.StudentID })

@@ -617,8 +617,13 @@ namespace EduConnect.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                TempData["ChangePasswordError"] =
-                    "Please fix the errors below.";
+                // The form is on Profile, reached by redirect, so say what
+                // was wrong rather than point at errors it can't show.
+                TempData["ChangePasswordError"] = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrEmpty(m))
+                    ?? "Please check the password fields.";
                 return RedirectToAction("Profile");
             }
 

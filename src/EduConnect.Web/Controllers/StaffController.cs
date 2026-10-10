@@ -275,26 +275,48 @@ namespace EduConnect.Web.Controllers
             if (!string.IsNullOrEmpty(filter.Status))
                 rows = rows.Where(a => a.ToStatus == filter.Status);
 
+            // One line per report, not per change: the report's latest
+            // matching entry, with how many there were. The full trail is
+            // on the report's own History.
+            var perReport = rows
+                .GroupBy(a => a.ReportID)
+                .Select(g => new
+                {
+                    ReportID = g.Key,
+                    LatestID = g.Max(a => a.ActivityID),
+                    Updates = g.Count()
+                });
+
+            var page = await perReport
+                .OrderByDescending(r => r.LatestID)
+                .Skip((filter.Page - 1) * StaffActivityViewModel.PageSize)
+                .Take(StaffActivityViewModel.PageSize)
+                .ToListAsync();
+            var latestIds = page.Select(r => r.LatestID).ToList();
+
             var model = new StaffActivityViewModel
             {
                 Filter = filter,
                 ReceivedCount = await period.CountAsync(
                     a => a.Action == IncidentReportActivity.Received),
-                ResolvedCount = await work.CountAsync(a =>
-                    a.Action == IncidentReportActivity.StatusChanged
-                    && a.ToStatus == "Resolved"),
-                DismissedCount = await work.CountAsync(a =>
-                    a.Action == IncidentReportActivity.StatusChanged
-                    && a.ToStatus == "Dismissed"),
-                ActionCount = await work.CountAsync(),
-                TotalRows = await rows.CountAsync(),
-                Rows = await rows
+                // Counted in reports, so a report reopened and resolved
+                // again counts once.
+                ResolvedCount = await work
+                    .Where(a => a.Action == IncidentReportActivity.StatusChanged
+                                && a.ToStatus == "Resolved")
+                    .Select(a => a.ReportID).Distinct().CountAsync(),
+                DismissedCount = await work
+                    .Where(a => a.Action == IncidentReportActivity.StatusChanged
+                                && a.ToStatus == "Dismissed")
+                    .Select(a => a.ReportID).Distinct().CountAsync(),
+                ActionCount = await work.Select(a => a.ReportID).Distinct().CountAsync(),
+                TotalRows = await perReport.CountAsync(),
+                UpdateCounts = page.ToDictionary(r => r.ReportID, r => r.Updates),
+                Rows = await _context.IncidentReportActivities
+                    .Where(a => latestIds.Contains(a.ActivityID))
                     .Include(a => a.Report)
                         .ThenInclude(r => r.ReportedBy)
-                    .OrderByDescending(a => a.CreatedAt)
-                    .ThenByDescending(a => a.ActivityID)
-                    .Skip((filter.Page - 1) * StaffActivityViewModel.PageSize)
-                    .Take(StaffActivityViewModel.PageSize)
+                    .OrderByDescending(a => a.ActivityID)
                     .ToListAsync()
             };
 

@@ -208,13 +208,15 @@
                                    class="form-control"
                                    id="newPwd"
                                    placeholder="Minimum 8 characters"
-                                   minlength="8" />
+                                   data-password-rule
+                                   aria-describedby="newPwdHint" />
                             <button class="btn btn-outline-secondary"
                                     type="button"
                                     onclick="togglePwd('newPwd','eyeNew')">
                                 <i class="bi bi-eye" id="eyeNew"></i>
                             </button>
                         </div>
+                        <div id="newPwdHint" class="form-text">@PersonInput.PasswordHint</div>
                     </div>
 
                     <!-- Confirm Password -->
@@ -250,6 +252,7 @@
 </div>
 
 @section Scripts {
+    <partial name="_PasswordRule" />
     <script>
         function togglePwd(fieldId, iconId) {
             const f = document.getElementById(fieldId);

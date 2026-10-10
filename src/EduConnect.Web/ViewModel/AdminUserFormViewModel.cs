@@ -40,7 +40,7 @@ namespace EduConnect.Web.ViewModels
 
         // Leave blank on edit to keep existing password
         [DataType(DataType.Password)]
-        [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
+        [RegularExpression(PersonInput.PasswordPattern, ErrorMessage = PersonInput.PasswordError)]
         public string? Password { get; set; }
 
         // Students only. Optional here, but 9 digits when given.
