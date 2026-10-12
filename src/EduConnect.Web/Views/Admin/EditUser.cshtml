@@ -19,6 +19,24 @@
 <div class="card border-0 shadow-sm mx-auto" style="max-width:640px;">
     <div class="card-body p-4">
 
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert alert-success alert-dismissible mb-3">
+                <i class="bi bi-check-circle me-2"></i>
+                @TempData["Success"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible mb-3">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                @TempData["Error"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
         <form asp-action="EditUser" asp-route-id="@Model.UserID" method="post">
             @Html.AntiForgeryToken()
 
@@ -70,6 +88,7 @@
                            placeholder="Leave blank to keep existing password" />
                     <div class="form-text">If you set one: @PersonInput.PasswordHint</div>
                     <span asp-validation-for="Password" class="text-danger small"></span>
+                    <div class="form-text">The user will have to change a password you set here at their next login.</div>
                 </div>
 
                 <div class="col-12" id="studentIdField">
@@ -113,6 +132,29 @@
 
             </div>
         </form>
+
+        @if (Model.CanResendCredentials)
+        {
+            <hr class="my-4" />
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="fw-semibold">Login details</div>
+                    <small class="text-muted">
+                        @if (Model.MustChangePassword)
+                        {
+                            <span>Hasn't set their own password yet.</span>
+                        }
+                        Emails a new temporary password; the current one stops working.
+                    </small>
+                </div>
+                <form asp-action="ResendCredentials" asp-route-id="@Model.UserID" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">
+                        <i class="bi bi-envelope me-1"></i>Resend login details
+                    </button>
+                </form>
+            </div>
+        }
     </div>
 </div>
 

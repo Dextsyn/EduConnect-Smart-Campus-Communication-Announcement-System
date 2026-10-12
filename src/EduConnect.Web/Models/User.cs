@@ -56,6 +56,16 @@ namespace EduConnect.Web.Models
         public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLogin { get; set; }
 
+        // Set when a student clicks the emailed confirmation link, or when an
+        // admin-created user first logs in with the password emailed to them.
+        public DateTime? EmailConfirmedAt { get; set; }
+
+        // The password was issued by the system (admin-created account or a
+        // credential resend); the user must choose their own before using
+        // the app, and the issued one stops working at TempPasswordExpiresAt.
+        public bool MustChangePassword { get; set; }
+        public DateTime? TempPasswordExpiresAt { get; set; }
+
         public Role Role { get; set; }
         public User? VerifiedBy { get; set; }
         public College? College { get; set; }

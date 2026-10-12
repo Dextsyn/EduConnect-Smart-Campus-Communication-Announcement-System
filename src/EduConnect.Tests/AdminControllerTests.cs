@@ -14,6 +14,7 @@ namespace EduConnect.Tests
     {
         private readonly TestDb _db = new();
         private readonly FakeSession _session = new();
+        private readonly FakeEmailService _email = new();
         private readonly DepartmentTag _schoolWide;
 
         public AdminControllerTests()
@@ -30,9 +31,10 @@ namespace EduConnect.Tests
             _session.SetString("RoleName", RoleNames.Administrator);
             var http = FakeSession.HttpContextWith(_session);
             var controller = new AdminController(
-                _db.Context, new FakeEmailService(), NullLogger<AdminController>.Instance,
+                _db.Context, _email, NullLogger<AdminController>.Instance,
                 new HierarchyService(_db.Context), new PlacementService(_db.Context),
-                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }));
+                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }),
+                TestAccountEmails.Create(_db.Context, _email, http));
             controller.ControllerContext = new ControllerContext { HttpContext = http };
             controller.TempData = new TempDataDictionary(controller.ControllerContext.HttpContext, new NullTempDataProvider());
             return controller;

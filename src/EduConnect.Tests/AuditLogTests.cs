@@ -36,9 +36,11 @@ namespace EduConnect.Tests
         private AdminController Admin()
         {
             var (http, audit) = Request();
+            var email = new FakeEmailService();
             var controller = new AdminController(
-                _db.Context, new FakeEmailService(), NullLogger<AdminController>.Instance,
-                new HierarchyService(_db.Context), new PlacementService(_db.Context), audit);
+                _db.Context, email, NullLogger<AdminController>.Instance,
+                new HierarchyService(_db.Context), new PlacementService(_db.Context), audit,
+                TestAccountEmails.Create(_db.Context, email, http));
             controller.ControllerContext = new ControllerContext { HttpContext = http };
             controller.TempData = new TempDataDictionary(http, new NullTempDataProvider());
             return controller;

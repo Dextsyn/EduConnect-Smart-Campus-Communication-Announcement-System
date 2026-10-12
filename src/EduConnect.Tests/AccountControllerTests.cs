@@ -17,6 +17,8 @@ namespace EduConnect.Tests
         private readonly TestDb _db = new();
         private readonly FakeBlobStorage _blobs = new();
         private readonly FakeSession _session = new();
+        private readonly FakeEmailService _email = new();
+        private readonly FakeNotificationService _notifications = new();
 
         public void Dispose() => _db.Dispose();
 
@@ -26,11 +28,12 @@ namespace EduConnect.Tests
             var controller = new AccountController(
                 _db.Context,
                 NullLogger<AccountController>.Instance,
-                null!, null!, null!, null!,
+                null!, _email, _notifications, null!,
                 _blobs,
                 new HierarchyService(_db.Context),
                 new PlacementService(_db.Context),
-                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }));
+                new AuditService(_db.Context, new HttpContextAccessor { HttpContext = http }),
+                TestAccountEmails.Create(_db.Context, _email, http));
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = http
