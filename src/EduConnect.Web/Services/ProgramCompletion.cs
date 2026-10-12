@@ -13,6 +13,9 @@ namespace EduConnect.Web.Services
         {
             "/Account/Profile",
             "/Account/ChangePassword",
+            // PasswordChangeRequired runs first and sends here; redirecting
+            // it back to Profile would loop.
+            PasswordChangeRequired.SetPasswordPath,
             "/Account/Logout",
             "/Account/Login",
             // The exception handler re-runs failed requests here; redirecting

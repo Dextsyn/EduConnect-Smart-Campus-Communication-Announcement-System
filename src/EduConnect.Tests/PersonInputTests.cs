@@ -116,6 +116,22 @@ namespace EduConnect.Tests
             Assert.Equal(valid, Valid(new AdminUserFormViewModel(), nameof(AdminUserFormViewModel.Password), password));
             Assert.Equal(valid, Valid(new ChangePasswordViewModel(), nameof(ChangePasswordViewModel.NewPassword), password));
             Assert.Equal(valid, Valid(new ResetPasswordViewModel(), nameof(ResetPasswordViewModel.NewPassword), password));
+            Assert.Equal(valid, Valid(new SetPasswordViewModel(), nameof(SetPasswordViewModel.NewPassword), password));
+        }
+
+        [Fact]
+        public void TemporaryPasswords_MeetThePasswordRule()
+        {
+            var service = TestAccountEmails.Create(_db.Context, new FakeEmailService(),
+                FakeSession.HttpContextWith(new FakeSession()));
+            var user = _db.AddUser(RoleNames.Faculty);
+
+            for (var i = 0; i < 200; i++)
+            {
+                var password = service.IssueTemporaryPassword(user);
+                Assert.Matches(PersonInput.PasswordPattern, password);
+                Assert.Equal(12, password.Length);
+            }
         }
 
         [Fact]
