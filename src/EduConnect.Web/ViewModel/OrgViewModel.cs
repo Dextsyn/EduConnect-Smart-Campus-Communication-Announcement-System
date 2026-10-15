@@ -31,10 +31,7 @@ namespace EduConnect.Web.ViewModels
 
         public int? CollegeID { get; set; }
 
-        [Required(ErrorMessage = "Please select a Faculty adviser")]
-        public int AdviserUserID { get; set; }
 
-        public List<SelectListItem> FacultyOptions { get; set; } = new();
         public List<SelectListItem> CollegeOptions { get; set; } = new();
     }
 
@@ -53,5 +50,29 @@ namespace EduConnect.Web.ViewModels
         public IFormFile? Attachment { get; set; }
         public bool IsPinned { get; set; }
         public DateTime? ExpiresAt { get; set; }
+    }
+
+    // Admin → Organizations → Members & Officers.
+    public class OrgMembersViewModel
+    {
+        public Organization Org { get; set; }
+        public List<OrgMemberRow> Officers { get; set; } = new();
+        public List<OrgMemberRow> Members { get; set; } = new();
+    }
+
+    public class OrgMemberRow
+    {
+        public int MemberID { get; set; }
+        public int UserID { get; set; }
+        public string Name { get; set; } = "";
+        public string StudentID { get; set; } = "—";
+        public string Email { get; set; } = "";
+        public string Placement { get; set; } = "—";
+        public string? Position { get; set; }
+        public bool IsOfficer { get; set; }
+        // False when the account was deactivated or is no longer a
+        // verified Student: the row stays, but it grants nothing.
+        public bool IsEligible { get; set; }
+        public DateTime JoinedAt { get; set; }
     }
 }

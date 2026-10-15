@@ -144,6 +144,7 @@
     function getIcon(type) {
         switch (type) {
             case 'Announcement': return 'bi-megaphone';
+            case 'OrgAnnouncement': return 'bi-people-fill';
             case 'EventRegistration': return 'bi-calendar-check';
             case 'WaitlistPromotion': return 'bi-arrow-up-circle';
             case 'PasswordReset': return 'bi-shield-lock';

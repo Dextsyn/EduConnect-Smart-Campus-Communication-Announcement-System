@@ -39,18 +39,6 @@
                     <span asp-validation-for="OrgName" class="text-danger small"></span>
                 </div>
 
-                <div class="col-12 col-md-6">
-                    <label asp-for="AdviserUserID" class="form-label fw-semibold">
-                        Faculty Adviser <span class="text-danger">*</span>
-                    </label>
-                    <select asp-for="AdviserUserID"
-                            asp-items="Model.FacultyOptions"
-                            class="form-select">
-                        <option value="">— Select Adviser —</option>
-                    </select>
-                    <span asp-validation-for="AdviserUserID" class="text-danger small"></span>
-                </div>
-
                 <div class="col-12">
                     <label asp-for="Description" class="form-label fw-semibold">
                         Description

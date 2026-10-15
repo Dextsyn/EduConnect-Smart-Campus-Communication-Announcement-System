@@ -391,6 +391,12 @@ namespace EduConnect.Web.Data
                 entity.HasKey(e => e.MemberID);
                 entity.HasIndex(e => new
                 { e.OrgID, e.UserID }).IsUnique();
+                // A student is an officer of one organization at a time.
+                // Named, so the plain foreign-key index on UserID stays too.
+                entity.HasIndex(e => e.UserID, "IX_OrgMembers_UserID");
+                entity.HasIndex(e => e.UserID, "IX_OrgMembers_OneOfficerOrgPerUser")
+                      .IsUnique()
+                      .HasFilter("[OrgRole] = 'Officer' AND [IsActive] = 1");
                 entity.HasOne(e => e.Organization)
                       .WithMany(e => e.Members)
                       .HasForeignKey(e => e.OrgID)

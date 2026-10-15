@@ -18,6 +18,7 @@ builder.Services.AddScoped<EduConnect.Web.Services.IPlacementService, EduConnect
 builder.Services.AddScoped<EduConnect.Web.Services.IAudienceService, EduConnect.Web.Services.AudienceService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IApprovalService, EduConnect.Web.Services.ApprovalService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IAuditService, EduConnect.Web.Services.AuditService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IOrgAccess, EduConnect.Web.Services.OrgAccess>();
 builder.Services.AddScoped<EduConnect.Web.Services.IReportingSanctionService, EduConnect.Web.Services.ReportingSanctionService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IAccountEmailService, EduConnect.Web.Services.AccountEmailService>();
 builder.Services.AddMemoryCache();
