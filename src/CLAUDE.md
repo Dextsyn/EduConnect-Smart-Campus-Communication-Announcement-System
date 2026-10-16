@@ -67,6 +67,8 @@ Named roles (constants in `RoleNames.cs` — never compare a literal): `Administ
 
 **Events** are optionally linked to an announcement (`AnnouncementID` nullable). Registration supports a waitlist: when the event is full, users are added to `EventWaitlist` with a position number. Cancellation automatically notifies the first person on the waitlist by email. QR codes for event check-in are generated with QRCoder and uploaded to the Azure Blob Storage container `qrcodes` (see `IBlobStorageService`); `EventRegistration.QRCode` stores the resulting public blob URL, which views render directly in `<img src>`. A Dean manages the events of organizers placed in their college, a Chairperson those in their department (`EventAccess`).
 
+**Group Finder** (`GroupController`, chat in `GroupChatHub`): a group's chat expires one week after it is created (`GroupController.ChatLifetime`, stored in `ChatExpiresAt`), Open or Full; joins and leaves never move it. `ChatExpiryService` sweeps hourly (and at startup), deleting the messages and setting `Status = "Dissolved"`; until then, an expired group is hidden from the list, can't be joined, and doesn't count as its creator's one live group.
+
 ### Time
 
 The App Service runs with `WEBSITE_TIME_ZONE=Singapore Standard Time` (UTC+8, same as Manila), so `DateTime.Now` is Manila time and that is what the database stores. Event schedules are stored as typed (Manila wall-clock). Exceptions: Group Finder uses `DateTime.UtcNow` throughout (write a UTC value to the browser with `DateTime.SpecifyKind(..., Utc)` so it carries a `Z`), and raw SQL in migrations runs on Azure SQL's UTC clock — use `DATEADD(hour, 8, SYSUTCDATETIME())`, not `SYSDATETIME()`.
