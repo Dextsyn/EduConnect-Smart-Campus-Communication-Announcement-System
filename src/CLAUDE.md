@@ -79,7 +79,7 @@ The App Service runs with `WEBSITE_TIME_ZONE=Singapore Standard Time` (UTC+8, sa
 
 `IReportingSanctionService` / `ReportingSanctionService` — false safety reports. Any Staff member can mark a report false (status `False report`, reason required); for a Student reporter (never a legacy anonymous report) that is one strike, and strikes in the last 12 months that weren't revoked set the sanction: 1st warning, 2nd 7-day suspension, 3rd+ 30-day suspension plus an Office of Student Affairs referral flag (OSA is contacted outside the app). `ReportingSanctions` rows are never deleted; a suspension expires by `EndsAt` and is enforced in `SafetyReportController.Submit` (GET and POST); My Reports always stays visible. A student appeals each sanction once; only an Administrator upholds or revokes (`/Staff/Sanctions`), and revoking restores the report's earlier status. Every step is audited under `AuditArea.SafetyReports`.
 
-`IEmailService` / `EmailService` — sends HTML email via Gmail SMTP (MailKit). Credentials are in `appsettings.json` under `EmailSettings`. In Development, SSL cert validation is skipped. Email is fire-and-forget (failures are logged but don't break the request), except that Add User tells the admin when the temporary-password email fails. Links in account emails use the `AppBaseUrl` setting, falling back to the request host.
+`IEmailService` / `EmailService` — sends HTML email via Gmail SMTP (MailKit). Credentials are in `appsettings.json` under `EmailSettings`. In Development, SSL cert validation is skipped. Email is fire-and-forget (failures are logged but don't break the request), except that Add User tells the admin when the temporary-password email fails. Links in emails (and event QR codes) come from `AppUrls.BaseUrl` — see "Links in emails" below.
 
 `IBlobStorageService` / `BlobStorageService` — uploads a byte array to an Azure Blob Storage container and returns the blob's public URL. Reads the connection string from the `AzureBlobStorage` configuration key; **never hardcode it** — it lives in user-secrets locally and as an App Service application setting in production. Currently used for event QR codes (container `qrcodes`, which has Blob-level public read access). Throws `InvalidOperationException` if the key is missing.
 
@@ -98,6 +98,6 @@ Event cover photos and announcement images go into `wwwroot/uploads/<subfolder>/
 
 Razor views under `Views/<Controller>/`. Role-specific dashboards: `Admin/Index`, `Dean/Index`, `Faculty/Index`. The shared `_Layout.cshtml` drives the nav. ViewModels live in `ViewModel/` (note: some controllers import from `EduConnect.Web.ViewModels` namespace — the folder was renamed but namespace may be inconsistent).
 
-### Hardcoded localhost URLs
+### Links in emails
 
-Several email bodies contain `https://localhost:7135/...` links (in `AnnouncementController`). These will need updating before any production deployment.
+Every absolute link that leaves the app (email buttons, event QR codes) is built from `AppUrls.BaseUrl` (`Services/AppUrls.cs`) — never hardcode a host. It uses the `AppBaseUrl` setting, falling back to the request's scheme and host. `appsettings.json` leaves it empty, `appsettings.Development.json` sets `https://localhost:7135`, and production sets it as the App Service application setting `AppBaseUrl` = `https://educonnect-cnb8auaqg3gqehhx.malaysiawest-01.azurewebsites.net`. A localhost value is ignored when the request came in on a public host, so a dev setting can't put localhost into a production email.

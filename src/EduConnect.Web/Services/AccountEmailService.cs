@@ -166,15 +166,8 @@ namespace EduConnect.Web.Services
                    If you weren't expecting an account, contact ITC.</p>"));
         }
 
-        private string BaseUrl()
-        {
-            var configured = _config["AppBaseUrl"]?.TrimEnd('/');
-            if (!string.IsNullOrEmpty(configured))
-                return configured;
-
-            var request = _http.HttpContext?.Request;
-            return request == null ? "" : $"{request.Scheme}://{request.Host}";
-        }
+        private string BaseUrl() =>
+            AppUrls.BaseUrl(_config, _http.HttpContext?.Request);
 
         private static string Hash(string token) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));

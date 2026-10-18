@@ -154,7 +154,7 @@ namespace EduConnect.Web.Controllers
                     subject,
                     $"<p>Hello {reviewer.FirstName},</p>" +
                     $"<p>{intro}: <strong>{announcement.Title}</strong></p>" +
-                    $"<p><a href='https://localhost:7135/Announcement/Review/" +
+                    $"<p><a href='{AppUrls.BaseUrl(HttpContext)}/Announcement/Review/" +
                     $"{announcement.AnnouncementID}'>Click here to review</a></p>");
             }
         }
@@ -1468,7 +1468,7 @@ namespace EduConnect.Web.Controllers
                 "EduConnect: Announcement Approved",
                 $"<p>Your announcement <strong>{announcement.Title}</strong> has been approved by {approvedBy}. " +
                 "You can now publish it.</p>" +
-                "<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>Go to My Announcements</a></p>");
+                $"<p><a href='{AppUrls.BaseUrl(HttpContext)}/Announcement/MyAnnouncements'>Go to My Announcements</a></p>");
             await ReviewQueueChangedAsync(announcement, "approved");
 
             TempData["Success"] = "Announcement approved. The author has been notified.";
@@ -1522,7 +1522,7 @@ namespace EduConnect.Web.Controllers
                 "EduConnect: Announcement Rejected",
                 $"<p>Your announcement <strong>{announcement.Title}</strong> was rejected by {rejectedBy}.</p>" +
                 $"<p><strong>Reason:</strong> {System.Net.WebUtility.HtmlEncode(reason)}</p>" +
-                "<p><a href='https://localhost:7135/Announcement/MyAnnouncements'>" +
+                $"<p><a href='{AppUrls.BaseUrl(HttpContext)}/Announcement/MyAnnouncements'>" +
                 "Go to My Announcements to revise and resubmit</a></p>");
             await ReviewQueueChangedAsync(announcement, "rejected");
 
