@@ -199,9 +199,14 @@ namespace EduConnect.Web.Controllers
             await _audience.AddTargetLabelsAsync(model.RecentAnnouncements);
 
             return View(model);
-
-
         }
 
+        // Where UseExceptionHandler sends unhandled errors in production.
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error() =>
+            View(new ErrorViewModel
+            {
+                RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier
+            });
     }
 }

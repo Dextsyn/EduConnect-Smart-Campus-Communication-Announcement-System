@@ -23,6 +23,14 @@ namespace EduConnect.Web.Controllers
         private bool IsStudent() =>
             HttpContext.Session.GetString("RoleName") == RoleNames.Student;
 
+        // Forbid() needs an authentication scheme, which this app does not
+        // register, so it would throw; refuse with a message instead.
+        private IActionResult StudentsOnly()
+        {
+            TempData["Error"] = "Only students can create or join groups.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private static readonly HashSet<string> _allowedCategories = new()
         {
             "Study Group", "Project Team", "Research",
@@ -72,7 +80,7 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Create()
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
-            if (!IsStudent()) return Forbid();
+            if (!IsStudent()) return StudentsOnly();
 
             var existing = await FindActiveCreatedGroupAsync(GetUserID());
             if (existing != null)
@@ -91,7 +99,7 @@ namespace EduConnect.Web.Controllers
             string name, string category, string? description, int maxMembers)
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
-            if (!IsStudent()) return Forbid();
+            if (!IsStudent()) return StudentsOnly();
 
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category)
                 || maxMembers < 2 || maxMembers > 50)
@@ -182,7 +190,7 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Join(int id)
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
-            if (!IsStudent()) return Forbid();
+            if (!IsStudent()) return StudentsOnly();
 
             var group = await _context.Groups
                 .Include(g => g.Members)
@@ -222,7 +230,7 @@ namespace EduConnect.Web.Controllers
         public async Task<IActionResult> Leave(int id)
         {
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
-            if (!IsStudent()) return Forbid();
+            if (!IsStudent()) return StudentsOnly();
 
             var group = await _context.Groups.FindAsync(id);
             if (group == null) return NotFound();
@@ -263,7 +271,11 @@ namespace EduConnect.Web.Controllers
                 .FirstOrDefaultAsync(g => g.GroupID == id);
 
             if (group == null) return NotFound();
-            if (group.CreatorID != GetUserID()) return Forbid();
+            if (group.CreatorID != GetUserID())
+            {
+                TempData["Error"] = "Only the group's creator can dissolve it.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
             if (group.Status == "Dissolved") return RedirectToAction(nameof(Index));
 
             _context.GroupMessages.RemoveRange(group.Messages);
