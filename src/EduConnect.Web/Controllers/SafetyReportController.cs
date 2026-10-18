@@ -42,7 +42,7 @@ namespace EduConnect.Web.Controllers
             int.Parse(HttpContext.Session.GetString("UserID")!);
 
         private string GetBaseUrl() =>
-            $"{Request.Scheme}://{Request.Host}";
+            AppUrls.BaseUrl(HttpContext);
 
         // GET /SafetyReport
         public IActionResult Index()

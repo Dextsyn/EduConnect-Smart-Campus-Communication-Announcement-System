@@ -120,7 +120,7 @@ namespace EduConnect.Web.Controllers
             ev.OrganizerID == GetUserID();
 
         private string GetBaseUrl() =>
-            $"{Request.Scheme}://{Request.Host}";
+            AppUrls.BaseUrl(HttpContext);
 
         // ─── Generate QR Code ──────────────────
         private async Task<string> GenerateQRCode(

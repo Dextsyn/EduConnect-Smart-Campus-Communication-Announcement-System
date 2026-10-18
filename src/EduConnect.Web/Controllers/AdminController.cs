@@ -42,7 +42,7 @@ namespace EduConnect.Web.Controllers
                 .GetString("RoleName") == RoleNames.Administrator;
 
         private string GetBaseUrl() =>
-            $"{Request.Scheme}://{Request.Host}";
+            AppUrls.BaseUrl(HttpContext);
 
         // ─── Audit helpers ─────────────────────
         // "BSIT · ITIS · CCIT" (implicit departments hidden), or "—".
