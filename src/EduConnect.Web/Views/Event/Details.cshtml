@@ -95,6 +95,13 @@
                             Online Event
                         </span>
                     }
+                    @if (Model.AudienceName != null)
+                    {
+                        <span class="badge bg-light text-dark border">
+                            <i class="bi bi-people me-1"></i>
+                            For @Model.AudienceName
+                        </span>
+                    }
                     <span class="badge @(Model.Status == "Upcoming" ? "bg-primary" : Model.Status == "Ongoing" ? "bg-success" : Model.Status == "Completed" ? "bg-secondary" : "bg-danger")">
                         @Model.Status
                     </span>

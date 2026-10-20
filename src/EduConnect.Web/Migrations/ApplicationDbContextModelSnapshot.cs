@@ -592,6 +592,9 @@ namespace EduConnect.Web.Migrations
                     b.Property<int?>("AnnouncementID")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CollegeID")
+                        .HasColumnType("int");
+
                     b.Property<string>("CoverPhotoURL")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -600,6 +603,9 @@ namespace EduConnect.Web.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("CurrentAttendees")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DepartmentID")
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
@@ -613,6 +619,9 @@ namespace EduConnect.Web.Migrations
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsDepartmentOnly")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsOnline")
                         .HasColumnType("bit");
@@ -651,6 +660,10 @@ namespace EduConnect.Web.Migrations
                     b.HasKey("EventID");
 
                     b.HasIndex("AnnouncementID");
+
+                    b.HasIndex("CollegeID");
+
+                    b.HasIndex("DepartmentID");
 
                     b.HasIndex("OrganizerID");
 
@@ -1828,6 +1841,16 @@ namespace EduConnect.Web.Migrations
                         .HasForeignKey("AnnouncementID")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("EduConnect.Web.Models.College", "College")
+                        .WithMany()
+                        .HasForeignKey("CollegeID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduConnect.Web.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EduConnect.Web.Models.User", "Organizer")
                         .WithMany("OrganizedEvents")
                         .HasForeignKey("OrganizerID")
@@ -1835,6 +1858,10 @@ namespace EduConnect.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("Announcement");
+
+                    b.Navigation("College");
+
+                    b.Navigation("Department");
 
                     b.Navigation("Organizer");
                 });

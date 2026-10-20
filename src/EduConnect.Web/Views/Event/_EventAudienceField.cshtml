@@ -1,0 +1,38 @@
+@model EduConnect.Web.ViewModels.EventFormViewModel
+@* Who can see the event (EventAudience). Shared by Create and Edit. *@
+
+<div class="mb-3">
+    <label class="form-label fw-semibold">
+        Who can see this event
+    </label>
+    @if (Model.DepartmentName == null)
+    {
+        <input type="hidden" asp-for="DepartmentOnly" value="False" />
+        <div class="form-text mt-0">
+            <i class="bi bi-people me-1"></i>
+            Everyone in @(Model.CollegeName ?? "your college")
+        </div>
+    }
+    else
+    {
+        <div class="form-check">
+            <input class="form-check-input" type="radio"
+                   asp-for="DepartmentOnly" value="False"
+                   id="audienceCollege" />
+            <label class="form-check-label" for="audienceCollege">
+                Everyone in @Model.CollegeName
+            </label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio"
+                   asp-for="DepartmentOnly" value="True"
+                   id="audienceDepartment" />
+            <label class="form-check-label" for="audienceDepartment">
+                Only @Model.DepartmentName
+            </label>
+        </div>
+    }
+    <div class="form-text">
+        Nobody outside this audience can see or join the event.
+    </div>
+</div>

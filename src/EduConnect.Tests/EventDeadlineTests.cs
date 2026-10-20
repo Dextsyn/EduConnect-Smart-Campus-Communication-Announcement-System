@@ -18,8 +18,14 @@ namespace EduConnect.Tests
 
         public EventDeadlineTests()
         {
-            _organizer = _db.AddUser(RoleNames.Faculty);
+            _college = _db.AddCollege("CCIT");
+            _department = _db.AddDepartment(_college, "IT&IS");
+            _organizer = _db.AddUser(RoleNames.Faculty,
+                _college.CollegeID, _department.DepartmentID);
         }
+
+        private readonly College _college;
+        private readonly Department _department;
 
         public void Dispose() => _db.Dispose();
 
@@ -54,6 +60,8 @@ namespace EduConnect.Tests
             var ev = new Event
             {
                 OrganizerID = _organizer.UserID,
+                CollegeID = _college.CollegeID,
+                DepartmentID = _department.DepartmentID,
                 EventTitle = "Orientation",
                 StartDateTime = start,
                 EndDateTime = start.AddHours(2),
@@ -144,7 +152,7 @@ namespace EduConnect.Tests
         {
             // A deadline after the start used to let this through.
             var ev = AddEvent(DateTime.Now.AddHours(-1), DateTime.Now.AddHours(5));
-            var student = _db.AddUser(RoleNames.Student);
+            var student = _db.AddUser(RoleNames.Student, _college.CollegeID);
             var controller = Controller(student, RoleNames.Student);
 
             await controller.Register(ev.EventID, consentGiven: true);
