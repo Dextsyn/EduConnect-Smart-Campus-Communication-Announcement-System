@@ -55,6 +55,15 @@ namespace EduConnect.Web.Models
         public DateTime? RegistrationDeadline
         { get; set; }
 
+        // Who the event is for: the organizer's college and department
+        // when it was created (stamped by the server, never moved with
+        // the organizer). DepartmentID is null for a Dean's event.
+        // IsDepartmentOnly narrows it from the college to the department.
+        // See EventAudience.
+        public int? CollegeID { get; set; }
+        public int? DepartmentID { get; set; }
+        public bool IsDepartmentOnly { get; set; }
+
         public DateTime CreatedAt { get; set; }
             = DateTime.Now;
 
@@ -64,6 +73,8 @@ namespace EduConnect.Web.Models
         public Announcement? Announcement
         { get; set; }
         public User Organizer { get; set; }
+        public College? College { get; set; }
+        public Department? Department { get; set; }
         public ICollection<EventRegistration>
             Registrations
         { get; set; }

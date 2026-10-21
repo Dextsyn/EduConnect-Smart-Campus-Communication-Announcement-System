@@ -116,6 +116,55 @@ namespace EduConnect.Web.Controllers
                 (departmentID != null && e.Organizer.DepartmentID == departmentID));
         }
 
+        // Events the current user may see (EventAudience).
+        private Task<System.Linq.Expressions.Expression<Func<Event, bool>>> VisibleEventsAsync() =>
+            EventAudience.ForUserAsync(_context, GetUserID(), GetRoleName());
+
+        private async Task<bool> IsVisibleAsync(int eventID) =>
+            await _context.Events
+                .Where(e => e.EventID == eventID)
+                .AnyAsync(await VisibleEventsAsync());
+
+        // The current user's college and department, as an event origin.
+        // A Dean has a college only.
+        private async Task<(int? CollegeID, int? DepartmentID)> MyPlacementAsync()
+        {
+            var userID = GetUserID();
+            var me = await _context.Users
+                .Where(u => u.UserID == userID)
+                .Select(u => new { u.CollegeID, u.DepartmentID })
+                .FirstOrDefaultAsync();
+            return (me?.CollegeID, me?.DepartmentID);
+        }
+
+        // A college without departments has one hidden implicit
+        // department; narrowing to it would mean the same thing.
+        private Task<bool> CanNarrowToDepartmentAsync(int? departmentID) =>
+            _context.Departments.AnyAsync(d =>
+                d.DepartmentID == departmentID && !d.IsImplicit);
+
+        // Everything the Create / Edit form shows besides the posted values.
+        private async Task FillFormAsync(EventFormViewModel model,
+            (int? CollegeID, int? DepartmentID) origin)
+        {
+            var userID = GetUserID();
+            model.Announcements = await _context.Announcements
+                .Where(a => a.Status == "Published" &&
+                            a.AuthorID == userID)
+                .OrderByDescending(a => a.PublishedAt)
+                .ToListAsync();
+            model.CollegeName = await _context.Colleges
+                .Where(c => c.CollegeID == origin.CollegeID)
+                .Select(c => c.Name)
+                .FirstOrDefaultAsync();
+            model.DepartmentName = await _context.Departments
+                .Where(d => d.DepartmentID == origin.DepartmentID && !d.IsImplicit)
+                .Select(d => d.Name)
+                .FirstOrDefaultAsync();
+            if (model.DepartmentName == null)
+                model.DepartmentOnly = false;
+        }
+
         private bool IsCreator(Event ev) =>
             ev.OrganizerID == GetUserID();
 
@@ -204,7 +253,7 @@ namespace EduConnect.Web.Controllers
             var query = _context.Events
                 .Include(e => e.Organizer)
                 .Include(e => e.Registrations)
-                .AsQueryable();
+                .Where(await VisibleEventsAsync());
 
             // Apply filters
             if (!string.IsNullOrEmpty(searchQuery))
@@ -340,9 +389,15 @@ namespace EduConnect.Web.Controllers
             var userID = GetUserID();
             var roleName = GetRoleName();
 
+            // Outside the event's audience it doesn't exist.
+            if (!await IsVisibleAsync(id))
+                return NotFound();
+
             var ev = await _context.Events
                 .Include(e => e.Organizer)
                     .ThenInclude(u => u.Role)
+                .Include(e => e.College)
+                .Include(e => e.Department)
                 .Include(e => e.Announcement)
                 .Include(e => e.Registrations)
                     .ThenInclude(r => r.User)
@@ -417,6 +472,9 @@ namespace EduConnect.Web.Controllers
                     ev.Organizer.LastName,
                 OrganizerRole =
                     ev.Organizer.Role.RoleName,
+                AudienceName = ev.IsDepartmentOnly
+                    ? ev.Department?.Name
+                    : ev.College?.Name,
                 IsRegistered =
                     userRegistration != null,
                 IsOnWaitlist =
@@ -474,21 +532,8 @@ namespace EduConnect.Web.Controllers
             if (!CanManageEvents())
                 return RedirectToAction("Index");
 
-            var userID = GetUserID();
-
-            // Load published announcements
-            // to optionally link to event
-            var model = new EventFormViewModel
-            {
-                Announcements = await _context
-                    .Announcements
-                    .Where(a =>
-                        a.Status == "Published" &&
-                        a.AuthorID == userID)
-                    .OrderByDescending(a =>
-                        a.PublishedAt)
-                    .ToListAsync()
-            };
+            var model = new EventFormViewModel();
+            await FillFormAsync(model, await MyPlacementAsync());
 
             return View(model);
         }
@@ -509,6 +554,15 @@ namespace EduConnect.Web.Controllers
 
             if (!CanManageEvents())
                 return RedirectToAction("Index");
+
+            // The event is for the organizer's college (or department)
+            // as placed now; it stays there if they move later.
+            var origin = await MyPlacementAsync();
+            if (origin.CollegeID == null)
+                ModelState.AddModelError("",
+                    "Your account isn't placed in a college yet, so " +
+                    "an event can't be created. Ask an administrator " +
+                    "to set your college.");
 
             // ─── Manual date validation ────────────
             if (!model.StartDateTime.HasValue)
@@ -551,12 +605,7 @@ namespace EduConnect.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                model.Announcements = await _context
-                    .Announcements
-                    .Where(a => a.Status == "Published" &&
-                                a.AuthorID == GetUserID())
-                    .OrderByDescending(a => a.PublishedAt)
-                    .ToListAsync();
+                await FillFormAsync(model, origin);
                 return View(model);
             }
 
@@ -582,11 +631,7 @@ namespace EduConnect.Web.Controllers
                 {
                     ModelState.AddModelError("CoverPhoto",
                         "Only image files are allowed (JPG, PNG, GIF, WebP).");
-                    model.Announcements = await _context.Announcements
-                        .Where(a => a.Status == "Published" &&
-                                    a.AuthorID == GetUserID())
-                        .OrderByDescending(a => a.PublishedAt)
-                        .ToListAsync();
+                    await FillFormAsync(model, origin);
                     return View(model);
                 }
 
@@ -594,11 +639,7 @@ namespace EduConnect.Web.Controllers
                 {
                     ModelState.AddModelError("CoverPhoto",
                         "File size cannot exceed 5MB.");
-                    model.Announcements = await _context.Announcements
-                        .Where(a => a.Status == "Published" &&
-                                    a.AuthorID == GetUserID())
-                        .OrderByDescending(a => a.PublishedAt)
-                        .ToListAsync();
+                    await FillFormAsync(model, origin);
                     return View(model);
                 }
 
@@ -639,6 +680,10 @@ namespace EduConnect.Web.Controllers
                 IsRegistrationOpen = true,
                 RegistrationDeadline =
                     model.RegistrationDeadline,
+                CollegeID = origin.CollegeID,
+                DepartmentID = origin.DepartmentID,
+                IsDepartmentOnly = model.DepartmentOnly &&
+                    await CanNarrowToDepartmentAsync(origin.DepartmentID),
                 Status = "Upcoming",
                 CreatedAt = DateTime.Now
             };
@@ -652,10 +697,7 @@ namespace EduConnect.Web.Controllers
             {
                 _logger.LogError("Failed to save event: {Error}", ex.Message);
                 ModelState.AddModelError("", "Unable to save the event. Please try again.");
-                model.Announcements = await _context.Announcements
-                    .Where(a => a.Status == "Published" && a.AuthorID == GetUserID())
-                    .OrderByDescending(a => a.PublishedAt)
-                    .ToListAsync();
+                await FillFormAsync(model, origin);
                 return View(model);
             }
 
@@ -704,12 +746,9 @@ namespace EduConnect.Web.Controllers
                 RegistrationDeadline = ev.RegistrationDeadline,
                 LinkedAnnouncementID = ev.AnnouncementID,
                 ExistingCoverPhotoURL = ev.CoverPhotoURL,
-                Announcements        = await _context.Announcements
-                    .Where(a => a.Status == "Published" &&
-                                a.AuthorID == GetUserID())
-                    .OrderByDescending(a => a.PublishedAt)
-                    .ToListAsync()
+                DepartmentOnly       = ev.IsDepartmentOnly
             };
+            await FillFormAsync(model, (ev.CollegeID, ev.DepartmentID));
 
             return View(model);
         }
@@ -744,6 +783,10 @@ namespace EduConnect.Web.Controllers
                     "Details", new { id });
             }
 
+            // The origin is fixed; only the college/department choice
+            // can change.
+            var origin = (ev.CollegeID, ev.DepartmentID);
+
             // ─── Date validation ───────────────────────
             if (!model.StartDateTime.HasValue)
                 ModelState.AddModelError(
@@ -767,11 +810,7 @@ namespace EduConnect.Web.Controllers
             if (!ModelState.IsValid)
             {
                 model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
-                model.Announcements = await _context.Announcements
-                    .Where(a => a.Status == "Published" &&
-                                a.AuthorID == GetUserID())
-                    .OrderByDescending(a => a.PublishedAt)
-                    .ToListAsync();
+                await FillFormAsync(model, origin);
                 return View(model);
             }
 
@@ -796,11 +835,7 @@ namespace EduConnect.Web.Controllers
                     ModelState.AddModelError("CoverPhoto",
                         "Only image files are allowed (JPG, PNG, GIF, WebP).");
                     model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
-                    model.Announcements = await _context.Announcements
-                        .Where(a => a.Status == "Published" &&
-                                    a.AuthorID == GetUserID())
-                        .OrderByDescending(a => a.PublishedAt)
-                        .ToListAsync();
+                    await FillFormAsync(model, origin);
                     return View(model);
                 }
 
@@ -809,11 +844,7 @@ namespace EduConnect.Web.Controllers
                     ModelState.AddModelError("CoverPhoto",
                         "File size cannot exceed 5MB.");
                     model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
-                    model.Announcements = await _context.Announcements
-                        .Where(a => a.Status == "Published" &&
-                                    a.AuthorID == GetUserID())
-                        .OrderByDescending(a => a.PublishedAt)
-                        .ToListAsync();
+                    await FillFormAsync(model, origin);
                     return View(model);
                 }
 
@@ -856,6 +887,8 @@ namespace EduConnect.Web.Controllers
             ev.MeetingURL            = model.MeetingURL;
             ev.RegistrationDeadline  = model.RegistrationDeadline;
             ev.AnnouncementID        = model.LinkedAnnouncementID;
+            ev.IsDepartmentOnly      = model.DepartmentOnly &&
+                await CanNarrowToDepartmentAsync(ev.DepartmentID);
             ev.UpdatedAt             = DateTime.Now;
 
             try
@@ -867,10 +900,7 @@ namespace EduConnect.Web.Controllers
                 _logger.LogError("Failed to update event: {Error}", ex.Message);
                 ModelState.AddModelError("", "Unable to save changes. Please try again.");
                 model.ExistingCoverPhotoURL = ev.CoverPhotoURL;
-                model.Announcements = await _context.Announcements
-                    .Where(a => a.Status == "Published" && a.AuthorID == GetUserID())
-                    .OrderByDescending(a => a.PublishedAt)
-                    .ToListAsync();
+                await FillFormAsync(model, origin);
                 return View(model);
             }
 
@@ -1024,6 +1054,9 @@ namespace EduConnect.Web.Controllers
                 "Event consent accepted: User {UserID}, " +
                 "Event {EventID}, {Time}",
                 userID, eventID, DateTime.Now);
+
+            if (!await IsVisibleAsync(eventID))
+                return NotFound();
 
             var ev = await _context.Events
                 .Include(e => e.Registrations)
