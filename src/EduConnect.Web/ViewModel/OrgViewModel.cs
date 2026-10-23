@@ -1,20 +1,27 @@
+using EduConnect.Web;
 using EduConnect.Web.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.ComponentModel.DataAnnotations;
 
 namespace EduConnect.Web.ViewModels
 {
-    public class OrgFeedViewModel
+    // GET /Org — the organization directory. Students see the orgs they
+    // follow or belong to first, then every other org to discover.
+    // Post titles appear only for orgs the viewer may read.
+    public class OrgDirectoryViewModel
     {
-        public List<OrgFeedGroup> Groups { get; set; } = new();
-        public int? FilterOrgID { get; set; }
-        public List<SelectListItem> OrgOptions { get; set; } = new();
+        public List<OrgDirectoryRow> Following { get; set; } = new();
+        public List<OrgDirectoryRow> Discover { get; set; } = new();
+        public bool CanFollow { get; set; }
+        public int? OfficerOrgID { get; set; }
     }
 
-    public class OrgFeedGroup
+    public class OrgDirectoryRow
     {
         public Organization Org { get; set; }
-        public List<OrgAnnouncement> Announcements { get; set; } = new();
+        public int FollowerCount { get; set; }
+        public string? LatestTitle { get; set; }
+        public string Relation { get; set; } = OrgRelation.None;
     }
 
     public class OrgFormViewModel

@@ -1,6 +1,7 @@
 using EduConnect.Web;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -200,6 +201,69 @@ namespace EduConnect.Tests
 
             Assert.Equal("NotStudent", view.ViewData["Relation"]);
             Assert.Empty(Posts(view));
+        }
+
+        // ─── /Org directory ────────────────────
+
+        private async Task<OrgDirectoryViewModel> Directory(User u, string role) =>
+            Assert.IsType<OrgDirectoryViewModel>(
+                Assert.IsType<ViewResult>(await Controller(u, role).Index()).Model);
+
+        [Fact]
+        public async Task Directory_splits_followed_and_other_orgs()
+        {
+            var s = Student();
+            Follow(_org, s);
+
+            var vm = await Directory(s, RoleNames.Student);
+
+            Assert.Equal(_org.OrgID, Assert.Single(vm.Following).Org.OrgID);
+            Assert.Equal(OrgRelation.Following, vm.Following[0].Relation);
+            Assert.Equal(_otherOrg.OrgID, Assert.Single(vm.Discover).Org.OrgID);
+            Assert.True(vm.CanFollow);
+        }
+
+        [Fact]
+        public async Task Discover_rows_never_leak_post_titles()
+        {
+            PostIn(_org, "Followed news");
+            PostIn(_otherOrg, "Private news");
+            var s = Student();
+            Follow(_org, s);
+
+            var vm = await Directory(s, RoleNames.Student);
+
+            Assert.Equal("Followed news", vm.Following[0].LatestTitle);
+            Assert.Null(vm.Discover[0].LatestTitle);
+        }
+
+        [Fact]
+        public async Task Expired_posts_are_not_the_latest_title()
+        {
+            PostIn(_org, "Older live", at: DateTime.Now.AddDays(-2));
+            PostIn(_org, "Newer expired", expires: DateTime.Now.AddDays(-1), at: DateTime.Now.AddHours(-1));
+            var s = Student();
+            Follow(_org, s);
+
+            var vm = await Directory(s, RoleNames.Student);
+
+            Assert.Equal("Older live", vm.Following[0].LatestTitle);
+        }
+
+        [Fact]
+        public async Task Non_students_get_one_list_without_follow()
+        {
+            PostIn(_org, "News");
+
+            var faculty = await Directory(_faculty, RoleNames.Faculty);
+            Assert.False(faculty.CanFollow);
+            Assert.Empty(faculty.Following);
+            Assert.Equal(2, faculty.Discover.Count);
+            Assert.All(faculty.Discover, r => Assert.Null(r.LatestTitle));
+
+            var admin = await Directory(_admin, RoleNames.Administrator);
+            Assert.False(admin.CanFollow);
+            Assert.Equal("News", admin.Discover.Single(r => r.Org.OrgID == _org.OrgID).LatestTitle);
         }
 
         // ─── Who sees posts ────────────────────

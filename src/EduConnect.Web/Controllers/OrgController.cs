@@ -59,60 +59,67 @@ namespace EduConnect.Web.Controllers
             _orgAccess.IsOfficerAsync(GetUserID(), orgId);
 
         // ─── GET: /Org ─────────────────────────
-        public async Task<IActionResult> Index(int? orgId)
+        public async Task<IActionResult> Index()
         {
             if (!IsLoggedIn())
                 return RedirectToAction("Login", "Account");
 
+            var userId = GetUserID();
             var now = DateTime.Now;
-            var orgsQuery = _context.Organizations
+
+            var orgs = await _context.Organizations
                 .Include(o => o.College)
-                .Where(o => o.IsActive);
-
-            if (orgId.HasValue)
-                orgsQuery = orgsQuery.Where(o => o.OrgID == orgId.Value);
-
-            var orgs = await orgsQuery.OrderBy(o => o.OrgName).ToListAsync();
-
-            var orgIds = orgs.Select(o => o.OrgID).ToList();
-            var allPosts = await _context.OrgAnnouncements
-                .Include(a => a.PostedBy)
-                .Where(a => orgIds.Contains(a.OrgID) &&
-                            (a.ExpiresAt == null || a.ExpiresAt > now))
+                .Where(o => o.IsActive)
+                .OrderBy(o => o.OrgName)
                 .ToListAsync();
 
-            var postsByOrg = allPosts
+            var visible = (await _orgAccess.VisibleOrgIds(userId, GetRoleName()).ToListAsync())
+                .ToHashSet();
+            var latestTitles = (await _context.OrgAnnouncements
+                    .Where(a => visible.Contains(a.OrgID) &&
+                                (a.ExpiresAt == null || a.ExpiresAt > now))
+                    .Select(a => new { a.OrgID, a.Title, a.PostedAt })
+                    .ToListAsync())
                 .GroupBy(a => a.OrgID)
-                .ToDictionary(g => g.Key, g => g
-                    .OrderByDescending(a => a.IsPinned)
-                    .ThenByDescending(a => a.PostedAt)
-                    .ToList());
+                .ToDictionary(g => g.Key, g => g.MaxBy(a => a.PostedAt)!.Title);
 
-            var groups = orgs.Select(org => new OrgFeedGroup
+            var canFollow = await _orgAccess.EligibleStudents().AnyAsync(u => u.UserID == userId);
+            var memberOf = (await _context.OrgMembers
+                    .Where(m => m.UserID == userId && m.IsActive &&
+                                m.OrgRole != OrgRoles.Adviser && m.User.IsActive)
+                    .Select(m => m.OrgID)
+                    .ToListAsync())
+                .ToHashSet();
+            var follows = (await _context.OrgFollowers
+                    .Where(f => f.UserID == userId)
+                    .Select(f => f.OrgID)
+                    .ToListAsync())
+                .ToHashSet();
+            var followerCounts = await FollowerCountsAsync();
+
+            var rows = orgs.Select(o => new OrgDirectoryRow
             {
-                Org = org,
-                Announcements = postsByOrg.TryGetValue(org.OrgID, out var p) ? p : new()
+                Org = o,
+                FollowerCount = followerCounts.GetValueOrDefault(o.OrgID),
+                LatestTitle = latestTitles.GetValueOrDefault(o.OrgID),
+                Relation = memberOf.Contains(o.OrgID) ? OrgRelation.Member
+                    : !canFollow ? OrgRelation.NotStudent
+                    : follows.Contains(o.OrgID) ? OrgRelation.Following
+                    : OrgRelation.None
             }).ToList();
 
-            var allOrgs = orgId.HasValue
-                ? await _context.Organizations
-                    .Where(o => o.IsActive)
-                    .OrderBy(o => o.OrgName)
-                    .ToListAsync()
-                : orgs;
+            bool mine(OrgDirectoryRow r) =>
+                r.Relation == OrgRelation.Member || r.Relation == OrgRelation.Following;
 
-            var vm = new OrgFeedViewModel
+            var officerOrg = await _orgAccess.OfficerOrgAsync(userId);
+            var vm = new OrgDirectoryViewModel
             {
-                Groups = groups,
-                FilterOrgID = orgId,
-                OrgOptions = allOrgs
-                    .Select(o => new SelectListItem(o.OrgName, o.OrgID.ToString()))
-                    .ToList()
+                Following = rows.Where(mine).ToList(),
+                Discover = rows.Where(r => !mine(r)).ToList(),
+                CanFollow = canFollow,
+                OfficerOrgID = officerOrg != null && await IsOfficerOf(officerOrg.OrgID)
+                    ? officerOrg.OrgID : null
             };
-
-            var officerOrg = await _orgAccess.OfficerOrgAsync(GetUserID());
-            ViewBag.OfficerOrgID = officerOrg != null &&
-                await IsOfficerOf(officerOrg.OrgID) ? officerOrg.OrgID : (int?)null;
 
             return View(vm);
         }

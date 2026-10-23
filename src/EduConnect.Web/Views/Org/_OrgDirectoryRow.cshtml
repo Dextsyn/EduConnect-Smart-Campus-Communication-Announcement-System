@@ -1,0 +1,68 @@
+@using EduConnect.Web
+@using EduConnect.Web.ViewModels
+@model OrgDirectoryRow
+
+<div class="card border-0 shadow-sm mb-2 ec-lift">
+    <div class="card-body py-2 px-3 d-flex align-items-center gap-3">
+        <a href="/Org/Details/@Model.Org.OrgID"
+           class="d-flex align-items-center gap-3 flex-grow-1 text-decoration-none text-reset"
+           style="min-width:0;">
+            @if (!string.IsNullOrEmpty(Model.Org.LogoURL))
+            {
+                <img src="@Model.Org.LogoURL"
+                     class="rounded-circle ec-avatar-ring flex-shrink-0"
+                     width="40" height="40"
+                     style="object-fit:cover;" />
+            }
+            else
+            {
+                <div class="rounded-circle bg-primary bg-opacity-10 flex-shrink-0
+                            d-flex align-items-center justify-content-center"
+                     style="width:40px;height:40px;">
+                    <i class="bi bi-building text-primary"></i>
+                </div>
+            }
+            <div style="min-width:0;">
+                <div class="fw-semibold text-truncate">@Model.Org.OrgName</div>
+                @if (Model.LatestTitle != null &&
+                     (Model.Relation == OrgRelation.Member || Model.Relation == OrgRelation.Following))
+                {
+                    <div class="text-muted small text-truncate">New: @Model.LatestTitle</div>
+                }
+                else
+                {
+                    <div class="text-muted small text-truncate">
+                        @(Model.Org.College?.Name ?? "University-wide")
+                        · @Model.FollowerCount @(Model.FollowerCount == 1 ? "follower" : "followers")
+                        @if (Model.LatestTitle != null)
+                        {
+                            <span>· Latest: @Model.LatestTitle</span>
+                        }
+                    </div>
+                }
+            </div>
+        </a>
+        <div class="flex-shrink-0">
+            @if (Model.Relation == OrgRelation.None)
+            {
+                <form method="post" action="/Org/Follow/@Model.Org.OrgID" class="m-0">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="/Org" />
+                    <button type="submit" class="btn btn-warning btn-sm">Follow</button>
+                </form>
+            }
+            else if (Model.Relation == OrgRelation.Following)
+            {
+                <span class="small fw-semibold text-primary">
+                    <i class="bi bi-check-lg"></i> Following
+                </span>
+            }
+            else if (Model.Relation == OrgRelation.Member)
+            {
+                <span class="small fw-semibold text-primary">
+                    <i class="bi bi-person-check"></i> Member
+                </span>
+            }
+        </div>
+    </div>
+</div>
