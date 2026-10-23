@@ -24,6 +24,17 @@ namespace EduConnect.Web.ViewModels
         public string Relation { get; set; } = OrgRelation.None;
     }
 
+    // An org's officers (and admins) edit only its About Us text; the name,
+    // logo and college stay on the admin Edit form.
+    public class OrgAboutUsViewModel
+    {
+        public int OrgID { get; set; }
+        public string OrgName { get; set; } = "";
+
+        [MaxLength(2000, ErrorMessage = "About Us can be at most 2000 characters.")]
+        public string? AboutUs { get; set; }
+    }
+
     public class OrgFormViewModel
     {
         [Required(ErrorMessage = "Organization name is required")]

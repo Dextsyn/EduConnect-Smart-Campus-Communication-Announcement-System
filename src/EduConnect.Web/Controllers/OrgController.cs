@@ -256,6 +256,65 @@ namespace EduConnect.Web.Controllers
                 ? LocalRedirect(returnUrl)
                 : RedirectToAction("Details", new { id = orgId });
 
+        // ─── GET: /Org/AboutUs/{orgId} ─────────
+        // The org's officers, and admins, edit its About Us.
+        [HttpGet("Org/AboutUs/{orgId:int}")]
+        public async Task<IActionResult> AboutUs(int orgId)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var org = await EditableAboutUsOrgAsync(orgId);
+            if (org == null)
+                return RedirectToAction("Details", new { id = orgId });
+
+            return View(new OrgAboutUsViewModel
+            {
+                OrgID = org.OrgID,
+                OrgName = org.OrgName,
+                AboutUs = org.Description
+            });
+        }
+
+        // ─── POST: /Org/AboutUs/{orgId} ────────
+        [HttpPost("Org/AboutUs/{orgId:int}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AboutUs(int orgId, OrgAboutUsViewModel vm)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var org = await EditableAboutUsOrgAsync(orgId);
+            if (org == null)
+                return RedirectToAction("Details", new { id = orgId });
+
+            vm.OrgID = org.OrgID;
+            vm.OrgName = org.OrgName;
+            if (!ModelState.IsValid)
+                return View(vm);
+
+            var before = new { org.Description };
+            org.Description = string.IsNullOrWhiteSpace(vm.AboutUs) ? null : vm.AboutUs.Trim();
+            org.UpdatedAt = DateTime.Now;
+
+            _audit.Record("Edit About Us", AuditArea.Organizations, org.OrgID,
+                $"Edited the About Us of {org.OrgName}",
+                before, new { org.Description });
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "About Us updated.";
+            return RedirectToAction("Details", new { id = orgId });
+        }
+
+        // The active org, when the viewer may edit its About Us.
+        private async Task<Organization?> EditableAboutUsOrgAsync(int orgId)
+        {
+            if (!IsAdmin() && !await IsOfficerOf(orgId))
+                return null;
+            return await _context.Organizations
+                .FirstOrDefaultAsync(o => o.OrgID == orgId && o.IsActive);
+        }
+
         // ─── GET: /Org/Post/{orgId} ────────────
         [HttpGet("Org/Post/{orgId:int}")]
         public async Task<IActionResult> Post(int orgId)

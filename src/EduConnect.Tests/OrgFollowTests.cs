@@ -266,6 +266,104 @@ namespace EduConnect.Tests
             Assert.Equal("News", admin.Discover.Single(r => r.Org.OrgID == _org.OrgID).LatestTitle);
         }
 
+        // ─── About Us ──────────────────────────
+
+        private static OrgAboutUsViewModel About(string? text) => new() { AboutUs = text };
+
+        private Organization ReloadOrg(Organization o) =>
+            _db.NewContext().Organizations.Single(x => x.OrgID == o.OrgID);
+
+        [Fact]
+        public async Task Officer_edits_about_us_and_it_is_audited()
+        {
+            var officer = Student("Of", "Fi");
+            Join(_org, officer, OrgRoles.Officer);
+            _org.Description = "Old text";
+            _db.Context.SaveChanges();
+
+            var result = await Controller(officer, RoleNames.Student).AboutUs(_org.OrgID, About("New text"));
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("New text", ReloadOrg(_org).Description);
+            var log = Assert.Single(_db.NewContext().AuditLogs);
+            Assert.Equal("Edit About Us", log.Action);
+            Assert.Equal(AuditArea.Organizations, log.TableAffected);
+            Assert.Contains("Old text", log.OldValues);
+            Assert.Contains("New text", log.NewValues);
+        }
+
+        [Fact]
+        public async Task Admin_can_edit_about_us()
+        {
+            await AsAdmin().AboutUs(_org.OrgID, About("By admin"));
+
+            Assert.Equal("By admin", ReloadOrg(_org).Description);
+        }
+
+        [Fact]
+        public async Task Member_follower_and_other_org_officer_cannot_edit()
+        {
+            var member = Student("Me", "Mb");
+            var follower = Student("Fo", "Ll");
+            var otherOfficer = Student("Ot", "Of");
+            Join(_org, member);
+            Follow(_org, follower);
+            Join(_otherOrg, otherOfficer, OrgRoles.Officer);
+
+            foreach (var u in new[] { member, follower, otherOfficer })
+            {
+                Assert.IsType<RedirectToActionResult>(
+                    await Controller(u, RoleNames.Student).AboutUs(_org.OrgID, About("Hijack")));
+                Assert.IsType<RedirectToActionResult>(
+                    await Controller(u, RoleNames.Student).AboutUs(_org.OrgID));
+            }
+
+            Assert.Null(ReloadOrg(_org).Description);
+            Assert.Empty(_db.NewContext().AuditLogs);
+        }
+
+        [Fact]
+        public async Task About_us_over_2000_chars_is_rejected()
+        {
+            var officer = Student();
+            Join(_org, officer, OrgRoles.Officer);
+            var vm = About(new string('a', 2001));
+            var controller = Controller(officer, RoleNames.Student);
+            var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+            System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                vm, new System.ComponentModel.DataAnnotations.ValidationContext(vm), errors, true);
+            foreach (var e in errors)
+                controller.ModelState.AddModelError(e.MemberNames.First(), e.ErrorMessage!);
+
+            Assert.IsType<ViewResult>(await controller.AboutUs(_org.OrgID, vm));
+            Assert.Null(ReloadOrg(_org).Description);
+        }
+
+        [Fact]
+        public async Task About_us_html_is_stored_as_text()
+        {
+            await AsAdmin().AboutUs(_org.OrgID, About("<script>x</script>"));
+
+            Assert.Equal("<script>x</script>", ReloadOrg(_org).Description);
+        }
+
+        [Fact]
+        public async Task Officer_edit_cannot_change_name_logo_or_college()
+        {
+            var officer = Student();
+            Join(_org, officer, OrgRoles.Officer);
+            _org.LogoURL = "https://blob/logo.png";
+            _db.Context.SaveChanges();
+
+            await Controller(officer, RoleNames.Student).AboutUs(_org.OrgID,
+                new OrgAboutUsViewModel { OrgName = "Renamed", AboutUs = "Hi" });
+
+            var org = ReloadOrg(_org);
+            Assert.Equal("Gaming Society", org.OrgName);
+            Assert.Equal("https://blob/logo.png", org.LogoURL);
+            Assert.Null(org.CollegeID);
+        }
+
         // ─── Who sees posts ────────────────────
 
         private OrgAccess Access() => new(_db.NewContext());
