@@ -266,6 +266,24 @@ namespace EduConnect.Tests
             Assert.Equal("News", admin.Discover.Single(r => r.Org.OrgID == _org.OrgID).LatestTitle);
         }
 
+        [Fact]
+        public async Task Member_who_is_no_longer_eligible_still_finds_their_org()
+        {
+            PostIn(_org, "News");
+            var s = Student();
+            Join(_org, s);
+            s.VerificationStatus = VerificationStatuses.Pending;
+            _db.Context.SaveChanges();
+
+            var vm = await Directory(s, RoleNames.Student);
+
+            Assert.False(vm.CanFollow);
+            Assert.Empty(vm.Following);
+            var row = vm.Discover.Single(r => r.Org.OrgID == _org.OrgID);
+            Assert.Equal(OrgRelation.Member, row.Relation);
+            Assert.Equal("News", row.LatestTitle);
+        }
+
         // ─── About Us ──────────────────────────
 
         private static OrgAboutUsViewModel About(string? text) => new() { AboutUs = text };
@@ -337,6 +355,26 @@ namespace EduConnect.Tests
 
             Assert.IsType<ViewResult>(await controller.AboutUs(_org.OrgID, vm));
             Assert.Null(ReloadOrg(_org).Description);
+        }
+
+        [Fact]
+        public async Task About_us_line_breaks_count_once_toward_the_limit()
+        {
+            // The browser counts a line break as one character but submits
+            // "\r\n"; text the counter shows as 2000 must save.
+            var text = string.Join("\r\n", Enumerable.Repeat(new string('a', 99), 20)) + "a";
+            Assert.Equal(2019, text.Length);
+            Assert.Equal(2000, text.Replace("\r\n", "\n").Length);
+            var vm = About(text);
+            var controller = AsAdmin();
+            var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+            System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                vm, new System.ComponentModel.DataAnnotations.ValidationContext(vm), errors, true);
+            foreach (var e in errors)
+                controller.ModelState.AddModelError(e.MemberNames.First(), e.ErrorMessage!);
+
+            Assert.IsType<RedirectToActionResult>(await controller.AboutUs(_org.OrgID, vm));
+            Assert.Equal(2000, ReloadOrg(_org).Description!.Length);
         }
 
         [Fact]

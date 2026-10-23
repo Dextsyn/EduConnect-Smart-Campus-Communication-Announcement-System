@@ -114,8 +114,10 @@ namespace EduConnect.Web.Controllers
             var officerOrg = await _orgAccess.OfficerOrgAsync(userId);
             var vm = new OrgDirectoryViewModel
             {
-                Following = rows.Where(mine).ToList(),
-                Discover = rows.Where(r => !mine(r)).ToList(),
+                // Viewers who can't follow get one list, which keeps any
+                // org they still belong to in sight.
+                Following = canFollow ? rows.Where(mine).ToList() : new(),
+                Discover = canFollow ? rows.Where(r => !mine(r)).ToList() : rows,
                 CanFollow = canFollow,
                 OfficerOrgID = officerOrg != null && await IsOfficerOf(officerOrg.OrgID)
                     ? officerOrg.OrgID : null
@@ -290,6 +292,13 @@ namespace EduConnect.Web.Controllers
 
             vm.OrgID = org.OrgID;
             vm.OrgName = org.OrgName;
+
+            // Browsers count a line break as one character (the counter and
+            // maxlength) but submit "\r\n"; measure what the officer saw.
+            vm.AboutUs = vm.AboutUs?.Replace("\r\n", "\n");
+            ModelState.Remove(nameof(vm.AboutUs));
+            if (vm.AboutUs?.Length > 2000)
+                ModelState.AddModelError(nameof(vm.AboutUs), "About Us can be at most 2000 characters.");
             if (!ModelState.IsValid)
                 return View(vm);
 
