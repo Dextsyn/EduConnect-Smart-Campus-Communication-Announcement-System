@@ -32,10 +32,16 @@ namespace EduConnect.Web.Controllers
 
         // A student may run one live group at a time. Dissolved groups do not
         // count: dissolving frees the slot, otherwise winding up a finished
-        // group would lock the student out of ever starting another.
+        // group would lock the student out of ever starting another. Neither
+        // does an expired group still waiting for the hourly sweep.
         private Task<Group?> FindActiveCreatedGroupAsync(int userId) =>
             _context.Groups.FirstOrDefaultAsync(
-                g => g.CreatorID == userId && g.Status != "Dissolved");
+                g => g.CreatorID == userId && g.Status != "Dissolved"
+                    && (g.ChatExpiresAt == null || g.ChatExpiresAt > DateTime.UtcNow));
+
+        // Every group's chat lives one week from creation, Open or Full;
+        // joining or leaving never moves the deadline.
+        public static readonly TimeSpan ChatLifetime = TimeSpan.FromDays(7);
 
         private const string OneGroupMessage =
             "You can only run one group at a time. Dissolve your current "
@@ -49,7 +55,8 @@ namespace EduConnect.Web.Controllers
             var groups = await _context.Groups
                 .Include(g => g.Creator)
                 .Include(g => g.Members)
-                .Where(g => g.Status != "Dissolved")
+                .Where(g => g.Status != "Dissolved"
+                    && (g.ChatExpiresAt == null || g.ChatExpiresAt > DateTime.UtcNow))
                 .OrderByDescending(g => g.CreatedAt)
                 .ToListAsync();
 
@@ -100,6 +107,7 @@ namespace EduConnect.Web.Controllers
             }
 
             var userId = GetUserID();
+            var now = DateTime.UtcNow;
 
             // Authoritative check: the GET guard only hides the form.
             var existing = await FindActiveCreatedGroupAsync(userId);
@@ -115,7 +123,9 @@ namespace EduConnect.Web.Controllers
                 Name = name.Trim(),
                 Category = category,
                 Description = description?.Trim(),
-                MaxMembers = maxMembers
+                MaxMembers = maxMembers,
+                CreatedAt = now,
+                ChatExpiresAt = now.Add(ChatLifetime)
             };
             _context.Groups.Add(group);
             await _context.SaveChangesAsync();
@@ -180,7 +190,8 @@ namespace EduConnect.Web.Controllers
 
             if (group == null) return NotFound();
 
-            if (group.Status != "Open")
+            if (group.Status != "Open"
+                || (group.ChatExpiresAt.HasValue && group.ChatExpiresAt <= DateTime.UtcNow))
             {
                 TempData["Error"] = "This group is not open for new members.";
                 return RedirectToAction(nameof(Details), new { id });
@@ -199,7 +210,6 @@ namespace EduConnect.Web.Controllers
             if (actualCount >= group.MaxMembers && group.Status == "Open")
             {
                 group.Status = "Full";
-                group.ChatExpiresAt = DateTime.UtcNow.AddDays(7);
                 await _context.SaveChangesAsync();
             }
 
@@ -235,10 +245,7 @@ namespace EduConnect.Web.Controllers
 
             _context.GroupMembers.Remove(membership);
             if (group.Status == "Full")
-            {
                 group.Status = "Open";
-                group.ChatExpiresAt = null;
-            }
             await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));

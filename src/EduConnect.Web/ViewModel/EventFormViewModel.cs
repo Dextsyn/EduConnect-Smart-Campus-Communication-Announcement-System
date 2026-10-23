@@ -44,6 +44,17 @@ namespace EduConnect.Web.ViewModels
         { get; set; }
         public bool RemoveCoverPhoto { get; set; }
 
+        // Audience: false = the organizer's whole college,
+        // true = only their department.
+        public bool DepartmentOnly { get; set; }
+
+        // Display only (filled by the controller): the names behind
+        // the audience choice. DepartmentName is null when there is
+        // no department to narrow to (a Dean, or a college without
+        // departments).
+        public string? CollegeName { get; set; }
+        public string? DepartmentName { get; set; }
+
         // Dropdown data
         public List<Announcement> Announcements
         { get; set; }
@@ -73,6 +84,9 @@ namespace EduConnect.Web.ViewModels
         // Organizer info
         public string OrganizerName { get; set; }
         public string OrganizerRole { get; set; }
+
+        // The college, or department, the event is for
+        public string? AudienceName { get; set; }
 
         // Registration status for current user
         public bool IsRegistered { get; set; }

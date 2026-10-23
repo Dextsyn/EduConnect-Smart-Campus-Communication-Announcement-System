@@ -76,8 +76,12 @@ namespace EduConnect.Web.Controllers
                             n.IsRead == false)
                 .CountAsync();
 
+            var visibleEvents = await EventAudience.ForUserAsync(
+                _context, userID, roleName);
+
             model.UpcomingEvents = await _context
                 .Events
+                .Where(visibleEvents)
                 .Where(e => e.StartDateTime >= DateTime.Now)
                 .CountAsync();
 
@@ -134,6 +138,7 @@ namespace EduConnect.Web.Controllers
                     a.FeedType == filterFeedType);
 
             model.UpcomingEventsList = await _context.Events
+                .Where(visibleEvents)
                 .Where(e => e.StartDateTime >= DateTime.Now
                          && e.Status != "Cancelled")
                 .OrderBy(e => e.StartDateTime)

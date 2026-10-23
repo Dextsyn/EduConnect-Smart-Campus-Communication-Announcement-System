@@ -912,8 +912,7 @@ namespace EduConnect.Web.Controllers
             await _context.SaveChangesAsync();
 
             // Build reset URL
-            var baseUrl = _configuration["AppBaseUrl"]?.TrimEnd('/')
-                ?? $"{Request.Scheme}://{Request.Host}";
+            var baseUrl = AppUrls.BaseUrl(_configuration, Request);
             var resetURL = $"{baseUrl}/Account/ResetPassword?token={Uri.EscapeDataString(token)}";
 
             // Send email

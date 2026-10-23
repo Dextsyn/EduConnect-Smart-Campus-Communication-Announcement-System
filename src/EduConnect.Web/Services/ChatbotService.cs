@@ -337,7 +337,9 @@ namespace EduConnect.Web.Services
                 .Take(10)
                 .ToListAsync();
 
+            // Only the events this user may see (EventAudience).
             var events = await _context.Events
+                .Where(await EventAudience.ForUserAsync(_context, userId, roleName))
                 .Where(e => e.StartDateTime >= DateTime.Now && e.Status != "Cancelled")
                 .OrderBy(e => e.StartDateTime)
                 .Take(eventTake)

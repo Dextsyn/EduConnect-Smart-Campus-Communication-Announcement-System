@@ -42,7 +42,7 @@ namespace EduConnect.Web.Services
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var expired = await db.Groups
-                .Where(g => g.Status == "Full" && g.ChatExpiresAt <= DateTime.UtcNow)
+                .Where(g => g.Status != "Dissolved" && g.ChatExpiresAt <= DateTime.UtcNow)
                 .Include(g => g.Messages)
                 .ToListAsync();
 
