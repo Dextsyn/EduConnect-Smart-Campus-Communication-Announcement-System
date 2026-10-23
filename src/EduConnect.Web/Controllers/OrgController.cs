@@ -46,6 +46,9 @@ namespace EduConnect.Web.Controllers
         private int GetUserID() =>
             int.Parse(HttpContext.Session.GetString("UserID")!);
 
+        private string? GetRoleName() =>
+            HttpContext.Session.GetString("RoleName");
+
         private bool IsAdmin() =>
             HttpContext.Session.GetString("RoleName") == RoleNames.Administrator;
 
@@ -126,8 +129,12 @@ namespace EduConnect.Web.Controllers
 
             if (org == null) return NotFound();
 
+            var userId = GetUserID();
+            var canSeePosts = await _orgAccess.CanSeePostsAsync(userId, GetRoleName(), id);
+
+            // Everyone else gets the About Us view; their posts are never loaded.
             var now = DateTime.Now;
-            var posts = await _context.OrgAnnouncements
+            var posts = !canSeePosts ? new List<OrgAnnouncement>() : await _context.OrgAnnouncements
                 .Include(a => a.PostedBy)
                 .Where(a => a.OrgID == id &&
                             (a.ExpiresAt == null || a.ExpiresAt > now))
@@ -135,6 +142,10 @@ namespace EduConnect.Web.Controllers
                 .ThenByDescending(a => a.PostedAt)
                 .ToListAsync();
 
+            var followerCounts = await FollowerCountsAsync();
+            ViewBag.CanSeePosts = canSeePosts;
+            ViewBag.Relation = await RelationToAsync(userId, id);
+            ViewBag.FollowerCount = followerCounts.GetValueOrDefault(id);
             ViewBag.IsOfficer = await IsOfficerOf(id);
             ViewBag.Officers = await _context.OrgMembers
                 .Where(m => m.OrgID == id &&
@@ -211,6 +222,27 @@ namespace EduConnect.Web.Controllers
 
             return BackTo(orgId, returnUrl);
         }
+
+        // How the viewer stands with an org; drives the Follow button.
+        private async Task<string> RelationToAsync(int userId, int orgId)
+        {
+            if (await _orgAccess.IsMemberAsync(userId, orgId))
+                return OrgRelation.Member;
+            if (!await _orgAccess.EligibleStudents().AnyAsync(u => u.UserID == userId))
+                return OrgRelation.NotStudent;
+            return await _context.OrgFollowers.AnyAsync(f => f.OrgID == orgId && f.UserID == userId)
+                ? OrgRelation.Following
+                : OrgRelation.None;
+        }
+
+        // Followers per org, counting only those who are still eligible
+        // students.
+        private Task<Dictionary<int, int>> FollowerCountsAsync() =>
+            _context.OrgFollowers
+                .Where(f => _orgAccess.EligibleStudents().Any(u => u.UserID == f.UserID))
+                .GroupBy(f => f.OrgID)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count);
 
         private IActionResult BackTo(int orgId, string? returnUrl) =>
             !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)

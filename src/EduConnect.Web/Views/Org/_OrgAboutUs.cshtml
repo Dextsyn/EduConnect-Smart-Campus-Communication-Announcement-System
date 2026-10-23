@@ -1,0 +1,49 @@
+@using EduConnect.Web.Models
+@model Organization
+@{
+    bool canEdit = ViewData["CanEditAboutUs"] as bool? ?? false;
+    var officers = ViewData["Officers"] as List<EduConnect.Web.ViewModels.OrgMemberRow>
+        ?? new List<EduConnect.Web.ViewModels.OrgMemberRow>();
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold mb-0"><i class="bi bi-info-circle me-1"></i> About Us</h6>
+            @if (canEdit)
+            {
+                <a href="/Org/AboutUs/@Model.OrgID" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Edit
+                </a>
+            }
+        </div>
+        @if (string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p class="text-muted mb-0">This organization hasn't written its About Us yet.</p>
+        }
+        else
+        {
+            <p class="text-muted mb-0" style="white-space:pre-line;">@Model.Description</p>
+        }
+    </div>
+</div>
+
+@if (officers.Any())
+{
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body p-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-person-badge me-1"></i> Officers</h6>
+            @foreach (var o in officers)
+            {
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <i class="bi bi-person-circle text-primary"></i>
+                    <span>@o.Name</span>
+                    @if (o.Position != null)
+                    {
+                        <span class="text-muted small">· @o.Position</span>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

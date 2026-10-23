@@ -132,6 +132,76 @@ namespace EduConnect.Tests
             Assert.Equal("Login", result.ActionName);
         }
 
+        // ─── Org page ──────────────────────────
+
+        private OrgAnnouncement PostIn(Organization org, string title, DateTime? expires = null,
+            DateTime? at = null)
+        {
+            var poster = Student("Po", "St");
+            var a = new OrgAnnouncement
+            {
+                OrgID = org.OrgID, PostedByID = poster.UserID, Title = title, Body = "body",
+                ExpiresAt = expires, PostedAt = at ?? DateTime.Now
+            };
+            _db.Context.OrgAnnouncements.Add(a);
+            _db.Context.SaveChanges();
+            return a;
+        }
+
+        private static List<OrgAnnouncement> Posts(ViewResult v) =>
+            (List<OrgAnnouncement>)v.ViewData["Announcements"]!;
+
+        [Fact]
+        public async Task Non_follower_gets_about_us_and_no_posts()
+        {
+            PostIn(_org, "Cup sign-ups");
+            var s = Student();
+
+            var view = Assert.IsType<ViewResult>(await Controller(s, RoleNames.Student).Details(_org.OrgID));
+
+            Assert.Empty(Posts(view));
+            Assert.False((bool)view.ViewData["CanSeePosts"]!);
+            Assert.Equal("None", view.ViewData["Relation"]);
+        }
+
+        [Fact]
+        public async Task Follower_gets_posts()
+        {
+            PostIn(_org, "Cup sign-ups");
+            var s = Student();
+            Follow(_org, s);
+
+            var view = Assert.IsType<ViewResult>(await Controller(s, RoleNames.Student).Details(_org.OrgID));
+
+            Assert.Equal("Cup sign-ups", Assert.Single(Posts(view)).Title);
+            Assert.True((bool)view.ViewData["CanSeePosts"]!);
+            Assert.Equal("Following", view.ViewData["Relation"]);
+            Assert.Equal(1, view.ViewData["FollowerCount"]);
+        }
+
+        [Fact]
+        public async Task Member_relation_is_member_even_if_also_following()
+        {
+            var s = Student();
+            Join(_org, s);
+            Follow(_org, s);
+
+            var view = Assert.IsType<ViewResult>(await Controller(s, RoleNames.Student).Details(_org.OrgID));
+
+            Assert.Equal("Member", view.ViewData["Relation"]);
+        }
+
+        [Fact]
+        public async Task Faculty_sees_about_us_without_follow_button()
+        {
+            PostIn(_org, "Cup sign-ups");
+
+            var view = Assert.IsType<ViewResult>(await Controller(_faculty, RoleNames.Faculty).Details(_org.OrgID));
+
+            Assert.Equal("NotStudent", view.ViewData["Relation"]);
+            Assert.Empty(Posts(view));
+        }
+
         // ─── Who sees posts ────────────────────
 
         private OrgAccess Access() => new(_db.NewContext());
