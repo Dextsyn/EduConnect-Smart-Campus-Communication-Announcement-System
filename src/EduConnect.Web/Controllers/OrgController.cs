@@ -153,6 +153,70 @@ namespace EduConnect.Web.Controllers
             return View(org);
         }
 
+        // ─── POST: /Org/Follow/{orgId} ─────────
+        // Any eligible student may follow any active org, whatever their
+        // college. Following is not membership and is not audited.
+        [HttpPost("Org/Follow/{orgId:int}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Follow(int orgId, string? returnUrl)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            if (!await _context.Organizations.AnyAsync(o => o.OrgID == orgId && o.IsActive))
+                return NotFound();
+
+            var userId = GetUserID();
+            if (!await _orgAccess.EligibleStudents().AnyAsync(u => u.UserID == userId))
+            {
+                TempData["Error"] = "Only verified students can follow organizations.";
+                return BackTo(orgId, returnUrl);
+            }
+
+            if (!await _context.OrgFollowers.AnyAsync(f => f.OrgID == orgId && f.UserID == userId))
+            {
+                _context.OrgFollowers.Add(new OrgFollower { OrgID = orgId, UserID = userId });
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException)
+                {
+                    // A second click raced this one; the unique index kept
+                    // one row, which is all following needs.
+                }
+            }
+
+            return BackTo(orgId, returnUrl);
+        }
+
+        // ─── POST: /Org/Unfollow/{orgId} ───────
+        // Members keep seeing posts through their membership, so this only
+        // removes a follow row when there is one.
+        [HttpPost("Org/Unfollow/{orgId:int}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Unfollow(int orgId, string? returnUrl)
+        {
+            if (!IsLoggedIn())
+                return RedirectToAction("Login", "Account");
+
+            var userId = GetUserID();
+            var row = await _context.OrgFollowers
+                .FirstOrDefaultAsync(f => f.OrgID == orgId && f.UserID == userId);
+            if (row != null)
+            {
+                _context.OrgFollowers.Remove(row);
+                await _context.SaveChangesAsync();
+            }
+
+            return BackTo(orgId, returnUrl);
+        }
+
+        private IActionResult BackTo(int orgId, string? returnUrl) =>
+            !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+                ? LocalRedirect(returnUrl)
+                : RedirectToAction("Details", new { id = orgId });
+
         // ─── GET: /Org/Post/{orgId} ────────────
         [HttpGet("Org/Post/{orgId:int}")]
         public async Task<IActionResult> Post(int orgId)

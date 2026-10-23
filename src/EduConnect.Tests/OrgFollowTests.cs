@@ -1,6 +1,7 @@
 using EduConnect.Web;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Tests
@@ -29,6 +30,106 @@ namespace EduConnect.Tests
             _db.Context.SaveChanges();
 
             Assert.Empty(_db.NewContext().OrgFollowers);
+        }
+
+        // ─── Follow / Unfollow ─────────────────
+
+        private int FollowRows(User u) =>
+            _db.NewContext().OrgFollowers.Count(f => f.UserID == u.UserID);
+
+        [Fact]
+        public async Task Student_follows_and_unfollows()
+        {
+            var s = Student();
+
+            Assert.IsType<RedirectToActionResult>(await Controller(s, RoleNames.Student).Follow(_org.OrgID, null));
+            Assert.Equal(1, FollowRows(s));
+            Assert.Empty(_db.NewContext().OrgMembers.Where(m => m.UserID == s.UserID));
+
+            await Controller(s, RoleNames.Student).Unfollow(_org.OrgID, null);
+            Assert.Equal(0, FollowRows(s));
+        }
+
+        [Fact]
+        public async Task Following_twice_keeps_one_row()
+        {
+            var s = Student();
+            await Controller(s, RoleNames.Student).Follow(_org.OrgID, null);
+            await Controller(s, RoleNames.Student).Follow(_org.OrgID, null);
+
+            Assert.Equal(1, FollowRows(s));
+        }
+
+        [Fact]
+        public async Task Faculty_and_unverified_students_cannot_follow()
+        {
+            var unverified = Student(verified: false);
+
+            var asFaculty = Controller(_faculty, RoleNames.Faculty);
+            await asFaculty.Follow(_org.OrgID, null);
+            Assert.NotNull(asFaculty.TempData["Error"]);
+
+            var asUnverified = Controller(unverified, RoleNames.Student);
+            await asUnverified.Follow(_org.OrgID, null);
+            Assert.NotNull(asUnverified.TempData["Error"]);
+
+            Assert.Empty(_db.NewContext().OrgFollowers);
+        }
+
+        [Fact]
+        public async Task Cannot_follow_a_deactivated_or_missing_org()
+        {
+            var s = Student();
+            _otherOrg.IsActive = false;
+            _db.Context.SaveChanges();
+
+            Assert.IsType<NotFoundResult>(await Controller(s, RoleNames.Student).Follow(_otherOrg.OrgID, null));
+            Assert.IsType<NotFoundResult>(await Controller(s, RoleNames.Student).Follow(9999, null));
+            Assert.Empty(_db.NewContext().OrgFollowers);
+        }
+
+        [Fact]
+        public async Task Member_unfollow_is_a_noop_and_keeps_access()
+        {
+            var member = Student();
+            Join(_org, member);
+
+            Assert.IsType<RedirectToActionResult>(await Controller(member, RoleNames.Student).Unfollow(_org.OrgID, null));
+            Assert.True(await Access().CanSeePostsAsync(member.UserID, RoleNames.Student, _org.OrgID));
+        }
+
+        [Fact]
+        public async Task Students_from_any_college_can_follow()
+        {
+            var coe = _db.AddCollege("COE");
+            var ce = _db.AddProgram(_db.AddDepartment(coe, "Civil"), "BSCE");
+            var engineer = Student(programId: ce.ProgramID);
+            _org.CollegeID = _db.Context.Departments.Find(_bsit.DepartmentID)!.CollegeID;
+            _db.Context.SaveChanges();
+
+            await Controller(engineer, RoleNames.Student).Follow(_org.OrgID, null);
+
+            Assert.Equal(1, FollowRows(engineer));
+        }
+
+        [Fact]
+        public async Task Follow_returns_to_a_local_url()
+        {
+            var s = Student();
+
+            var result = await Controller(s, RoleNames.Student).Follow(_org.OrgID, "/Org");
+
+            Assert.Equal("/Org", Assert.IsType<LocalRedirectResult>(result).Url);
+        }
+
+        [Fact]
+        public async Task Not_logged_in_is_sent_to_login()
+        {
+            var controller = Controller(Student(), RoleNames.Student);
+            _session.Clear();
+
+            var result = Assert.IsType<RedirectToActionResult>(await controller.Follow(_org.OrgID, null));
+            Assert.Equal("Login", result.ActionName);
         }
 
         // ─── Who sees posts ────────────────────
