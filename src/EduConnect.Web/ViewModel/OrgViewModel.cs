@@ -23,7 +23,7 @@ namespace EduConnect.Web.ViewModels
         [MaxLength(200)]
         public string OrgName { get; set; }
 
-        [MaxLength(500)]
+        [MaxLength(2000)]
         public string? Description { get; set; }
 
         public IFormFile? Logo { get; set; }

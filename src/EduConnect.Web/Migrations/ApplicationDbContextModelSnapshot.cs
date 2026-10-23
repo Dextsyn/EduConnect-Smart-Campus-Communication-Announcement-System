@@ -1076,6 +1076,10 @@ namespace EduConnect.Web.Migrations
                     b.Property<int>("OrgID")
                         .HasColumnType("int");
 
+                    b.Property<string>("PhotoURL")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("PostedAt")
                         .HasColumnType("datetime2");
 
@@ -1097,6 +1101,33 @@ namespace EduConnect.Web.Migrations
                     b.HasIndex("PostedByID");
 
                     b.ToTable("OrgAnnouncements");
+                });
+
+            modelBuilder.Entity("EduConnect.Web.Models.OrgFollower", b =>
+                {
+                    b.Property<int>("OrgFollowerID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrgFollowerID"));
+
+                    b.Property<DateTime>("FollowedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OrgID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("OrgFollowerID");
+
+                    b.HasIndex("UserID");
+
+                    b.HasIndex("OrgID", "UserID")
+                        .IsUnique();
+
+                    b.ToTable("OrgFollowers");
                 });
 
             modelBuilder.Entity("EduConnect.Web.Models.OrgMember", b =>
@@ -1167,8 +1198,8 @@ namespace EduConnect.Web.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -2048,6 +2079,25 @@ namespace EduConnect.Web.Migrations
                     b.Navigation("PostedBy");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.OrgFollower", b =>
+                {
+                    b.HasOne("EduConnect.Web.Models.Organization", "Organization")
+                        .WithMany("Followers")
+                        .HasForeignKey("OrgID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EduConnect.Web.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.OrgMember", b =>
                 {
                     b.HasOne("EduConnect.Web.Models.Organization", "Organization")
@@ -2329,6 +2379,8 @@ namespace EduConnect.Web.Migrations
             modelBuilder.Entity("EduConnect.Web.Models.Organization", b =>
                 {
                     b.Navigation("Announcements");
+
+                    b.Navigation("Followers");
 
                     b.Navigation("Members");
                 });

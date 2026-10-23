@@ -25,6 +25,10 @@ namespace EduConnect.Web.Models
         [MaxLength(500)]
         public string? AttachmentURL { get; set; }
 
+        // One inline photo, shown in the post. AttachmentURL is for files.
+        [MaxLength(500)]
+        public string? PhotoURL { get; set; }
+
         public bool IsPinned { get; set; } = false;
 
         public DateTime? ExpiresAt { get; set; }

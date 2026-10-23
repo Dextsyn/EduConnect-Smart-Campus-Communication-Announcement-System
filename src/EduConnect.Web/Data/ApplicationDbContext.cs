@@ -48,6 +48,7 @@ namespace EduConnect.Web.Data
         // Organizations
         public DbSet<Organization> Organizations { get; set; }
         public DbSet<OrgMember> OrgMembers { get; set; }
+        public DbSet<OrgFollower> OrgFollowers { get; set; }
         public DbSet<OrgAnnouncement> OrgAnnouncements
         { get; set; }
 
@@ -405,6 +406,23 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.UserID)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── OrgFollowers ──────────────────────
+            modelBuilder.Entity<OrgFollower>(entity =>
+            {
+                entity.HasKey(e => e.OrgFollowerID);
+                entity.HasIndex(e => new
+                { e.OrgID, e.UserID }).IsUnique();
+                entity.HasOne(e => e.Organization)
+                      .WithMany(e => e.Followers)
+                      .HasForeignKey(e => e.OrgID)
+                      .OnDelete(DeleteBehavior.Cascade);
+                // Follows are personal: deleting a user removes them.
+                entity.HasOne(e => e.User)
+                      .WithMany()
+                      .HasForeignKey(e => e.UserID)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ─── OrgAnnouncements ──────────────────

@@ -13,8 +13,9 @@ namespace EduConnect.Web.Models
         [MaxLength(200)]
         public string OrgName { get; set; }
 
-        [MaxLength(500)]
+        [MaxLength(2000)]
         public string? Description { get; set; }
+        // Shown as "About Us". Its officers edit it, as does an admin.
 
         [MaxLength(500)]
         public string? LogoURL { get; set; }
@@ -44,6 +45,7 @@ namespace EduConnect.Web.Models
         public College? College { get; set; }
         public User CreatedBy { get; set; }
         public ICollection<OrgMember> Members { get; set; }
+        public ICollection<OrgFollower> Followers { get; set; }
         public ICollection<OrgAnnouncement>
             Announcements
         { get; set; }
