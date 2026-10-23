@@ -65,6 +65,8 @@ namespace EduConnect.Web.ViewModels
         [Required(ErrorMessage = "Body is required")]
         public string Body { get; set; }
 
+        // One inline photo (JPG, PNG or WEBP); Attachment is for files.
+        public IFormFile? Photo { get; set; }
         public IFormFile? Attachment { get; set; }
         public bool IsPinned { get; set; }
         public DateTime? ExpiresAt { get; set; }

@@ -364,6 +364,87 @@ namespace EduConnect.Tests
             Assert.Null(org.CollegeID);
         }
 
+        // ─── Posting: photo, files, notifications ─
+
+        private User Officer()
+        {
+            var o = Student("Of", "Fi");
+            Join(_org, o, OrgRoles.Officer);
+            return o;
+        }
+
+        [Fact]
+        public async Task Post_with_photo_stores_photo_url()
+        {
+            var vm = APost();
+            vm.Photo = Upload("poster.png", "image/png");
+
+            Assert.IsType<RedirectToActionResult>(await Controller(Officer(), RoleNames.Student).Post(_org.OrgID, vm));
+
+            var post = Assert.Single(_db.NewContext().OrgAnnouncements);
+            Assert.NotNull(post.PhotoURL);
+            Assert.Null(post.AttachmentURL);
+        }
+
+        [Fact]
+        public async Task Non_image_photo_is_rejected()
+        {
+            var vm = APost();
+            vm.Photo = Upload("x.pdf", "application/pdf");
+            var controller = Controller(Officer(), RoleNames.Student);
+
+            Assert.IsType<ViewResult>(await controller.Post(_org.OrgID, vm));
+            Assert.True(controller.ModelState["Photo"]!.Errors.Count > 0);
+            Assert.Empty(_db.NewContext().OrgAnnouncements);
+        }
+
+        [Fact]
+        public async Task Image_as_file_attachment_is_rejected()
+        {
+            var vm = APost();
+            vm.Attachment = Upload("p.jpg", "image/jpeg");
+            var controller = Controller(Officer(), RoleNames.Student);
+
+            Assert.IsType<ViewResult>(await controller.Post(_org.OrgID, vm));
+            Assert.True(controller.ModelState["Attachment"]!.Errors.Count > 0);
+            Assert.Empty(_db.NewContext().OrgAnnouncements);
+        }
+
+        [Fact]
+        public async Task New_post_notifies_members_and_followers_once()
+        {
+            var officer = Officer();
+            var member = Student("Me", "Mb");
+            var follower = Student("Fo", "Ll");
+            var both = Student("Bo", "Th");
+            var unverifiedFollower = Student("Un", "Ve", verified: false);
+            Join(_org, member);
+            Follow(_org, follower);
+            Join(_org, both);
+            Follow(_org, both);
+            Follow(_org, unverifiedFollower);
+            Follow(_org, officer);
+
+            await Controller(officer, RoleNames.Student).Post(_org.OrgID, APost());
+
+            Assert.Equal(new[] { member.UserID, follower.UserID, both.UserID }.OrderBy(i => i),
+                _notifications.Sent.Select(s => s.UserId).OrderBy(i => i));
+        }
+
+        [Fact]
+        public async Task Follower_who_left_the_student_role_is_not_notified()
+        {
+            var officer = Officer();
+            var former = Student("Fo", "Rm");
+            Follow(_org, former);
+            former.RoleID = _faculty.RoleID;
+            _db.Context.SaveChanges();
+
+            await Controller(officer, RoleNames.Student).Post(_org.OrgID, APost());
+
+            Assert.Empty(_notifications.Sent);
+        }
+
         // ─── Who sees posts ────────────────────
 
         private OrgAccess Access() => new(_db.NewContext());
