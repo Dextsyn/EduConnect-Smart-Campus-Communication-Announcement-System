@@ -42,7 +42,7 @@
         <button class="btn btn-outline-secondary btn-sm" data-filter="unread">
             Unread <span class="badge bg-danger ms-1">@unreadCount</span>
         </button>
-        <button class="btn btn-outline-secondary btn-sm" data-filter="Announcement">
+        <button class="btn btn-outline-secondary btn-sm" data-filter="Announcement,OrgAnnouncement">
             <i class="bi bi-megaphone me-1"></i>Announcements
         </button>
         <button class="btn btn-outline-secondary btn-sm" data-filter="EventRegistration,WaitlistPromotion">
@@ -73,6 +73,7 @@ else
             var icon = n.Type switch
             {
                 "Announcement" => "bi-megaphone",
+                "OrgAnnouncement" => "bi-people-fill",
                 "EventRegistration" => "bi-calendar-check",
                 "WaitlistPromotion" => "bi-arrow-up-circle",
                 "PasswordReset" => "bi-shield-lock",
@@ -82,6 +83,7 @@ else
             var iconColor = n.Type switch
             {
                 "Announcement" => "text-primary",
+                "OrgAnnouncement" => "text-primary",
                 "EventRegistration" => "text-success",
                 "WaitlistPromotion" => "text-warning",
                 "PasswordReset" => "text-danger",

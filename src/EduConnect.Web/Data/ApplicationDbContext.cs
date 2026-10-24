@@ -48,6 +48,7 @@ namespace EduConnect.Web.Data
         // Organizations
         public DbSet<Organization> Organizations { get; set; }
         public DbSet<OrgMember> OrgMembers { get; set; }
+        public DbSet<OrgFollower> OrgFollowers { get; set; }
         public DbSet<OrgAnnouncement> OrgAnnouncements
         { get; set; }
 
@@ -391,6 +392,12 @@ namespace EduConnect.Web.Data
                 entity.HasKey(e => e.MemberID);
                 entity.HasIndex(e => new
                 { e.OrgID, e.UserID }).IsUnique();
+                // A student is an officer of one organization at a time.
+                // Named, so the plain foreign-key index on UserID stays too.
+                entity.HasIndex(e => e.UserID, "IX_OrgMembers_UserID");
+                entity.HasIndex(e => e.UserID, "IX_OrgMembers_OneOfficerOrgPerUser")
+                      .IsUnique()
+                      .HasFilter("[OrgRole] = 'Officer' AND [IsActive] = 1");
                 entity.HasOne(e => e.Organization)
                       .WithMany(e => e.Members)
                       .HasForeignKey(e => e.OrgID)
@@ -399,6 +406,23 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.UserID)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── OrgFollowers ──────────────────────
+            modelBuilder.Entity<OrgFollower>(entity =>
+            {
+                entity.HasKey(e => e.OrgFollowerID);
+                entity.HasIndex(e => new
+                { e.OrgID, e.UserID }).IsUnique();
+                entity.HasOne(e => e.Organization)
+                      .WithMany(e => e.Followers)
+                      .HasForeignKey(e => e.OrgID)
+                      .OnDelete(DeleteBehavior.Cascade);
+                // Follows are personal: deleting a user removes them.
+                entity.HasOne(e => e.User)
+                      .WithMany()
+                      .HasForeignKey(e => e.UserID)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ─── OrgAnnouncements ──────────────────

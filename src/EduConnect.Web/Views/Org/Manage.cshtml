@@ -35,8 +35,8 @@
                 <thead class="table-light">
                     <tr>
                         <th>Organization</th>
-                        <th>Adviser</th>
-                        <th>Department</th>
+                        <th>Officers</th>
+                        <th>College</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -44,8 +44,12 @@
                 <tbody>
                     @foreach (var org in Model)
                     {
-                        var adviser = org.Members?
-                            .FirstOrDefault(m => m.OrgRole == "Adviser" && m.IsActive);
+                        var officers = (org.Members ?? new List<OrgMember>())
+                            .Where(m => m.OrgRole == EduConnect.Web.OrgRoles.Officer && m.IsActive)
+                            .OrderBy(m => m.User.LastName)
+                            .ToList();
+                        var memberCount = (org.Members ?? new List<OrgMember>())
+                            .Count(m => m.IsActive && m.OrgRole != EduConnect.Web.OrgRoles.Adviser);
                         <tr>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
@@ -69,9 +73,18 @@
                                 </div>
                             </td>
                             <td>
-                                @if (adviser != null)
+                                @if (officers.Any())
                                 {
-                                    @($"{adviser.User.FirstName} {adviser.User.LastName}")
+                                    @foreach (var o in officers)
+                                    {
+                                        <div class="@(o.User.IsActive ? "" : "text-muted text-decoration-line-through")">
+                                            @($"{o.User.FirstName} {o.User.LastName}")
+                                            @if (o.Position != null)
+                                            {
+                                                <span class="text-muted small">· @o.Position</span>
+                                            }
+                                        </div>
+                                    }
                                 }
                                 else
                                 {
@@ -101,6 +114,12 @@
                                 }
                             </td>
                             <td class="text-end">
+                                <a href="/Org/Members/@org.OrgID"
+                                   class="btn btn-outline-primary btn-sm me-1"
+                                   title="Members & officers">
+                                    <i class="bi bi-people"></i>
+                                    <span class="small">@memberCount</span>
+                                </a>
                                 <a href="/Org/Edit/@org.OrgID"
                                    class="btn btn-outline-primary btn-sm me-1">
                                     <i class="bi bi-pencil"></i>

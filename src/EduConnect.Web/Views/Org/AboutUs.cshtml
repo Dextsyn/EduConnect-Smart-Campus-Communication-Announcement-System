@@ -1,0 +1,61 @@
+@model EduConnect.Web.ViewModels.OrgAboutUsViewModel
+@{
+    ViewData["Title"] = $"About Us — {Model.OrgName}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-info-circle me-2 text-primary"></i>
+            Edit About Us
+        </h4>
+        <small class="text-muted">@Model.OrgName</small>
+    </div>
+    <a href="/Org/Details/@Model.OrgID"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Cancel
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <form asp-action="AboutUs"
+              asp-route-orgId="@Model.OrgID"
+              method="post">
+            @Html.AntiForgeryToken()
+
+            <label asp-for="AboutUs" class="form-label fw-semibold">About Us</label>
+            <div class="form-text mt-0 mb-2">
+                Students who don't follow your organization see this. Plain text; line breaks are kept.
+            </div>
+            <textarea asp-for="AboutUs"
+                      id="aboutUsText"
+                      class="form-control"
+                      rows="10"
+                      maxlength="2000"></textarea>
+            <div class="d-flex justify-content-between mt-1">
+                <span asp-validation-for="AboutUs" class="text-danger small"></span>
+                <span class="text-muted small"><span id="aboutUsCount">0</span> / 2000</span>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end mt-4">
+                <a href="/Org/Details/@Model.OrgID" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Save About Us
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var text = document.getElementById('aboutUsText');
+            var count = document.getElementById('aboutUsCount');
+            function update() { count.textContent = text.value.length; }
+            text.addEventListener('input', update);
+            update();
+        })();
+    </script>
+}

@@ -18,11 +18,13 @@ namespace EduConnect.Web.Models
         [Required]
         [MaxLength(20)]
         public string OrgRole { get; set; } = "Member";
-        // Values: Member, Officer, President, Adviser
+        // Values: OrgRoles.Member, OrgRoles.Officer (a Student who posts
+        // for the org), OrgRoles.Adviser (retired; kept inactive)
 
         [MaxLength(100)]
         public string? Position { get; set; }
-        // e.g. "Vice President", "Secretary"
+        // An officer's title, e.g. "President", "PRO". A label only —
+        // every officer has the same rights.
 
         public bool IsActive { get; set; } = true;
 

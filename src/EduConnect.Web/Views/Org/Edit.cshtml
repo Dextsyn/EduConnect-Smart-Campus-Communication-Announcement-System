@@ -42,24 +42,19 @@
                 </div>
 
                 <div class="col-12 col-md-6">
-                    <label asp-for="AdviserUserID" class="form-label fw-semibold">
-                        Faculty Adviser <span class="text-danger">*</span>
-                    </label>
-                    <select asp-for="AdviserUserID"
-                            asp-items="Model.FacultyOptions"
-                            class="form-select">
-                        <option value="">— Select Adviser —</option>
-                    </select>
-                    <span asp-validation-for="AdviserUserID" class="text-danger small"></span>
+                    <div class="form-label fw-semibold">Organization Officers</div>
+                    <a href="/Org/Members/@orgId" class="btn btn-outline-primary">
+                        <i class="bi bi-people me-1"></i> Manage members &amp; officers
+                    </a>
                 </div>
 
                 <div class="col-12">
                     <label asp-for="Description" class="form-label fw-semibold">
-                        Description
+                        About Us
                     </label>
                     <textarea asp-for="Description"
                               class="form-control"
-                              rows="3"></textarea>
+                              rows="5"></textarea>
                 </div>
 
                 <div class="col-12 col-md-6">
