@@ -122,6 +122,49 @@ namespace EduConnect.Tests
         public void ContainsProhibited_Blank_IsFalse(string? text) =>
             Assert.False(Matcher.ContainsProhibited(text));
 
+        // A long spaced-out run must not cost cubic time: chat runs this on
+        // every message, and 1000 spaced letters fit in one.
+        [Fact]
+        public void LongSpacedRun_IsFast()
+        {
+            var text = string.Join(" ", Enumerable.Repeat("a", 1000));
+            Matcher.Mask(text);
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            Matcher.Mask(text);
+            Assert.True(watch.ElapsedMilliseconds < 200, $"took {watch.ElapsedMilliseconds} ms");
+        }
+
+        [Fact]
+        public void LongSpacedRun_StillFindsWordAtTheEnd()
+        {
+            var text = string.Join(" ", Enumerable.Repeat("q", 300)) + " z o r b a k";
+            Assert.EndsWith(" ***********", Matcher.Mask(text));
+        }
+
+        // The letter after an apostrophe ("it's", "I'm") is part of a word,
+        // not a spaced-out letter, so it never joins the next one.
+        [Theory]
+        [InlineData("It's a nice day, that's a plan")]
+        [InlineData("it’s a plan")]
+        public void Contractions_DoNotJoinIntoWords(string text)
+        {
+            var matcher = new ModerationMatcher(new[] { "sa" }, Array.Empty<string>());
+            Assert.Equal(text, matcher.Mask(text));
+            Assert.Equal("*** nice", matcher.Mask("s a nice"));
+        }
+
+        // Entries are read the way messages are: symbols and digits as
+        // letters, and - _ ' as spaces between words.
+        [Theory]
+        [InlineData("bad b4d", "*** ***")]
+        [InlineData("zor-bak zor bak", "******* *******")]
+        public void EntriesWithSymbols_StillMatch(string text, string expected)
+        {
+            var matcher = new ModerationMatcher(new[] { "b4d", "zor-bak" }, Array.Empty<string>());
+            Assert.Equal(expected, matcher.Mask(text));
+        }
+
         [Theory]
         [InlineData("  Flim   BO mo ", "flim bo mo")]
         [InlineData("ZORBAK", "zorbak")]

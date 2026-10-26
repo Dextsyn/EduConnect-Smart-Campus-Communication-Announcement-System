@@ -25,10 +25,14 @@ namespace EduConnect.Web.Services
         private readonly Dictionary<string, List<string>> _wordsByCollapsed = new();
         private readonly List<string[]> _phrases = new();
         private readonly HashSet<string> _allowed = new();
+        // Longest stretch of spaced letters worth joining: twice the longest
+        // word, so stretched spellings still fit. Caps the run search,
+        // which would otherwise be cubic in the message length.
+        private readonly int _maxRunLetters;
 
         public ModerationMatcher(IEnumerable<string> prohibited, IEnumerable<string> allowed)
         {
-            foreach (var entry in prohibited.Select(NormalizeEntry).Where(e => e.Length > 0).Distinct())
+            foreach (var entry in prohibited.Select(EntryForm).Where(e => e.Length > 0).Distinct())
             {
                 if (entry.Contains(' '))
                 {
@@ -44,13 +48,22 @@ namespace EduConnect.Web.Services
             // Longest phrase first, so "a b c" wins over "a b".
             _phrases.Sort((a, b) => b.Length.CompareTo(a.Length));
 
-            foreach (var entry in allowed.Select(NormalizeEntry).Where(e => e.Length > 0))
+            foreach (var entry in allowed.Select(EntryForm).Where(e => e.Length > 0))
                 _allowed.Add(entry);
+
+            _maxRunLetters = 2 * _words.Select(w => w.Length).DefaultIfEmpty(0).Max();
         }
 
         // How a list entry is stored: trimmed, lowercase, single spaces.
         public static string NormalizeEntry(string word) =>
             Regex.Replace((word ?? "").Trim().ToLowerInvariant(), @"\s+", " ");
+
+        // How an entry is compared: read the way message tokens are, so
+        // "b4d" means "bad" and "zor-bak" is the phrase "zor bak".
+        private static string EntryForm(string word) =>
+            string.Join(" ", NormalizeEntry(Regex.Replace(word ?? "", @"[-_'’]", " "))
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => Variants(part).First()));
 
         public bool ContainsProhibited(string? text) =>
             !string.IsNullOrWhiteSpace(text) && FindSpans(text).Count > 0;
@@ -106,16 +119,15 @@ namespace EduConnect.Web.Services
             var run = new List<int>();
             for (var i = 0; i <= tokens.Count; i++)
             {
-                var joins = i < tokens.Count && !covered[i] && tokens[i].Length == 1
-                    && (run.Count == 0 || IsSpacerGap(text, tokens[run[^1]].End, tokens[i].Start));
-                if (joins)
+                var letter = i < tokens.Count && IsRunLetter(text, tokens[i], covered[i]);
+                if (letter && (run.Count == 0 || IsSpacerGap(text, tokens[run[^1]].End, tokens[i].Start)))
                 {
                     run.Add(i);
                     continue;
                 }
                 MatchLetterRun(run, tokens, covered, spans);
                 run.Clear();
-                if (i < tokens.Count && !covered[i] && tokens[i].Length == 1) run.Add(i);
+                if (letter) run.Add(i);
             }
 
             // 3. Whole tokens.
@@ -139,7 +151,7 @@ namespace EduConnect.Web.Services
             while (at < run.Count - 1)
             {
                 var matched = false;
-                for (var len = run.Count - at; len >= 2 && !matched; len--)
+                for (var len = Math.Min(run.Count - at, _maxRunLetters); len >= 2 && !matched; len--)
                 {
                     var joined = string.Concat(run.Skip(at).Take(len).Select(t => tokens[t].Raw));
                     if (IsAllowed(joined) || !Variants(joined).Any(MatchesAnyWord)) continue;
@@ -154,6 +166,12 @@ namespace EduConnect.Web.Services
                 if (!matched) at++;
             }
         }
+
+        // A lone letter that may be part of a spaced-out word. The letter
+        // after an apostrophe ("it's", "I'm") belongs to its word instead.
+        private static bool IsRunLetter(string text, Token token, bool covered) =>
+            !covered && token.Length == 1
+            && !(token.Start > 0 && text[token.Start - 1] is '\'' or '’');
 
         private static bool IsSpacerGap(string text, int from, int to)
         {
