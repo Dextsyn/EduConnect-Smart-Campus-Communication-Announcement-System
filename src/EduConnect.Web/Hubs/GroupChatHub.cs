@@ -1,5 +1,6 @@
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
+using EduConnect.Web.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,12 @@ namespace EduConnect.Web.Hubs
     public class GroupChatHub : Hub
     {
         private readonly ApplicationDbContext _context;
+        private readonly IContentModerationService _moderation;
 
-        public GroupChatHub(ApplicationDbContext context)
+        public GroupChatHub(ApplicationDbContext context, IContentModerationService moderation)
         {
             _context = context;
+            _moderation = moderation;
         }
 
         public override async Task OnConnectedAsync()
@@ -60,7 +63,9 @@ namespace EduConnect.Web.Hubs
             {
                 GroupID = groupId,
                 SenderID = userId,
-                Content = content.Trim()
+                // Listed words are starred out before saving, so the
+                // original never reaches the database or other members.
+                Content = await _moderation.MaskAsync(content.Trim())
             };
             _context.GroupMessages.Add(message);
             await _context.SaveChangesAsync();
