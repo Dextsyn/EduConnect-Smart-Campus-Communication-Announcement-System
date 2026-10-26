@@ -1000,6 +1000,37 @@ namespace EduConnect.Web.Migrations
                     b.ToTable("IncidentReportActivities");
                 });
 
+            modelBuilder.Entity("EduConnect.Web.Models.ModerationWord", b =>
+                {
+                    b.Property<int>("ModerationWordID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ModerationWordID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAllowed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("ModerationWordID");
+
+                    b.HasIndex("Word")
+                        .IsUnique();
+
+                    b.ToTable("ModerationWords");
+                });
+
             modelBuilder.Entity("EduConnect.Web.Models.Notification", b =>
                 {
                     b.Property<int>("NotificationID")
