@@ -7,6 +7,7 @@ using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -35,7 +36,8 @@ namespace EduConnect.Tests
             _session.SetString("UserID", user.UserID.ToString());
             _session.SetString("RoleName", RoleNames.Student);
             var http = FakeSession.HttpContextWith(_session);
-            return new GroupController(_db.Context)
+            return new GroupController(_db.Context,
+                new ContentModerationService(_db.Context, new MemoryCache(new MemoryCacheOptions())))
             {
                 ControllerContext = new ControllerContext { HttpContext = http },
                 TempData = new TempDataDictionary(http, new NullTempDataProvider())

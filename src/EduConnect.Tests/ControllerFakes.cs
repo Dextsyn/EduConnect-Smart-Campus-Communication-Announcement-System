@@ -5,7 +5,10 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.Session;
+using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 
 namespace EduConnect.Tests
@@ -32,6 +35,62 @@ namespace EduConnect.Tests
             context.Features.Set<ISessionFeature>(new SessionFeature { Session = session });
             return context;
         }
+    }
+
+    // A SignalR caller whose HttpContext carries the given session, for
+    // driving hub methods directly.
+    public sealed class FakeHubCallerContext : HubCallerContext
+    {
+        private readonly FeatureCollection _features = new();
+
+        public FakeHubCallerContext(FakeSession session) =>
+            _features.Set<IHttpContextFeature>(
+                new HttpContextFeature { HttpContext = FakeSession.HttpContextWith(session) });
+
+        private sealed class HttpContextFeature : IHttpContextFeature
+        {
+            public HttpContext? HttpContext { get; set; }
+        }
+
+        public override string ConnectionId => "test-connection";
+        public override string? UserIdentifier => null;
+        public override ClaimsPrincipal? User => null;
+        public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
+        public override IFeatureCollection Features => _features;
+        public override CancellationToken ConnectionAborted => CancellationToken.None;
+        public override void Abort() { }
+    }
+
+    // Records what a hub broadcasts. Only Group(...) is used by the hubs
+    // under test.
+    public sealed class FakeHubClients : IHubCallerClients
+    {
+        public RecordingClientProxy Proxy { get; } = new();
+
+        public sealed class RecordingClientProxy : IClientProxy
+        {
+            public List<(string Method, object?[] Args)> Calls { get; } = new();
+
+            public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
+            {
+                Calls.Add((method, args));
+                return Task.CompletedTask;
+            }
+        }
+
+        public IClientProxy Group(string groupName) => Proxy;
+
+        public IClientProxy Caller => throw new NotSupportedException();
+        public IClientProxy Others => throw new NotSupportedException();
+        public IClientProxy All => throw new NotSupportedException();
+        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public IClientProxy Client(string connectionId) => throw new NotSupportedException();
+        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
+        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
+        public IClientProxy OthersInGroup(string groupName) => throw new NotSupportedException();
+        public IClientProxy User(string userId) => throw new NotSupportedException();
+        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
     }
 
     // TempData that keeps nothing between requests.

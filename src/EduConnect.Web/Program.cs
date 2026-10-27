@@ -21,6 +21,7 @@ builder.Services.AddScoped<EduConnect.Web.Services.IAuditService, EduConnect.Web
 builder.Services.AddScoped<EduConnect.Web.Services.IOrgAccess, EduConnect.Web.Services.OrgAccess>();
 builder.Services.AddScoped<EduConnect.Web.Services.IReportingSanctionService, EduConnect.Web.Services.ReportingSanctionService>();
 builder.Services.AddScoped<EduConnect.Web.Services.IAccountEmailService, EduConnect.Web.Services.AccountEmailService>();
+builder.Services.AddScoped<EduConnect.Web.Services.IContentModerationService, EduConnect.Web.Services.ContentModerationService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
@@ -115,6 +116,23 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// Group Finder moderation: fill an empty word list from the private
+// Moderation:SeedWords setting. A failure here (say the migration hasn't
+// been applied yet) is logged and never stops the site from starting.
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        await EduConnect.Web.Services.ModerationWordImporter.ImportAsync(
+            scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(), app.Configuration, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Importing moderation words failed.");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

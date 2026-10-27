@@ -1,5 +1,10 @@
 @{
     ViewData["Title"] = "Create Group";
+    // Set by the POST when it re-shows the form after an error.
+    var keptCategory = ViewData["Category"] as string;
+    var categoryKept = new[] { "Study Group", "Project Team", "Research", "Hobby & Arts",
+        "Sports & Fitness", "Tech & Gaming", "Volunteer & Advocacy", "Culture & Faith" }
+        .Contains(keptCategory);
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -32,7 +37,8 @@
                         </label>
                         <input type="text" name="name" class="form-control"
                                maxlength="150" required
-                               placeholder="e.g. DS101 Finals Study Group" />
+                               placeholder="e.g. DS101 Finals Study Group"
+                               value="@ViewData["Name"]" />
                     </div>
 
                     <div class="mb-3">
@@ -40,18 +46,18 @@
                             Category <span class="text-danger">*</span>
                         </label>
                         <select name="category" class="form-select" required>
-                            <option value="" disabled selected>Select a category...</option>
+                            <option value="" disabled selected="@(!categoryKept)">Select a category...</option>
                             <optgroup label="Academic">
-                                <option value="Study Group">Study Group</option>
-                                <option value="Project Team">Project Team</option>
-                                <option value="Research">Research</option>
+                                <option value="Study Group" selected="@(keptCategory == "Study Group")">Study Group</option>
+                                <option value="Project Team" selected="@(keptCategory == "Project Team")">Project Team</option>
+                                <option value="Research" selected="@(keptCategory == "Research")">Research</option>
                             </optgroup>
                             <optgroup label="Interest">
-                                <option value="Hobby & Arts">Hobby &amp; Arts</option>
-                                <option value="Sports & Fitness">Sports &amp; Fitness</option>
-                                <option value="Tech & Gaming">Tech &amp; Gaming</option>
-                                <option value="Volunteer & Advocacy">Volunteer &amp; Advocacy</option>
-                                <option value="Culture & Faith">Culture &amp; Faith</option>
+                                <option value="Hobby & Arts" selected="@(keptCategory == "Hobby & Arts")">Hobby &amp; Arts</option>
+                                <option value="Sports & Fitness" selected="@(keptCategory == "Sports & Fitness")">Sports &amp; Fitness</option>
+                                <option value="Tech & Gaming" selected="@(keptCategory == "Tech & Gaming")">Tech &amp; Gaming</option>
+                                <option value="Volunteer & Advocacy" selected="@(keptCategory == "Volunteer & Advocacy")">Volunteer &amp; Advocacy</option>
+                                <option value="Culture & Faith" selected="@(keptCategory == "Culture & Faith")">Culture &amp; Faith</option>
                             </optgroup>
                         </select>
                     </div>
@@ -60,7 +66,7 @@
                         <label class="form-label fw-semibold">Description</label>
                         <textarea name="description" class="form-control" rows="3"
                                   maxlength="1000"
-                                  placeholder="What is this group about?"></textarea>
+                                  placeholder="What is this group about?">@ViewData["Description"]</textarea>
                     </div>
 
                     <div class="mb-4">
@@ -68,7 +74,7 @@
                             Max Members <span class="text-danger">*</span>
                         </label>
                         <input type="number" name="maxMembers" class="form-control"
-                               min="2" max="50" value="10" required />
+                               min="2" max="50" value="@(ViewData["MaxMembers"] ?? 10)" required />
                         <div class="form-text">Between 2 and 50. You count as 1 toward this limit.</div>
                     </div>
 

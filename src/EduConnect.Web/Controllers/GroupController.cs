@@ -1,5 +1,6 @@
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
+using EduConnect.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,12 @@ namespace EduConnect.Web.Controllers
     public class GroupController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IContentModerationService _moderation;
 
-        public GroupController(ApplicationDbContext context)
+        public GroupController(ApplicationDbContext context, IContentModerationService moderation)
         {
             _context = context;
+            _moderation = moderation;
         }
 
         private bool IsLoggedIn() =>
@@ -93,6 +96,12 @@ namespace EduConnect.Web.Controllers
             if (!IsLoggedIn()) return RedirectToAction("Login", "Account");
             if (!IsStudent()) return Forbid();
 
+            // Every error below re-shows the form with what the student typed.
+            ViewData["Name"] = name;
+            ViewData["Category"] = category;
+            ViewData["Description"] = description;
+            ViewData["MaxMembers"] = maxMembers;
+
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category)
                 || maxMembers < 2 || maxMembers > 50)
             {
@@ -103,6 +112,13 @@ namespace EduConnect.Web.Controllers
             if (!_allowedCategories.Contains(category))
             {
                 TempData["Error"] = "Invalid category selected.";
+                return View();
+            }
+
+            if (await _moderation.ContainsProhibitedAsync(name)
+                || await _moderation.ContainsProhibitedAsync(description))
+            {
+                TempData["Error"] = "Please remove inappropriate language from the group name or description.";
                 return View();
             }
 

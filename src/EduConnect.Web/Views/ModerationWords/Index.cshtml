@@ -1,0 +1,121 @@
+@model EduConnect.Web.ViewModels.ModerationWordsViewModel
+@{
+    ViewData["Title"] = "Moderation Words";
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-shield-exclamation me-2 text-primary"></i>
+            Moderation Words
+        </h4>
+        <small class="text-muted">
+            Group Finder stars these out of chats and blocks them in group names
+            · @Model.Prohibited.Count blocked · @Model.Allowed.Count always allowed
+        </small>
+    </div>
+    <a href="/Admin" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>Back
+    </a>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<!-- ─── ADD WORD ─────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="post" action="/Admin/ModerationWords/Add" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold" for="word">Word or phrase</label>
+                <input type="text" id="word" name="word" class="form-control"
+                       maxlength="100" required autocomplete="off" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold" for="language">Language</label>
+                <select id="language" name="language" class="form-select" required>
+                    @foreach (var language in EduConnect.Web.Models.ModerationLanguages.All)
+                    {
+                        <option value="@language">@language</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <span class="form-label small fw-semibold d-block">Type</span>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="isAllowed"
+                           id="typeBlocked" value="false" checked />
+                    <label class="form-check-label" for="typeBlocked">Blocked</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="isAllowed"
+                           id="typeAllowed" value="true" />
+                    <label class="form-check-label" for="typeAllowed">Always allowed</label>
+                </div>
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-plus-lg me-1"></i>Add
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    @foreach (var (title, icon, words, empty) in new[]
+    {
+        ("Blocked words", "bi-slash-circle", Model.Prohibited, "No blocked words yet."),
+        ("Always allowed", "bi-check-circle", Model.Allowed, "No always-allowed words.")
+    })
+    {
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi @icon me-2"></i>@title
+                    <span class="badge bg-light text-dark ms-1">@words.Count</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (!words.Any())
+                    {
+                        <div class="text-center text-muted py-4 small">@empty</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height:28rem">
+                            <table class="table table-hover align-middle mb-0">
+                                <tbody>
+                                    @foreach (var w in words)
+                                    {
+                                        <tr>
+                                            <td class="ps-3 text-break">@w.Word</td>
+                                            <td class="small text-muted">@(w.Language ?? "—")</td>
+                                            <td class="text-end pe-3">
+                                                <form method="post" action="/Admin/ModerationWords/Remove/@w.ModerationWordID"
+                                                      onsubmit="return confirm('Remove this word from the list?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                            title="Remove" aria-label="Remove @w.Word">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

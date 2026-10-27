@@ -69,6 +69,7 @@ namespace EduConnect.Web.Data
         public DbSet<Group> Groups { get; set; }
         public DbSet<GroupMember> GroupMembers { get; set; }
         public DbSet<GroupMessage> GroupMessages { get; set; }
+        public DbSet<ModerationWord> ModerationWords { get; set; }
 
         // Add DbSets
         public DbSet<EventRegistration> EventRegistrations
@@ -638,6 +639,13 @@ namespace EduConnect.Web.Data
                       .WithMany()
                       .HasForeignKey(e => e.SenderID)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ─── ModerationWords ───────────────────
+            modelBuilder.Entity<ModerationWord>(entity =>
+            {
+                entity.HasKey(e => e.ModerationWordID);
+                entity.HasIndex(e => e.Word).IsUnique();
             });
         }
     }
