@@ -223,7 +223,7 @@
 </form>
 
 <!-- ─── USERS TABLE + PAGER ──────────── -->
-<!-- The as-you-type search swaps this block for /Admin/Users?partial=1. -->
+<!-- The as-you-type search swaps this block for /Admin/Users?partial=true. -->
 <div id="usersResults">
     <partial name="_UsersTable" model="Model" />
 </div>
@@ -323,14 +323,17 @@
                 if (pending) pending.abort();
                 pending = new AbortController();
                 const live = new URLSearchParams(params);
-                live.set('partial', '1');
+                live.set('partial', 'true'); // MVC reads a bool only from true/false, not 1
                 try {
                     const res = await fetch('/Admin/Users?' + live, {
                         signal: pending.signal,
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
-                    if (!res.ok || res.redirected) { filters.submit(); return; }
-                    results.innerHTML = await res.text();
+                    const html = res.ok && !res.redirected ? await res.text() : '';
+                    // Anything but the bare table (a sign-in page, an error
+                    // page) falls back to a normal page load.
+                    if (!html.trimStart().startsWith('<div data-total=')) { filters.submit(); return; }
+                    results.innerHTML = html;
                 } catch (err) {
                     if (err.name === 'AbortError') return; // a newer search replaced it
                     filters.submit();

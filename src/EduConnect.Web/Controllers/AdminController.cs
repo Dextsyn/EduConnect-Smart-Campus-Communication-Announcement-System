@@ -446,7 +446,7 @@ namespace EduConnect.Web.Controllers
         //  GET: /Admin/Users
         //  Manage all users
         // ═══════════════════════════════════════
-        // ?partial=1 returns just the table and pager, for the as-you-type
+        // ?partial=true returns just the table and pager, for the as-you-type
         // search on the page; everything else gets the full page.
         public async Task<IActionResult> Users(
             string? searchQuery,
