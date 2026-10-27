@@ -243,9 +243,10 @@
 <!-- ─── PAGINATION ───────────────────── -->
 @if (Model.TotalCount > 0)
 {
-    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3"
+    <!-- Page buttons centered, with the "Showing" line under them. -->
+    <nav class="d-flex flex-column align-items-center gap-2 mt-3"
          aria-label="User pages">
-        <small class="text-muted">
+        <small class="text-muted order-last">
             Showing @Model.FirstShown–@Model.LastShown of @Model.TotalCount users
         </small>
         @if (Model.PageCount > 1)
