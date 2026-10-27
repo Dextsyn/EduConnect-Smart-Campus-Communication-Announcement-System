@@ -1,18 +1,12 @@
-﻿@{
+﻿@model EduConnect.Web.ViewModels.UserListViewModel
+@{
     ViewData["Title"] = "Manage Users";
-    var users = ViewBag.Users as
-        List<EduConnect.Web.Models.User>
-        ?? new List<EduConnect.Web.Models.User>();
     var roles = ViewBag.Roles as
         List<EduConnect.Web.Models.Role>
         ?? new List<EduConnect.Web.Models.Role>();
     var colleges = ViewBag.Colleges as List<College> ?? new List<College>();
     var hierarchy = ViewBag.Hierarchy as List<College> ?? new List<College>();
-    var filterCollege = ViewBag.FilterCollege as int?;
-
-    // Only these roles have a placement to move.
-    var movableRoles = new[] { RoleNames.Dean, RoleNames.Chairperson, RoleNames.Faculty,
-                               RoleNames.Student, RoleNames.StudentPending };
+    var filterCollege = Model.FilterCollege;
 }
 
 <!-- ─── PAGE HEADER ──────────────────── -->
@@ -22,7 +16,7 @@
             <i class="bi bi-people me-2 text-primary"></i>
             Manage Users
         </h4>
-        <small class="text-muted">@users.Count total users</small>
+        <small class="text-muted" aria-live="polite"><span id="usersTotal">@Model.TotalCount</span> total users</small>
     </div>
     <div class="d-flex gap-2">
         <a href="/Admin/AddUser" class="btn btn-primary btn-sm">
@@ -57,7 +51,7 @@
     </div>
 }
 
-@if ((int)(ViewBag.NeedsPlacementCount ?? 0) > 0 && ViewBag.FilterPlacement != "missing")
+@if ((int)(ViewBag.NeedsPlacementCount ?? 0) > 0 && Model.FilterPlacement != "missing")
 {
     <div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
         <span>
@@ -71,17 +65,20 @@
 <!-- ─── FILTERS ──────────────────────── -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <form method="get" class="row g-2">
+        <form method="get" class="row g-2" id="userFilters">
 
             <div class="col-12 col-md-3">
                 <div class="input-group">
                     <span class="input-group-text">
                         <i class="bi bi-search"></i>
                     </span>
-                    <input type="text"
+                    <input type="search"
                            name="searchQuery"
-                           value="@ViewBag.SearchQuery"
+                           id="userSearch"
+                           value="@Model.SearchQuery"
                            class="form-control"
+                           autocomplete="off"
+                           aria-controls="usersResults"
                            placeholder="Search name, email, ID..." />
                 </div>
             </div>
@@ -93,7 +90,7 @@
                     @foreach (var role in roles)
                     {
                         <option value="@role.RoleName"
-                                selected="@(ViewBag.FilterRole == role.RoleName)">
+                                selected="@(Model.FilterRole == role.RoleName)">
                             @role.RoleName
                         </option>
                     }
@@ -105,19 +102,19 @@
                         class="form-select">
                     <option value="">All Status</option>
                     <option value="Verified"
-                            selected="@(ViewBag.FilterStatus == "Verified")">
+                            selected="@(Model.FilterStatus == "Verified")">
                         Verified
                     </option>
                     <option value="Pending"
-                            selected="@(ViewBag.FilterStatus == "Pending")">
+                            selected="@(Model.FilterStatus == "Pending")">
                         Pending
                     </option>
                     <option value="Rejected"
-                            selected="@(ViewBag.FilterStatus == "Rejected")">
+                            selected="@(Model.FilterStatus == "Rejected")">
                         Rejected
                     </option>
                     <option value="@VerificationStatuses.EmailPending"
-                            selected="@(ViewBag.FilterStatus == VerificationStatuses.EmailPending)">
+                            selected="@(Model.FilterStatus == VerificationStatuses.EmailPending)">
                         Email not confirmed
                     </option>
                 </select>
@@ -138,7 +135,7 @@
             <div class="col-6 col-md-2">
                 <select name="filterPlacement" class="form-select">
                     <option value="">Any placement</option>
-                    <option value="missing" selected="@(ViewBag.FilterPlacement == "missing")">
+                    <option value="missing" selected="@(Model.FilterPlacement == "missing")">
                         Needs placement
                     </option>
                 </select>
@@ -165,7 +162,7 @@
 <!-- Shown once users are ticked; the row checkboxes join this form via form="bulkMoveForm". -->
 <form id="bulkMoveForm" asp-action="BulkMove" method="post"
       class="card border-0 shadow-sm mb-4 d-none">
-    <input type="hidden" name="returnQuery" value="@Context.Request.QueryString" />
+    <input type="hidden" name="returnQuery" id="bulkReturnQuery" value="@Context.Request.QueryString" />
     <div class="card-body">
         <div class="fw-semibold mb-2">
             <i class="bi bi-arrow-left-right me-1 text-primary"></i>
@@ -225,229 +222,10 @@
     </div>
 </form>
 
-<!-- ─── USERS TABLE ──────────────────── -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th class="ps-3" style="width:2rem">
-                            <input type="checkbox" class="form-check-input" id="bulkAll"
-                                   title="Select all that can be moved" aria-label="Select all" />
-                        </th>
-                        <th>User</th>
-                        <th>Student ID</th>
-                        <th>Placement</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Registered</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!users.Any())
-                    {
-                        <tr>
-                            <td colspan="8"
-                                class="text-center
-                                            py-5 text-muted">
-                                <i class="bi bi-people
-                                               fs-1 d-block
-                                               mb-2"></i>
-                                No users found
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var user in users)
-                        {
-                            var dept = user.UserDepartments
-                            .FirstOrDefault(
-                            ud => ud.IsPrimary);
-
-                            <tr>
-                                <!-- Select for bulk move -->
-                                <td class="ps-3">
-                                    @if (movableRoles.Contains(user.Role.RoleName))
-                                    {
-                                        <input type="checkbox" class="form-check-input bulk-check"
-                                               form="bulkMoveForm" name="userIds" value="@user.UserID"
-                                               aria-label="Select @user.FirstName @user.LastName" />
-                                    }
-                                </td>
-
-                                <!-- User -->
-                                <td>
-                                    <div class="d-flex
-                                                        align-items-center
-                                                        gap-2">
-                                        <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=002F6C&color=fff&size=32"
-                                             class="rounded-circle"
-                                             width="32"
-                                             height="32" />
-                                        <div>
-                                            <div class="fw-semibold
-                                                                small">
-                                                @user.FirstName
-                                                @user.LastName
-                                            </div>
-                                            <div class="text-muted"
-                                                 style="font-size:11px">
-                                                @user.Email
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <!-- Student ID -->
-                                <td class="small text-muted">
-                                    @(user.StudentID ?? "—")
-                                </td>
-
-                                <!-- Placement -->
-                                <td class="small">
-                                    @if (user.AcademicProgram != null)
-                                    {
-                                        <div>@(user.AcademicProgram.ShortName ?? user.AcademicProgram.Name)</div>
-                                    }
-                                    else if (user.Department != null && !user.Department.IsImplicit)
-                                    {
-                                        <div>@(user.Department.ShortName ?? user.Department.Name)</div>
-                                    }
-                                    @if (user.College != null)
-                                    {
-                                        <div class="text-muted" style="font-size:11px">@(user.College.ShortName ?? user.College.Name)</div>
-                                    }
-                                    else if (user.AcademicProgram == null && user.Department == null)
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                    @if (dept?.DepartmentTag != null)
-                                    {
-                                        <span class="badge bg-light text-dark border mt-1" title="Feed tag">
-                                            @dept.DepartmentTag.ShortName
-                                        </span>
-                                    }
-                                </td>
-
-                                <!-- Role -->
-                                <td>
-                                    <span class="badge bg-primary bg-opacity-10
-                                                 text-primary border border-primary
-                                                 border-opacity-25 small">
-                                        @user.Role.RoleName
-                                    </span>
-                                </td>
-
-                                <!-- Status -->
-                                <td>
-                                    @if (user.VerificationStatus
-                                                                == "Verified" &&
-                                                                user.IsActive)
-                                    {
-                                        <span class="badge bg-success">
-                                            Verified
-                                        </span>
-                                    }
-                                    else if (user.VerificationStatus
-                                    == "Pending")
-                                    {
-                                        <span class="badge bg-warning
-                                                                 text-dark">
-                                            Pending
-                                        </span>
-                                    }
-                                    else if (user.VerificationStatus
-                                    == VerificationStatuses.EmailPending)
-                                    {
-                                        <span class="badge bg-light text-dark border"
-                                              title="Registered but hasn't clicked the confirmation link yet">
-                                            Email not confirmed
-                                        </span>
-                                    }
-                                    else if (user.VerificationStatus
-                                    == "Rejected")
-                                    {
-                                        <span class="badge bg-danger">
-                                            Rejected
-                                        </span>
-                                    }
-                                    else if (!user.IsActive)
-                                    {
-                                        <span class="badge bg-secondary">
-                                            Deactivated
-                                        </span>
-                                    }
-                                </td>
-
-                                <!-- Registered -->
-                                <td class="text-muted small">
-                                    @user.CreatedAt.ToString("MMM dd, yyyy")
-                                </td>
-
-                                <!-- Actions -->
-                                <td>
-                                    <div class="d-flex gap-1">
-                                        <a href="/Admin/EditUser/@user.UserID"
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#deleteModal-@user.UserID">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-            @foreach (var user in users)
-            {
-                <div class="modal fade" id="deleteModal-@user.UserID"
-                     tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header border-0">
-                                <h5 class="modal-title fw-bold text-danger">
-                                    <i class="bi bi-exclamation-triangle me-2"></i>
-                                    Delete User
-                                </h5>
-                                <button type="button" class="btn-close"
-                                        data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p>Permanently delete
-                                    <strong>@user.FirstName @user.LastName</strong>?
-                                </p>
-                                <p class="text-muted small mb-0">
-                                    This action cannot be undone. Users with authored
-                                    announcements or organized events cannot be deleted.
-                                </p>
-                            </div>
-                            <div class="modal-footer border-0">
-                                <button type="button" class="btn btn-outline-secondary"
-                                        data-bs-dismiss="modal">Cancel</button>
-                                <form asp-action="DeleteUser" asp-route-id="@user.UserID"
-                                      method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-danger">
-                                        <i class="bi bi-trash me-1"></i>Delete
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
+<!-- ─── USERS TABLE + PAGER ──────────── -->
+<!-- The as-you-type search swaps this block for /Admin/Users?partial=1. -->
+<div id="usersResults">
+    <partial name="_UsersTable" model="Model" />
 </div>
 
 @section Scripts {
@@ -455,13 +233,16 @@
         (function () {
             const form = document.getElementById('bulkMoveForm');
             const count = document.getElementById('bulkCount');
-            const all = document.getElementById('bulkAll');
-            const checks = () => [...document.querySelectorAll('.bulk-check')];
+            const results = document.getElementById('usersResults');
+            const checks = () => [...results.querySelectorAll('.bulk-check')];
             const college = document.getElementById('moveCollege');
             const dept = document.getElementById('moveDept');
             const program = document.getElementById('moveProgram');
 
+            // The table is replaced by the live search, so the checkbox
+            // listeners sit on its container rather than on each box.
             function sync() {
+                const all = document.getElementById('bulkAll');
                 const n = checks().filter(c => c.checked).length;
                 count.textContent = n;
                 form.classList.toggle('d-none', n === 0);
@@ -469,8 +250,12 @@
                 all.indeterminate = n > 0 && n < checks().length;
             }
 
-            all.addEventListener('change', () => { checks().forEach(c => c.checked = all.checked); sync(); });
-            checks().forEach(c => c.addEventListener('change', sync));
+            results.addEventListener('change', e => {
+                if (e.target.id === 'bulkAll')
+                    checks().forEach(c => c.checked = e.target.checked);
+                if (e.target.id === 'bulkAll' || e.target.classList.contains('bulk-check'))
+                    sync();
+            });
             document.getElementById('bulkClear').addEventListener('click', () => {
                 checks().forEach(c => c.checked = false);
                 sync();
@@ -510,6 +295,61 @@
             });
 
             sync();
+
+            // ─── As-you-type search ───────────────
+            // Runs on the server (only one page is in the browser) once typing
+            // pauses, from 2 letters; clearing the box brings everyone back.
+            // The other filters stay applied and results start at page 1.
+            // Enter and the filter button still submit the form normally.
+            const filters = document.getElementById('userFilters');
+            const search = document.getElementById('userSearch');
+            const total = document.getElementById('usersTotal');
+            const returnQuery = document.getElementById('bulkReturnQuery');
+            let timer = null;
+            let pending = null;
+            let lastQuery = search.value.trim();
+
+            function query() {
+                const params = new URLSearchParams();
+                for (const [key, value] of new FormData(filters)) {
+                    const v = String(value).trim();
+                    if (v) params.set(key, v);
+                }
+                return params;
+            }
+
+            async function run() {
+                const params = query();
+                if (pending) pending.abort();
+                pending = new AbortController();
+                const live = new URLSearchParams(params);
+                live.set('partial', '1');
+                try {
+                    const res = await fetch('/Admin/Users?' + live, {
+                        signal: pending.signal,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (!res.ok || res.redirected) { filters.submit(); return; }
+                    results.innerHTML = await res.text();
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // a newer search replaced it
+                    filters.submit();
+                    return;
+                }
+                const shown = results.querySelector('[data-total]');
+                if (shown) total.textContent = shown.dataset.total;
+                const qs = params.toString() ? '?' + params : '';
+                history.replaceState(null, '', location.pathname + qs);
+                returnQuery.value = qs;
+                sync();
+            }
+
+            search.addEventListener('input', () => {
+                clearTimeout(timer);
+                const q = search.value.trim();
+                if (q === lastQuery || q.length === 1) return;
+                timer = setTimeout(() => { lastQuery = q; run(); }, 300);
+            });
         })();
     </script>
 }

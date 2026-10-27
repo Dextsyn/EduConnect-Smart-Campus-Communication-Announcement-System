@@ -1,0 +1,279 @@
+@model EduConnect.Web.ViewModels.UserListViewModel
+@*
+    The users table, its pager and the delete dialogs. Rendered inside
+    #usersResults by Users.cshtml, and on its own (/Admin/Users?partial=1) for
+    the as-you-type search, which swaps it in place.
+*@
+@{
+    // Only these roles have a placement to move.
+    var movableRoles = new[] { RoleNames.Dean, RoleNames.Chairperson, RoleNames.Faculty,
+                               RoleNames.Student, RoleNames.StudentPending };
+
+    string PageUrl(int p) => Url.Action("Users", Model.RouteFor(p))!;
+}
+
+<div data-total="@Model.TotalCount">
+
+<!-- ─── USERS TABLE ──────────────────── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="width:2rem">
+                            <input type="checkbox" class="form-check-input" id="bulkAll"
+                                   title="Select everyone on this page who can be moved"
+                                   aria-label="Select all on this page" />
+                        </th>
+                        <th>User</th>
+                        <th>Student ID</th>
+                        <th>Placement</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Users.Any())
+                    {
+                        <tr>
+                            <td colspan="8"
+                                class="text-center
+                                            py-5 text-muted">
+                                <i class="bi bi-people
+                                               fs-1 d-block
+                                               mb-2"></i>
+                                No users found
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var user in Model.Users)
+                        {
+                            var dept = user.UserDepartments
+                            .FirstOrDefault(
+                            ud => ud.IsPrimary);
+
+                            <tr>
+                                <!-- Select for bulk move -->
+                                <td class="ps-3">
+                                    @if (movableRoles.Contains(user.Role.RoleName))
+                                    {
+                                        <input type="checkbox" class="form-check-input bulk-check"
+                                               form="bulkMoveForm" name="userIds" value="@user.UserID"
+                                               aria-label="Select @user.FirstName @user.LastName" />
+                                    }
+                                </td>
+
+                                <!-- User -->
+                                <td>
+                                    <div class="d-flex
+                                                        align-items-center
+                                                        gap-2">
+                                        <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=002F6C&color=fff&size=32"
+                                             class="rounded-circle"
+                                             width="32"
+                                             height="32" />
+                                        <div>
+                                            <div class="fw-semibold
+                                                                small">
+                                                @user.FirstName
+                                                @user.LastName
+                                            </div>
+                                            <div class="text-muted"
+                                                 style="font-size:11px">
+                                                @user.Email
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Student ID -->
+                                <td class="small text-muted">
+                                    @(user.StudentID ?? "—")
+                                </td>
+
+                                <!-- Placement -->
+                                <td class="small">
+                                    @if (user.AcademicProgram != null)
+                                    {
+                                        <div>@(user.AcademicProgram.ShortName ?? user.AcademicProgram.Name)</div>
+                                    }
+                                    else if (user.Department != null && !user.Department.IsImplicit)
+                                    {
+                                        <div>@(user.Department.ShortName ?? user.Department.Name)</div>
+                                    }
+                                    @if (user.College != null)
+                                    {
+                                        <div class="text-muted" style="font-size:11px">@(user.College.ShortName ?? user.College.Name)</div>
+                                    }
+                                    else if (user.AcademicProgram == null && user.Department == null)
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                    @if (dept?.DepartmentTag != null)
+                                    {
+                                        <span class="badge bg-light text-dark border mt-1" title="Feed tag">
+                                            @dept.DepartmentTag.ShortName
+                                        </span>
+                                    }
+                                </td>
+
+                                <!-- Role -->
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10
+                                                 text-primary border border-primary
+                                                 border-opacity-25 small">
+                                        @user.Role.RoleName
+                                    </span>
+                                </td>
+
+                                <!-- Status -->
+                                <td>
+                                    @if (user.VerificationStatus
+                                                                == "Verified" &&
+                                                                user.IsActive)
+                                    {
+                                        <span class="badge bg-success">
+                                            Verified
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == "Pending")
+                                    {
+                                        <span class="badge bg-warning
+                                                                 text-dark">
+                                            Pending
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == VerificationStatuses.EmailPending)
+                                    {
+                                        <span class="badge bg-light text-dark border"
+                                              title="Registered but hasn't clicked the confirmation link yet">
+                                            Email not confirmed
+                                        </span>
+                                    }
+                                    else if (user.VerificationStatus
+                                    == "Rejected")
+                                    {
+                                        <span class="badge bg-danger">
+                                            Rejected
+                                        </span>
+                                    }
+                                    else if (!user.IsActive)
+                                    {
+                                        <span class="badge bg-secondary">
+                                            Deactivated
+                                        </span>
+                                    }
+                                </td>
+
+                                <!-- Registered -->
+                                <td class="text-muted small">
+                                    @user.CreatedAt.ToString("MMM dd, yyyy")
+                                </td>
+
+                                <!-- Actions -->
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a href="/Admin/EditUser/@user.UserID"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteModal-@user.UserID">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            @foreach (var user in Model.Users)
+            {
+                <div class="modal fade" id="deleteModal-@user.UserID"
+                     tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title fw-bold text-danger">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    Delete User
+                                </h5>
+                                <button type="button" class="btn-close"
+                                        data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Permanently delete
+                                    <strong>@user.FirstName @user.LastName</strong>?
+                                </p>
+                                <p class="text-muted small mb-0">
+                                    This action cannot be undone. Users with authored
+                                    announcements or organized events cannot be deleted.
+                                </p>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        data-bs-dismiss="modal">Cancel</button>
+                                <form asp-action="DeleteUser" asp-route-id="@user.UserID"
+                                      method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-trash me-1"></i>Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ─── PAGINATION ───────────────────── -->
+@if (Model.TotalCount > 0)
+{
+    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3"
+         aria-label="User pages">
+        <small class="text-muted">
+            Showing @Model.FirstShown–@Model.LastShown of @Model.TotalCount users
+        </small>
+        @if (Model.PageCount > 1)
+        {
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page - 1)" aria-label="Previous page">&laquo;</a>
+                </li>
+                @foreach (var p in Model.PageNumbers())
+                {
+                    if (p == null)
+                    {
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                    }
+                    else
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : "")">
+                            <a class="page-link" href="@PageUrl(p.Value)"
+                               aria-current="@(p == Model.Page ? "page" : null)">@p</a>
+                        </li>
+                    }
+                }
+                <li class="page-item @(Model.Page >= Model.PageCount ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page + 1)" aria-label="Next page">&raquo;</a>
+                </li>
+            </ul>
+        }
+    </nav>
+}
+
+</div>

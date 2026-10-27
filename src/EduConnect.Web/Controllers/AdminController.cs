@@ -446,16 +446,22 @@ namespace EduConnect.Web.Controllers
         //  GET: /Admin/Users
         //  Manage all users
         // ═══════════════════════════════════════
+        // ?partial=1 returns just the table and pager, for the as-you-type
+        // search on the page; everything else gets the full page.
         public async Task<IActionResult> Users(
             string? searchQuery,
             string? filterRole,
             string? filterStatus,
             string? filterPlacement,
-            int? filterCollege = null)
+            int? filterCollege = null,
+            int page = 1,
+            bool partial = false)
         {
             if (!IsAdmin())
                 return RedirectToAction(
                     "Login", "Account");
+
+            searchQuery = searchQuery?.Trim();
 
             var query = _context.Users
                 .Include(u => u.Role)
@@ -487,30 +493,40 @@ namespace EduConnect.Web.Controllers
             if (filterCollege.HasValue)
                 query = query.Where(u => u.CollegeID == filterCollege);
 
-            var users = await query
+            var model = new UserListViewModel
+            {
+                SearchQuery = searchQuery,
+                FilterRole = filterRole,
+                FilterStatus = filterStatus,
+                FilterPlacement = filterPlacement,
+                FilterCollege = filterCollege,
+                TotalCount = await query.CountAsync()
+            };
+            model.Page = model.ClampedPage(page);
+            model.Users = await query
                 .OrderByDescending(u => u.CreatedAt)
+                .ThenByDescending(u => u.UserID)
+                .Skip((model.Page - 1) * UserListViewModel.PageSize)
+                .Take(UserListViewModel.PageSize)
                 .ToListAsync();
 
-            ViewBag.Users = users;
-            ViewBag.SearchQuery = searchQuery;
-            ViewBag.FilterRole = filterRole;
-            ViewBag.FilterStatus = filterStatus;
+            if (partial)
+                return PartialView("_UsersTable", model);
+
             ViewBag.Roles = await _context
                 .Roles.ToListAsync();
-            ViewBag.FilterPlacement = filterPlacement;
             ViewBag.NeedsPlacementCount = await _context.Users
                 .Where(PlacementService.NeedsPlacement)
                 .CountAsync();
 
             // Retired colleges stay in the filter so their users can be found
             // and moved; the move picker offers only active ones.
-            ViewBag.FilterCollege = filterCollege;
             ViewBag.Colleges = await _context.Colleges
                 .OrderByDescending(c => c.IsActive).ThenBy(c => c.Name)
                 .ToListAsync();
             ViewBag.Hierarchy = await _hierarchy.GetTreeAsync(includeRetired: false);
 
-            return View();
+            return View(model);
         }
 
         // ═══════════════════════════════════════
