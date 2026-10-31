@@ -1087,8 +1087,8 @@ namespace EduConnect.Web.Controllers
                 await _notificationService.SendToManyAsync(
                     adminIds,
                     "PasswordReset",
-                    $"Student {resetToken.User.FirstName} {resetToken.User.LastName} reset their password.",
-                    "/Admin/UserManagement");
+                    $"{resetToken.User.FirstName} {resetToken.User.LastName} reset their password.",
+                    $"/Admin/EditUser/{resetToken.User.UserID}");
             }
 
             TempData["Success"] =

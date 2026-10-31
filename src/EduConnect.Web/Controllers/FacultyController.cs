@@ -77,7 +77,8 @@ namespace EduConnect.Web.Controllers
             ViewBag.CompletedEvents = await _context.Events
                 .Where(e =>
                     e.OrganizerID == userID &&
-                    e.EndDateTime < DateTime.Now)
+                    e.EndDateTime < DateTime.Now &&
+                    e.Status != "Cancelled")
                 .CountAsync();
 
             ViewBag.TotalRegistrations = await _context

@@ -420,6 +420,14 @@
                 else if (Model.RegistrationStatus
                 == "Open")
                 {
+                    @if (Model.IsSpotOpenForWaitlister)
+                    {
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-megaphone me-2"></i>
+                            A spot is open. Register now to take it
+                            before someone else does.
+                        </div>
+                    }
                     <div class="d-grid d-sm-block">
                         <button type="button"
                                 class="btn btn-primary

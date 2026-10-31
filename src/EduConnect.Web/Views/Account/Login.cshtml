@@ -139,17 +139,9 @@
                             </span>
                         </div>
 
-                        <!-- Remember Me -->
-                        <div class="mb-4 d-flex justify-content-between">
-                            <div class="form-check">
-                                <input asp-for="RememberMe"
-                                       class="form-check-input"
-                                       type="checkbox" />
-                                <label asp-for="RememberMe"
-                                       class="form-check-label small">
-                                    Remember me
-                                </label>
-                            </div>
+                        <!-- Sessions end when the browser closes, so
+                             there is no "Remember me". -->
+                        <div class="mb-4 d-flex justify-content-end">
                             <a href="/Account/ForgotPassword" class="small text-primary">
                                 Forgot password?
                             </a>

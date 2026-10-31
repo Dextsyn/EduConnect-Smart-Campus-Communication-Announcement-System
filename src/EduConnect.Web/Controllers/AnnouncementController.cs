@@ -1170,7 +1170,10 @@ namespace EduConnect.Web.Controllers
             if (announcement == null)
                 return NotFound();
 
-            if (!CanEditAnnouncement(announcement))
+            // The author archives their own post; an Administrator can
+            // take down any post.
+            if (!CanEditAnnouncement(announcement) &&
+                GetRoleName() != RoleNames.Administrator)
                 return RedirectToAction("Index");
 
             var wasPending = announcement.ApprovalStatus is "PendingChair" or "PendingDean";

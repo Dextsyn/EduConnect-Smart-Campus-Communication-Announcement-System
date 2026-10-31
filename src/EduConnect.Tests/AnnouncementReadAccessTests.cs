@@ -219,5 +219,23 @@ namespace EduConnect.Tests
 
             Assert.Equal(_schoolWide.AnnouncementID, page.AnnouncementID);
         }
+
+        [Fact]
+        public async Task Delete_AdministratorArchivesSomeoneElsesPost()
+        {
+            await Announcements(_admin).Delete(_forItis.AnnouncementID);
+
+            Assert.Equal("Archived",
+                _db.NewContext().Announcements.Find(_forItis.AnnouncementID)!.Status);
+        }
+
+        [Fact]
+        public async Task Delete_OtherAuthorCannotArchive()
+        {
+            await Announcements(_chair).Delete(_forItis.AnnouncementID);
+
+            Assert.Equal("Published",
+                _db.NewContext().Announcements.Find(_forItis.AnnouncementID)!.Status);
+        }
     }
 }
