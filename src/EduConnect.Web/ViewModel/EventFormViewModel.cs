@@ -91,6 +91,8 @@ namespace EduConnect.Web.ViewModels
         // Registration status for current user
         public bool IsRegistered { get; set; }
         public bool IsOnWaitlist { get; set; }
+        // On the waitlist, and a spot is free to register for now
+        public bool IsSpotOpenForWaitlister { get; set; }
         public bool IsFull { get; set; }
         public int SlotsRemaining { get; set; }
         public int WaitlistPosition { get; set; }

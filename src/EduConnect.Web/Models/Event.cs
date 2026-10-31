@@ -46,8 +46,17 @@ namespace EduConnect.Web.Models
         [MaxLength(20)]
         public string Status { get; set; }
             = "Upcoming";
-        // Values: Upcoming, Ongoing,
-        //         Completed, Cancelled
+        // Stored values: Upcoming, Cancelled.
+        // Ongoing and Completed follow the clock: see DisplayStatus.
+
+        // What to show: an Upcoming event is Ongoing between its start
+        // and end, and Completed after its end.
+        [NotMapped]
+        public string DisplayStatus =>
+            Status != "Upcoming" ? Status
+            : DateTime.Now >= EndDateTime ? "Completed"
+            : DateTime.Now >= StartDateTime ? "Ongoing"
+            : "Upcoming";
 
         public bool IsRegistrationOpen { get; set; }
             = true;

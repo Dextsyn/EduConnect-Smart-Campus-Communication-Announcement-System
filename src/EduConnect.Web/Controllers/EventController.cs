@@ -322,7 +322,7 @@ namespace EduConnect.Web.Controllers
                         .Count(r =>
                             r.Status == "Registered"),
                     IsOnline = e.IsOnline,
-                    Status = e.Status,
+                    Status = e.DisplayStatus,
                     IsRegistrationOpen =
                         e.IsRegistrationOpen &&
                         e.StartDateTime > DateTime.Now &&
@@ -426,10 +426,12 @@ namespace EduConnect.Web.Controllers
                         await _audience.GetViewerAsync(userID)))
                     .AnyAsync());
 
-            // Check user registration status
+            // Check user registration status. A cancelled registration
+            // doesn't count: the student can register again.
             var userRegistration = ev.Registrations
                 .FirstOrDefault(r =>
-                    r.UserID == userID);
+                    r.UserID == userID &&
+                    r.Status != "Cancelled");
 
             var userWaitlist = ev.Waitlist
                 .FirstOrDefault(w =>
@@ -448,10 +450,17 @@ namespace EduConnect.Web.Controllers
                 : 999;
 
             // Determine registration status
+            // A waitlisted student may take any spot that is free; they
+            // stay on the waitlist only while the event is full or closed.
+            bool isClosed = !ev.IsRegistrationOpen ||
+                ev.StartDateTime <= DateTime.Now ||
+                ev.RegistrationDeadline <= DateTime.Now;
+
             string regStatus = "Open";
             if (userRegistration != null)
                 regStatus = "Registered";
-            else if (userWaitlist != null)
+            else if (userWaitlist != null &&
+                     (isFull || isClosed))
                 regStatus = "Waitlist";
             else if (!ev.IsRegistrationOpen ||
                      ev.StartDateTime <= DateTime.Now ||
@@ -476,7 +485,7 @@ namespace EduConnect.Web.Controllers
                 CurrentAttendees = registeredCount,
                 IsOnline = ev.IsOnline,
                 MeetingURL = ev.MeetingURL,
-                Status = ev.Status,
+                Status = ev.DisplayStatus,
                 IsRegistrationOpen =
                     ev.IsRegistrationOpen,
                 RegistrationDeadline =
@@ -492,12 +501,18 @@ namespace EduConnect.Web.Controllers
                     : ev.College?.Name,
                 IsRegistered =
                     userRegistration != null,
-                IsOnWaitlist =
-                    userWaitlist != null,
+                IsOnWaitlist = regStatus == "Waitlist",
+                IsSpotOpenForWaitlister =
+                    userWaitlist != null &&
+                    regStatus == "Open",
                 IsFull = isFull,
                 SlotsRemaining = slotsRemaining,
-                WaitlistPosition =
-                    userWaitlist?.Position ?? 0,
+                // Positions keep their numbers when someone ahead leaves,
+                // so count who is still ahead instead.
+                WaitlistPosition = userWaitlist == null
+                    ? 0
+                    : ev.Waitlist.Count(w =>
+                        w.Position <= userWaitlist.Position),
                 UserQRCode =
                     userRegistration?.QRCode,
                 RegistrationStatus = regStatus,
@@ -1084,12 +1099,14 @@ namespace EduConnect.Web.Controllers
             if (ev == null)
                 return NotFound();
 
-            // Check if already registered
+            // Check if already registered. A cancelled registration is
+            // reused below: (EventID, UserID) is unique.
             var existing = ev.Registrations
                 .FirstOrDefault(r =>
                     r.UserID == userID);
 
-            if (existing != null)
+            if (existing != null &&
+                existing.Status != "Cancelled")
             {
                 TempData["Error"] =
                     "You are already registered " +
@@ -1098,19 +1115,9 @@ namespace EduConnect.Web.Controllers
                     "Details", new { id = eventID });
             }
 
-            // Check if already on waitlist
             var onWaitlist = ev.Waitlist
                 .FirstOrDefault(w =>
                     w.UserID == userID);
-
-            if (onWaitlist != null)
-            {
-                TempData["Error"] =
-                    "You are already on the " +
-                    "waitlist for this event.";
-                return RedirectToAction(
-                    "Details", new { id = eventID });
-            }
 
             // Check registration deadline
             if (ev.RegistrationDeadline.HasValue &&
@@ -1140,11 +1147,25 @@ namespace EduConnect.Web.Controllers
             bool isFull = ev.MaxAttendees.HasValue &&
                 registeredCount >= ev.MaxAttendees.Value;
 
-            if (isFull)
+            if (isFull && onWaitlist != null)
+            {
+                // Someone else took the spot first. Keep their place.
+                var wasNotified = onWaitlist.Status == "Notified";
+                onWaitlist.Status = "Waiting";
+                await _context.SaveChangesAsync();
+
+                TempData["Error"] = wasNotified
+                    ? "Sorry, that spot has already been taken. " +
+                      "You are still on the waitlist."
+                    : "You are already on the " +
+                      "waitlist for this event.";
+            }
+            else if (isFull)
             {
                 // Add to waitlist
-                var waitlistPosition =
-                    ev.Waitlist.Count + 1;
+                var waitlistPosition = ev.Waitlist.Count == 0
+                    ? 1
+                    : ev.Waitlist.Max(w => w.Position) + 1;
 
                 var waitlistEntry = new EventWaitlist
                 {
@@ -1166,26 +1187,41 @@ namespace EduConnect.Web.Controllers
             }
             else
             {
-                // Register directly
-                var registration = new EventRegistration
+                // Register directly, reviving a cancelled registration
+                var registration = existing;
+                if (registration == null)
                 {
-                    EventID = eventID,
-                    UserID = userID,
-                    Status = "Registered",
-                    RegisteredAt = DateTime.Now
-                };
+                    registration = new EventRegistration
+                    {
+                        EventID = eventID,
+                        UserID = userID
+                    };
+                    _context.EventRegistrations
+                        .Add(registration);
+                }
+                else
+                {
+                    registration.CheckedInAt = null;
+                    registration.UpdatedAt = DateTime.Now;
+                }
+                registration.Status = "Registered";
+                registration.RegisteredAt = DateTime.Now;
 
-                _context.EventRegistrations
-                    .Add(registration);
+                // A waitlisted student who takes a spot leaves the waitlist
+                if (onWaitlist != null)
+                    _context.EventWaitlist.Remove(onWaitlist);
+
                 await _context.SaveChangesAsync();
 
-                // Generate QR Code
-                var qrCodePath = await GenerateQRCode(
-                    registration.RegistrationID,
-                    eventID, userID);
-
-                registration.QRCode = qrCodePath;
-                await _context.SaveChangesAsync();
+                // Generate QR Code (a revived registration keeps its own:
+                // it encodes the same registration)
+                if (registration.QRCode == null)
+                {
+                    registration.QRCode = await GenerateQRCode(
+                        registration.RegistrationID,
+                        eventID, userID);
+                    await _context.SaveChangesAsync();
+                }
 
                 // Send real-time notification
                 await _notificationService.SendAsync(
@@ -1330,7 +1366,8 @@ namespace EduConnect.Web.Controllers
                 .EventRegistrations
                 .FirstOrDefaultAsync(r =>
                     r.EventID == eventID &&
-                    r.UserID == userID);
+                    r.UserID == userID &&
+                    r.Status == "Registered");
 
             if (registration != null)
             {
@@ -1359,7 +1396,7 @@ namespace EduConnect.Web.Controllers
                     await _notificationService.SendAsync(
                         firstWaiting.UserID,
                         "WaitlistPromotion",
-                        $"A spot opened for \"{waitlistEv?.EventTitle}\" — claim it within 24 hours!",
+                        $"A spot opened for \"{waitlistEv?.EventTitle}\" — register now to claim it!",
                         $"/Event/Details/{eventID}");
 
                     // Notify them via email
@@ -1384,14 +1421,10 @@ namespace EduConnect.Web.Controllers
                                    for <strong>
                                    {ev?.EventTitle}
                                    </strong>.</p>
-                                <p>Please login to
-                                   EduConnect and
-                                   register within
-                                   <strong>24 hours
-                                   </strong> or the
-                                   slot will go to
-                                   the next person
-                                   on the waitlist.
+                                <p>Log in to EduConnect
+                                   and register to claim
+                                   it. Spots go to whoever
+                                   registers first.
                                 </p>
                                 <a href='{GetBaseUrl()}/Event/Details/{eventID}'
                                    style='background:
@@ -1428,10 +1461,10 @@ namespace EduConnect.Web.Controllers
                         .SendAsync("UpdateAttendeeCount", registeredCount, evMaxAtt.Value);
                 }
 
-                TempData["Success"] =
-                    "Registration cancelled. " +
-                    "The next person on the " +
-                    "waitlist has been notified.";
+                TempData["Success"] = firstWaiting != null
+                    ? "Registration cancelled. The next person " +
+                      "on the waitlist has been notified."
+                    : "Registration cancelled.";
             }
 
             return RedirectToAction(
