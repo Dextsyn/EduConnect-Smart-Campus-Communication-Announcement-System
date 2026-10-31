@@ -92,14 +92,6 @@ namespace EduConnect.Web.Controllers
                 return View(model);
             }
 
-            if (user.VerificationStatus == VerificationStatuses.Pending)
-            {
-                ModelState.AddModelError("",
-                    "Your email is confirmed. Your account is " +
-                    "waiting for verification by ITC.");
-                return View(model);
-            }
-
             if (user.VerificationStatus == VerificationStatuses.Rejected)
             {
                 ModelState.AddModelError("",
@@ -295,8 +287,8 @@ namespace EduConnect.Web.Controllers
                 .HashPassword(model.Password);
             // ─── End hash ──────────────────────────
 
-            // The student confirms their email before ITC sees the account
-            // (ConfirmEmail moves it to Pending).
+            // The account stays inactive until the student confirms their
+            // email (ConfirmEmail verifies it).
             var user = new User
             {
                 FirstName = model.FirstName,
@@ -333,7 +325,7 @@ namespace EduConnect.Web.Controllers
                 await _accountEmails.SendVerificationAsync(user);
                 TempData["Pending"] =
                     $"Almost done! We sent a confirmation link to {user.Email}. " +
-                    "Click it within 24 hours, then ITC will verify your account.";
+                    "Click it within 24 hours to activate your account.";
             }
             catch (Exception ex)
             {
@@ -361,36 +353,30 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction(nameof(ResendVerification));
             }
 
+            // Owning an Adamson inbox is the proof of enrollment: the account
+            // is verified now, and ITC reviews it afterwards from Recent
+            // Registrations (VerifiedByID stays null to mark it).
             if (user.VerificationStatus == VerificationStatuses.EmailPending)
             {
-                user.VerificationStatus = VerificationStatuses.Pending;
+                var studentRole = await _context.Roles
+                    .FirstAsync(r => r.RoleName == RoleNames.Student);
+
+                user.VerificationStatus = VerificationStatuses.Verified;
+                user.RoleID = studentRole.RoleID;
+                user.IsActive = true;
                 user.EmailConfirmedAt = DateTime.Now;
+                user.VerifiedAt = DateTime.Now;
                 user.UpdatedAt = DateTime.Now;
+
+                _audit.Record("Verify", AuditArea.Users, user.UserID,
+                    $"{user.FirstName} {user.LastName} ({user.Email}) confirmed their Adamson email; account verified.");
             }
             await _context.SaveChangesAsync();
-
-            if (user.VerificationStatus == VerificationStatuses.Pending)
-            {
-                // Only now does the registration reach ITC's queue.
-                var adminIds = await _context.Users
-                    .Where(u => u.Role.RoleName == RoleNames.Administrator && u.IsActive)
-                    .Select(u => u.UserID)
-                    .ToListAsync();
-                if (adminIds.Count > 0)
-                {
-                    await _notificationService.SendToManyAsync(
-                        adminIds,
-                        "NewPendingStudent",
-                        $"New student pending approval: {user.FirstName} {user.LastName}",
-                        "/Admin/PendingVerifications");
-                }
-            }
 
             _logger.LogInformation("Email confirmed: {Email}", user.Email);
 
             TempData["Pending"] =
-                "Email confirmed! ITC will verify your " +
-                "account within 1-2 business days.";
+                "Email confirmed! Your account is ready. Log in to get started.";
             return RedirectToAction("Login");
         }
 

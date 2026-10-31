@@ -41,9 +41,6 @@ namespace EduConnect.Web.Controllers
             HttpContext.Session
                 .GetString("RoleName") == RoleNames.Administrator;
 
-        private string GetBaseUrl() =>
-            AppUrls.BaseUrl(HttpContext);
-
         // ─── Audit helpers ─────────────────────
         // "BSIT · ITIS · CCIT" (implicit departments hidden), or "—".
         private async Task<string> PlacementTextAsync(int? collegeId, int? departmentId, int? programId)
@@ -130,9 +127,7 @@ namespace EduConnect.Web.Controllers
                 .Where(u => u.VerificationStatus == "Verified")
                 .CountAsync();
 
-            ViewBag.PendingVerifications = await _context.Users
-                .Where(u => u.VerificationStatus == "Pending")
-                .CountAsync();
+            ViewBag.NewRegistrations = await RecentRegistrations().CountAsync();
 
             ViewBag.CountFaculty = await _context.Users
                 .Where(u => u.Role.RoleName == RoleNames.Faculty && u.IsActive)
@@ -181,13 +176,9 @@ namespace EduConnect.Web.Controllers
             ViewBag.RoleLabels = roleData.Select(r => r.Role).ToList();
             ViewBag.RoleCount = roleData.Select(r => r.Count).ToList();
 
-            // ─── Recent Pending Verifications ───────
-            ViewBag.RecentPendingUsers = await _context.Users
-                .Include(u => u.UserDepartments)
-                    .ThenInclude(ud => ud.DepartmentTag)
-                .Where(u => u.VerificationStatus == "Pending")
-                .OrderBy(u => u.CreatedAt)
-                .Take(5)
+            // ─── Recent Registrations ───────────────
+            ViewBag.RecentRegistrations = await RecentRegistrations()
+                .Take(4)
                 .ToListAsync();
 
             // ─── Recently Added Users ───────────────
@@ -203,243 +194,36 @@ namespace EduConnect.Web.Controllers
             return View();
         }
         // ═══════════════════════════════════════
-        //  GET: /Admin/PendingUsers
-        //  Show all pending student accounts
+        //  GET: /Admin/Registrations
+        //  Students verified by email, for ITC to
+        //  review after the fact
         // ═══════════════════════════════════════
-        public async Task<IActionResult> PendingUsers()
+        public async Task<IActionResult> Registrations()
         {
             if (!IsAdmin())
                 return RedirectToAction(
                     "Login", "Account");
 
-            var pendingUsers = await _context.Users
-                .Include(u => u.Role)
-                .Include(u => u.UserDepartments)
-                    .ThenInclude(ud => ud.DepartmentTag)
-                .Where(u => u.VerificationStatus
-                    == "Pending")
-                .OrderBy(u => u.CreatedAt)
-                .ToListAsync();
-
-            return View(pendingUsers);
+            return View(await RecentRegistrations().ToListAsync());
         }
 
-        // ═══════════════════════════════════════
-        //  POST: /Admin/ApproveUser
-        //  Approve a pending student account
-        // ═══════════════════════════════════════
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ApproveUser(
-            int userID)
+        // Self-registered students who confirmed their email in the last
+        // RegistrationReviewWindow. No VerifiedByID marks a verification by
+        // email rather than by an admin, newest first.
+        public static readonly TimeSpan RegistrationReviewWindow = TimeSpan.FromDays(30);
+
+        private IQueryable<User> RecentRegistrations()
         {
-            if (!IsAdmin())
-                return RedirectToAction(
-                    "Login", "Account");
-
-            var adminID = int.Parse(
-                HttpContext.Session
-                    .GetString("UserID"));
-
-            var user = await _context.Users
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u =>
-                    u.UserID == userID);
-
-            if (user == null)
-            {
-                TempData["Error"] =
-                    "User not found.";
-                return RedirectToAction("PendingUsers");
-            }
-
-            // A registration reaches ITC only once its email is confirmed.
-            if (user.VerificationStatus == VerificationStatuses.EmailPending)
-            {
-                TempData["Error"] =
-                    "This student hasn't confirmed their email yet.";
-                return RedirectToAction("PendingUsers");
-            }
-
-            // Get verified student role
-            var studentRole = await _context.Roles
-                .FirstOrDefaultAsync(r =>
-                    r.RoleName == RoleNames.Student);
-
-            // Update user
-            user.VerificationStatus = "Verified";
-            user.IsActive = true;
-            user.RoleID = studentRole.RoleID;
-            user.VerifiedByID = adminID;
-            user.VerifiedAt = DateTime.Now;
-            user.UpdatedAt = DateTime.Now;
-
-            _audit.Record("Approve", AuditArea.Users, user.UserID,
-                $"Approved the registration of {user.FirstName} {user.LastName} ({user.Email}).");
-            await _context.SaveChangesAsync();
-
-            // Send approval email
-            try
-            {
-                var emailBody = $@"
-                <div style='font-family: Arial, sans-serif;
-                            max-width: 600px;
-                            margin: 0 auto;'>
-                    <div style='background: #0d6efd;
-                                padding: 30px;
-                                text-align: center;
-                                border-radius: 8px 8px 0 0;'>
-                        <h1 style='color: white; margin: 0;'>
-                            EduConnect
-                        </h1>
-                    </div>
-                    <div style='background: #f8f9fa;
-                                padding: 30px;
-                                border-radius: 0 0 8px 8px;'>
-                        <h2 style='color: #198754;'>
-                            ✅ Account Approved!
-                        </h2>
-                        <p>Hi {user.FirstName},</p>
-                        <p>
-                            Your EduConnect account has been
-                            verified by ITC. You can now
-                            login and access the system.
-                        </p>
-                        <div style='text-align: center;
-                                    margin: 30px 0;'>
-                            <a href='{GetBaseUrl()}/Account/Login'
-                               style='background: #0d6efd;
-                                       color: white;
-                                       padding: 14px 30px;
-                                       text-decoration: none;
-                                       border-radius: 6px;
-                                       font-weight: bold;'>
-                                Login to EduConnect
-                            </a>
-                        </div>
-                        <p style='color: #666;'>
-                            Welcome to EduConnect!
-                        </p>
-                    </div>
-                </div>";
-
-                await _emailService.SendEmailAsync(
-                    user.Email,
-                    $"{user.FirstName} {user.LastName}",
-                    "EduConnect — Account Approved!",
-                    emailBody);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    "Approval email failed: {Error}",
-                    ex.Message);
-            }
-
-            _logger.LogInformation(
-                "User {Email} approved by Admin {AdminID}",
-                user.Email, adminID);
-
-            TempData["Success"] =
-                $"{user.FirstName} {user.LastName}'s " +
-                $"account has been approved.";
-            return RedirectToAction("PendingUsers");
-        }
-
-        // ═══════════════════════════════════════
-        //  POST: /Admin/RejectUser
-        //  Reject a pending student account
-        // ═══════════════════════════════════════
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RejectUser(
-            int userID, string rejectionReason)
-        {
-            if (!IsAdmin())
-                return RedirectToAction(
-                    "Login", "Account");
-
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u =>
-                    u.UserID == userID);
-
-            if (user == null)
-            {
-                TempData["Error"] = "User not found.";
-                return RedirectToAction("PendingUsers");
-            }
-
-            // Update user
-            user.VerificationStatus =
-                "Rejected";
-            user.IsActive = false;
-            user.VerificationRejectionReason =
-                rejectionReason;
-            user.UpdatedAt = DateTime.Now;
-
-            _audit.Record("Reject", AuditArea.Users, user.UserID,
-                $"Rejected the registration of {user.FirstName} {user.LastName} ({user.Email}): {rejectionReason}");
-            await _context.SaveChangesAsync();
-
-            // Send rejection email
-            try
-            {
-                var emailBody = $@"
-                <div style='font-family: Arial, sans-serif;
-                            max-width: 600px;
-                            margin: 0 auto;'>
-                    <div style='background: #dc3545;
-                                padding: 30px;
-                                text-align: center;
-                                border-radius: 8px 8px 0 0;'>
-                        <h1 style='color: white; margin: 0;'>
-                            EduConnect
-                        </h1>
-                    </div>
-                    <div style='background: #f8f9fa;
-                                padding: 30px;
-                                border-radius: 0 0 8px 8px;'>
-                        <h2 style='color: #dc3545;'>
-                            Account Verification Failed
-                        </h2>
-                        <p>Hi {user.FirstName},</p>
-                        <p>
-                            Unfortunately your EduConnect
-                            account could not be verified.
-                        </p>
-                        <div style='background: #fff3cd;
-                                    padding: 15px;
-                                    border-radius: 6px;
-                                    margin: 20px 0;'>
-                            <strong>Reason:</strong>
-                            <p style='margin: 5px 0 0;'>
-                                {rejectionReason}
-                            </p>
-                        </div>
-                        <p>
-                            Please contact ITC for
-                            further assistance.
-                        </p>
-                    </div>
-                </div>";
-
-                await _emailService.SendEmailAsync(
-                    user.Email,
-                    $"{user.FirstName} {user.LastName}",
-                    "EduConnect — Account Verification",
-                    emailBody);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    "Rejection email failed: {Error}",
-                    ex.Message);
-            }
-
-            TempData["Success"] =
-                $"{user.FirstName} {user.LastName}'s " +
-                $"account has been rejected.";
-            return RedirectToAction("PendingUsers");
+            var since = DateTime.Now - RegistrationReviewWindow;
+            return _context.Users
+                .Include(u => u.College)
+                .Include(u => u.Department)
+                .Include(u => u.AcademicProgram)
+                .Where(u => u.VerificationStatus == VerificationStatuses.Verified
+                    && u.VerifiedByID == null
+                    && u.Role.RoleName == RoleNames.Student
+                    && u.VerifiedAt >= since)
+                .OrderByDescending(u => u.VerifiedAt);
         }
 
         // ═══════════════════════════════════════

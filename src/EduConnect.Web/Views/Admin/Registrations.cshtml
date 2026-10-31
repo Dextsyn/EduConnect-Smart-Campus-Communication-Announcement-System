@@ -1,0 +1,110 @@
+@using EduConnect.Web.Models
+@using EduConnect.Web.Controllers
+@{
+    ViewData["Title"] = "Recent Registrations";
+    var users = Model as List<User>
+        ?? new List<User>();
+}
+
+<!-- ─── PAGE HEADER ──────────────────── -->
+<div class="d-flex justify-content-between
+            align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-person-check
+                       me-2 text-primary"></i>
+            Recent Registrations
+        </h4>
+        <small class="text-muted">
+            @users.Count student(s) verified by their Adamson email in the
+            last @AdminController.RegistrationReviewWindow.Days days.
+            Check each program; use Edit to correct it or deactivate the account.
+        </small>
+    </div>
+    <a href="/Admin"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-2"></i>
+        Back to Dashboard
+    </a>
+</div>
+
+@if (!users.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox
+                           fs-1 text-muted
+                           d-block mb-3"></i>
+            <h5 class="text-muted">
+                No Recent Registrations
+            </h5>
+            <p class="text-muted small mb-0">
+                Students appear here once they confirm their email.
+            </p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var user in users)
+        {
+            <div class="col-12">
+                <div class="card ec-lift border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center g-3">
+
+                            <!-- User Info -->
+                            <div class="col-12 col-md-5">
+                                <div class="d-flex align-items-center gap-3">
+                                    <img src="https://ui-avatars.com/api/?name=@user.FirstName+@user.LastName&background=002F6C&color=fff"
+                                         class="rounded-circle flex-shrink-0"
+                                         width="50" height="50" alt="" />
+                                    <div class="text-break">
+                                        <div class="fw-bold">
+                                            @user.FirstName @user.LastName @user.Suffix
+                                        </div>
+                                        <div class="text-muted small">@user.Email</div>
+                                        <div class="text-muted small">
+                                            <i class="bi bi-card-text me-1"></i>
+                                            Student number:
+                                            <strong>@(user.StudentID ?? "Not provided")</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Placement & Date -->
+                            <div class="col-12 col-md-5 small text-muted">
+                                <div>
+                                    <i class="bi bi-mortarboard me-1"></i>
+                                    <strong>Program:</strong>
+                                    @(user.AcademicProgram?.Name ?? "Not chosen")
+                                </div>
+                                <div class="mt-1">
+                                    <i class="bi bi-building me-1"></i>
+                                    @(user.College?.Name ?? "—")@(user.Department is { IsImplicit: false } d ? " › " + d.Name : "")
+                                </div>
+                                <div class="mt-1">
+                                    <i class="bi bi-envelope-check me-1"></i>
+                                    <strong>Verified:</strong>
+                                    @user.VerifiedAt?.ToString("MMM dd, yyyy h:mm tt")
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="col-12 col-md-2">
+                                <a href="/Admin/EditUser/@user.UserID"
+                                   class="btn btn-outline-primary btn-sm w-100">
+                                    <i class="bi bi-pencil me-1"></i>
+                                    Edit
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

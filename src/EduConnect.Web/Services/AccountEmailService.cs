@@ -92,7 +92,7 @@ namespace EduConnect.Web.Services
                 Layout("Confirm your email", $@"
                 <p>Hi {HtmlEncode(user.FirstName)},</p>
                 <p>Thanks for registering for EduConnect. Confirm that this is your
-                   Adamson email so ITC can review your account.</p>
+                   Adamson email to activate your account.</p>
                 <p>This link expires in <strong>24 hours</strong>.</p>
                 {Button(link, "Confirm my email")}
                 <p style='color:#999;font-size:13px;'>If you didn't register, ignore this

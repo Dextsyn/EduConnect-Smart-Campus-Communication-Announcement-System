@@ -61,7 +61,7 @@
                     }
 
                     <!-- Register Form -->
-                    <form asp-action="Register" method="post">
+                    <form asp-action="Register" method="post" id="registerForm">
                         @Html.AntiForgeryToken()
 
                         <!-- Name Row -->
@@ -268,20 +268,6 @@
 
                     </form>
 
-                    @if (TempData["Pending"] != null)
-                    {
-                        <div class="alert alert-warning">
-                            <i class="bi bi-clock-history me-2"></i>
-                            <strong>Registration Submitted!</strong>
-                            <p class="mb-0 small mt-1">
-                                Your account is pending verification
-                                by ITC. You will receive an email
-                                once your account is approved.
-                                This usually takes 1-2 business days.
-                            </p>
-                        </div>
-                    }
-
                     <!-- Login Link -->
                     <div class="text-center mt-4">
                         <small class="text-muted">
@@ -304,7 +290,106 @@
         </div>
     </div>
 
+    <!-- Review before submitting: the program can't be changed later
+         except by ITC, so the student checks everything once. -->
+    <div class="modal fade" id="reviewModal" tabindex="-1"
+         aria-labelledby="reviewModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="reviewModalTitle">
+                        <i class="bi bi-clipboard-check me-2 text-primary"></i>
+                        Is everything correct?
+                    </h5>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-3 small">
+                        <dt class="col-5 col-sm-4 text-muted fw-normal">Name</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold text-break" data-review="name"></dd>
+                        <dt class="col-5 col-sm-4 text-muted fw-normal">Student number</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold" data-review="studentId"></dd>
+                        <dt class="col-5 col-sm-4 text-muted fw-normal">Email</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold text-break" data-review="email"></dd>
+                        <dt class="col-5 col-sm-4 text-muted fw-normal">College</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold" data-review="college"></dd>
+                        <dt class="col-5 col-sm-4 text-muted fw-normal" data-review-row="department">Department</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold" data-review="department"></dd>
+                        <dt class="col-5 col-sm-4 text-muted fw-normal">Program</dt>
+                        <dd class="col-7 col-sm-8 fw-semibold mb-0" data-review="program"></dd>
+                    </dl>
+                    <div class="alert alert-warning small mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Your program decides which announcements and events you see.
+                        <strong>You can't change it yourself after registering</strong>;
+                        only ITC can.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        <i class="bi bi-pencil me-1"></i>
+                        Go back and edit
+                    </button>
+                    <button type="button" class="btn btn-primary" id="reviewConfirm">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Yes, submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js">
+    </script>
+    <script>
+        // Show what will be submitted and let the student confirm it. Only
+        // a form the browser accepts gets the pop-up; anything the server
+        // still has to report (no program, passwords that differ) submits
+        // straight away so its errors show as usual.
+        (function () {
+            const form = document.getElementById('registerForm');
+            const modalEl = document.getElementById('reviewModal');
+            const modal = new bootstrap.Modal(modalEl);
+            const confirmBtn = document.getElementById('reviewConfirm');
+            const domain = '@EduConnect.Web.ViewModels.RegisterViewModel.EmailDomain';
+            const val = id => document.getElementById(id).value.trim();
+            const chosen = id => {
+                const s = document.getElementById(id);
+                return s.value ? s.options[s.selectedIndex].text.trim() : '';
+            };
+            const set = (key, text) =>
+                modalEl.querySelector('[data-review="' + key + '"]').textContent = text;
+            let confirmed = false;
+
+            form.addEventListener('submit', function (e) {
+                if (confirmed) return;
+                if (!form.checkValidity() || !val('ProgramID') ||
+                    val('passwordField') !== val('confirmField')) return;
+
+                e.preventDefault();
+                const name = [val('FirstName'), val('LastName'), val('Suffix')]
+                    .filter(Boolean).join(' ').replace(/\s+/g, ' ');
+                const department = chosen('DepartmentID');
+                set('name', name);
+                set('studentId', val('StudentID'));
+                set('email', val('emailUser').toLowerCase() + domain);
+                set('college', chosen('CollegeID'));
+                set('department', department);
+                set('program', chosen('ProgramID'));
+                // Colleges without departments have nothing to show here.
+                for (const el of modalEl.querySelectorAll('[data-review-row="department"], [data-review="department"]'))
+                    el.hidden = !department;
+                modal.show();
+            });
+
+            confirmBtn.addEventListener('click', function () {
+                confirmed = true;
+                confirmBtn.disabled = true;
+                form.submit();
+            });
+        })();
     </script>
     <script>
         // The domain is fixed: a pasted full Adamson address is trimmed to
