@@ -284,11 +284,6 @@ namespace EduConnect.Web.Services
 
         private const string RetiredSuffix = " (retired)";
 
-        public static Expression<Func<Announcement, bool>> Not(
-            Expression<Func<Announcement, bool>> expression) =>
-            Expression.Lambda<Func<Announcement, bool>>(
-                Expression.Not(expression.Body), expression.Parameters);
-
         // One lambda per role so EF translates each to a single WHERE.
         // Captured locals become SQL parameters.
         private static Expression<Func<Announcement, bool>> Build(Viewer v, bool includeSchoolWideAndOwn)

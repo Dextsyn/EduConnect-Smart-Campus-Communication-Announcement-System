@@ -418,17 +418,5 @@ namespace EduConnect.Tests
 
             Assert.True(r.Ok);
         }
-
-        [Fact]
-        public async Task Not_InvertsVisibleTo()
-        {
-            var viewer = await Service.GetViewerAsync(_studentBsit.UserID);
-
-            var hidden = await _db.NewContext().Announcements
-                .Where(AudienceService.Not(Service.VisibleTo(viewer)))
-                .Select(a => a.Title).OrderBy(t => t).ToArrayAsync();
-
-            Assert.Equal(new[] { "C-COS", "D-CS", "OFFICE", "P-BSCS" }, hidden);
-        }
     }
 }

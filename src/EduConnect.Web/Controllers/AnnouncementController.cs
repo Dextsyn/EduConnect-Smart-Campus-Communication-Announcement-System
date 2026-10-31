@@ -53,6 +53,19 @@ namespace EduConnect.Web.Controllers
         private string GetRoleName() =>
             HttpContext.Session.GetString("RoleName");
 
+        // Fail closed: only the Administrator reads every announcement;
+        // everyone else — Deans and Chairpersons included — sees their
+        // own scope (their own posts included). Naming the scoped roles
+        // instead would silently expose any role missing from the list.
+        private async Task<IQueryable<Announcement>> ReadableByAsync(
+            IQueryable<Announcement> query, int userID, string? roleName)
+        {
+            if (roleName == RoleNames.Administrator)
+                return query;
+            var viewer = await _audience.GetViewerAsync(userID);
+            return query.Where(_audience.VisibleTo(viewer));
+        }
+
         // ─── CHECK IF CAN PUBLISH ──────────────
         private bool CanPublish()
         {
@@ -251,15 +264,7 @@ namespace EduConnect.Web.Controllers
                     a.Title.Contains(searchQuery) ||
                     a.Body.Contains(searchQuery));
 
-            // Fail closed: only the Administrator reads every announcement;
-            // everyone else — Deans and Chairpersons included — sees their
-            // own scope. Naming the scoped roles instead would silently
-            // expose any role missing from the list.
-            if (roleName != RoleNames.Administrator)
-            {
-                var viewer = await _audience.GetViewerAsync(userID);
-                query = query.Where(_audience.VisibleTo(viewer));
-            }
+            query = await ReadableByAsync(query, userID, roleName);
 
             // Total count for pagination
             var totalItems = await query.CountAsync();
@@ -325,11 +330,10 @@ namespace EduConnect.Web.Controllers
 
             var userID = GetUserID();
 
-            // Intentionally NOT department-scoped, unlike Index(). Department
-            // tags rank relevance, not access — the Explore section of
-            // FeedRankingService deliberately links students to other
-            // departments' announcements and depends on this staying open.
-            var announcement = await _context.Announcements
+            // Same audience as the list: outside it the post doesn't exist.
+            var readable = await ReadableByAsync(
+                _context.Announcements, userID, GetRoleName());
+            var announcement = await readable
                 .Include(a => a.Category)
                 .Include(a => a.Author)
                     .ThenInclude(u => u.Role)
@@ -730,6 +734,15 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("Login", "Account");
 
             var userID = GetUserID();
+
+            // Only someone who can read the post may rate it.
+            var readable = await ReadableByAsync(
+                _context.Announcements, userID, GetRoleName());
+            if (!await readable.AnyAsync(a =>
+                    a.AnnouncementID == model.AnnouncementID &&
+                    a.Status == "Published" &&
+                    (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now)))
+                return NotFound();
 
             // Check if already rated
             var existing = await _context.Feedbacks
