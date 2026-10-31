@@ -21,6 +21,7 @@ namespace EduConnect.Web.Controllers
         private readonly IHubContext<EventHub> _eventHub;
         private readonly IBlobStorageService _blobStorageService;
         private readonly IPlacementService _placement;
+        private readonly IAudienceService _audience;
 
         public EventController(
             ApplicationDbContext context,
@@ -30,7 +31,8 @@ namespace EduConnect.Web.Controllers
             INotificationService notificationService,
             IHubContext<EventHub> eventHub,
             IBlobStorageService blobStorageService,
-            IPlacementService placement)
+            IPlacementService placement,
+            IAudienceService audience)
         {
             _context = context;
             _logger = logger;
@@ -40,6 +42,7 @@ namespace EduConnect.Web.Controllers
             _eventHub = eventHub;
             _blobStorageService = blobStorageService;
             _placement = placement;
+            _audience = audience;
         }
 
         // ─── Helpers ───────────────────────────
@@ -411,6 +414,18 @@ namespace EduConnect.Web.Controllers
             if (ev == null)
                 return NotFound();
 
+            // The linked announcement keeps its own audience: link it only
+            // for viewers who could open it (School Wide reaches everyone).
+            var showAnnouncement = ev.AnnouncementID != null &&
+                (roleName == RoleNames.Administrator ||
+                 await _context.Announcements
+                    .Where(a => a.AnnouncementID == ev.AnnouncementID &&
+                                a.Status == "Published" &&
+                                (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now))
+                    .Where(_audience.VisibleTo(
+                        await _audience.GetViewerAsync(userID)))
+                    .AnyAsync());
+
             // Check user registration status
             var userRegistration = ev.Registrations
                 .FirstOrDefault(r =>
@@ -486,10 +501,12 @@ namespace EduConnect.Web.Controllers
                 UserQRCode =
                     userRegistration?.QRCode,
                 RegistrationStatus = regStatus,
-                AnnouncementTitle =
-                    ev.Announcement?.Title,
-                AnnouncementID =
-                    ev.AnnouncementID,
+                AnnouncementTitle = showAnnouncement
+                    ? ev.Announcement?.Title
+                    : null,
+                AnnouncementID = showAnnouncement
+                    ? ev.AnnouncementID
+                    : null,
                 Registrations = ev.Registrations
                     .Select(r =>
                         new EventRegistrationViewModel

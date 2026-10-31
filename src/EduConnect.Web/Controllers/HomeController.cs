@@ -58,13 +58,18 @@ namespace EduConnect.Web.Controllers
             };
 
             // ─── Stat Cards ────────────────────
+            // Counted within the viewer's audience: every named role with
+            // a wider view was redirected above.
+            var statViewer = await _audience.GetViewerAsync(userID);
             model.TotalAnnouncements = await _context
                 .Announcements
                 .Where(a => a.Status == "Published")
+                .Where(_audience.VisibleTo(statViewer))
                 .CountAsync();
 
             model.TodayAnnouncements = await _context
                 .Announcements
+                .Where(_audience.VisibleTo(statViewer))
                 .Where(a => a.Status == "Published" &&
                        a.PublishedAt.HasValue &&
                        a.PublishedAt.Value.Date == DateTime.Today)
@@ -156,14 +161,13 @@ namespace EduConnect.Web.Controllers
 
             if (roleName == RoleNames.Student)
             {
-                // Personalized feed: 3 sections ranked by behavior
+                // Personalized feed: 2 sections ranked by behavior
                 var viewer = await _audience.GetViewerAsync(userID);
                 var feed = await _feedRanking.GetPersonalizedFeedAsync(
                     viewer, searchQuery, filterFeedType);
 
                 model.DepartmentAnnouncements = feed.Department;
                 model.ForYouAnnouncements = feed.ForYou;
-                model.ExploreAnnouncements = feed.Explore;
 
                 return View(model);
             }

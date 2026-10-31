@@ -33,11 +33,6 @@
         { get; set; }
             = new List<AnnouncementTableViewModel>();
 
-        public List<AnnouncementTableViewModel>
-            ExploreAnnouncements
-        { get; set; }
-            = new List<AnnouncementTableViewModel>();
-
         // ─── Search ─────────────────────────────
         public string? SearchQuery { get; set; }
         public string? FilterCategory { get; set; }

@@ -9,7 +9,6 @@ namespace EduConnect.Web.Services
     {
         public List<AnnouncementTableViewModel> Department { get; set; } = new();
         public List<AnnouncementTableViewModel> ForYou { get; set; } = new();
-        public List<AnnouncementTableViewModel> Explore { get; set; } = new();
     }
 
     public interface IFeedRankingService
@@ -116,48 +115,15 @@ namespace EduConnect.Web.Services
                 .Take(5)
                 .ToList();
 
-            var forYouIDs = forYouCandidates
-                .Select(x => x.Announcement.AnnouncementID)
-                .ToHashSet();
-
             result.ForYou = forYouCandidates
                 .Select(x => ToViewModel(x.Announcement))
                 .ToList();
 
-            // ── Section 3: Explore ────────────────────────────────────────
-            // Cross-department: published announcements NOT in the user's authorized set
-            // (relaxed department filter — shows content from other departments)
-            var shownIDs = deptIDs.Union(forYouIDs).ToHashSet();
-
-            var exploreBase = await _context.Announcements
-                .Include(a => a.Category)
-                .Include(a => a.Author)
-                .Include(a => a.AnnouncementTags)
-                    .ThenInclude(at => at.DepartmentTag)
-                .Where(a => a.Status == "Published" &&
-                            (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now) &&
-                            // An emergency reaches everyone only via the School
-                            // Wide ("ALL") tag, which already puts it in every
-                            // user's authorized set above. Explore is the
-                            // opposite set — announcements the user is NOT
-                            // authorized for — so any emergency arriving here
-                            // belongs to someone else's department, and the
-                            // +10000 boost in ComputeScore would hand it a slot
-                            // on every student's dashboard.
-                            !a.IsEmergency)
-                .Where(AudienceService.Not(_audience.VisibleTo(viewer)))
-                .ToListAsync();
-
-            result.Explore = exploreBase
-                .Where(a => !shownIDs.Contains(a.AnnouncementID))
-                .Select(a => (Announcement: a, Score: ComputeScore(a, categoryAffinity, feedTypeAffinity)))
-                .OrderByDescending(x => x.Score)
-                .Take(3)
-                .Select(x => ToViewModel(x.Announcement))
-                .ToList();
-
+            // There is deliberately no section for announcements outside the
+            // student's audience: students read only what is addressed to
+            // them (the old "Explore" section was removed on 2026-10-31).
             await _audience.AddTargetLabelsAsync(
-                result.Department.Concat(result.ForYou).Concat(result.Explore));
+                result.Department.Concat(result.ForYou));
 
             return result;
         }

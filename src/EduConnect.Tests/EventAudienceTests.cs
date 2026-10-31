@@ -40,7 +40,8 @@ namespace EduConnect.Tests
             var controller = new EventController(
                 _db.Context, NullLogger<EventController>.Instance, null!,
                 new FakeEmailService(), new FakeNotificationService(), null!,
-                new FakeBlobStorage(), new PlacementService(_db.Context));
+                new FakeBlobStorage(), new PlacementService(_db.Context),
+                new AudienceService(_db.Context));
             controller.ControllerContext = new ControllerContext { HttpContext = FakeSession.HttpContextWith(_session) };
             controller.TempData = new TempDataDictionary(controller.ControllerContext.HttpContext, new NullTempDataProvider());
             return controller;
