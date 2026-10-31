@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EduConnect.Tests
 {
-    // Self-registration: email confirmation before the ITC queue.
+    // Self-registration: confirming the Adamson email verifies the account.
     // Admin-created accounts: emailed temporary password, changed on first login.
     public class EmailVerificationTests : IDisposable
     {
@@ -118,17 +118,38 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task ConfirmEmail_MovesToItcQueue_AndNotifiesAdmins()
+        public async Task ConfirmEmail_VerifiesTheStudent_WithoutAnItcQueue()
         {
             await Account().Register(Registration());
             var token = TokenFrom(_email.Bodies.Single());
 
             await Account().ConfirmEmail(token);
 
-            var user = await Saved(StudentEmail);
-            Assert.Equal(VerificationStatuses.Pending, user.VerificationStatus);
+            var context = _db.NewContext();
+            var user = await context.Users.Include(u => u.Role).SingleAsync(u => u.Email == StudentEmail);
+            Assert.Equal(VerificationStatuses.Verified, user.VerificationStatus);
+            Assert.Equal(RoleNames.Student, user.Role.RoleName);
+            Assert.True(user.IsActive);
             Assert.NotNull(user.EmailConfirmedAt);
-            Assert.Contains((_admin.UserID, "NewPendingStudent"), _notifications.Sent);
+            Assert.NotNull(user.VerifiedAt);
+            Assert.Null(user.VerifiedByID);
+            Assert.Equal(_bsit.ProgramID, user.ProgramID);
+            Assert.Empty(_notifications.Sent);
+
+            var log = await context.AuditLogs.SingleAsync();
+            Assert.Equal(("Verify", user.UserID), (log.Action, log.RecordID));
+            Assert.Null(log.UserID);
+        }
+
+        [Fact]
+        public async Task Login_AfterConfirming_SignsIn()
+        {
+            await Account().Register(Registration());
+            await Account().ConfirmEmail(TokenFrom(_email.Bodies.Single()));
+
+            await Account().Login(new LoginViewModel { Email = StudentEmail, Password = "Secret123!" });
+
+            Assert.Equal(RoleNames.Student, _session.GetString("RoleName"));
         }
 
         [Fact]
@@ -142,7 +163,7 @@ namespace EduConnect.Tests
 
             Assert.Equal(nameof(AccountController.ResendVerification),
                 Assert.IsType<RedirectToActionResult>(again).ActionName);
-            Assert.Single(_notifications.Sent);
+            Assert.Single(await _db.NewContext().AuditLogs.ToListAsync());
         }
 
         [Fact]
@@ -223,14 +244,32 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task ApproveUser_UnconfirmedStudent_IsRefused()
+        public async Task Registrations_ListsOnlyStudentsVerifiedByEmail()
         {
             await Account().Register(Registration());
-            var user = await Saved(StudentEmail);
+            await Account().ConfirmEmail(TokenFrom(_email.Bodies.Single()));
+            await Account().Register(Registration("not.confirmed"));
+            await CreateStaffAccount();
 
-            await Admin().ApproveUser(user.UserID);
+            var result = Assert.IsType<ViewResult>(await Admin().Registrations());
 
-            Assert.Equal(VerificationStatuses.EmailPending, (await Saved(StudentEmail)).VerificationStatus);
+            var listed = Assert.Single(Assert.IsAssignableFrom<List<User>>(result.Model));
+            Assert.Equal(StudentEmail, listed.Email);
+            Assert.Equal("BSIT", listed.AcademicProgram!.Name);
+        }
+
+        [Fact]
+        public async Task Registrations_LeavesOutOlderVerifications()
+        {
+            await Account().Register(Registration());
+            await Account().ConfirmEmail(TokenFrom(_email.Bodies.Single()));
+            var user = await _db.Context.Users.SingleAsync(u => u.Email == StudentEmail);
+            user.VerifiedAt = DateTime.Now - AdminController.RegistrationReviewWindow - TimeSpan.FromDays(1);
+            await _db.Context.SaveChangesAsync();
+
+            var result = Assert.IsType<ViewResult>(await Admin().Registrations());
+
+            Assert.Empty(Assert.IsAssignableFrom<List<User>>(result.Model));
         }
 
         // ─── Admin-created accounts ───────────────

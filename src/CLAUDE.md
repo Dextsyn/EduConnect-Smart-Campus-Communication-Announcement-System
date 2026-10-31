@@ -45,9 +45,9 @@ private bool IsAdmin() =>
 
 Roles stored in the `Roles` table. Key flow:
 1. Student registers (choosing college → department → program; program required) → `VerificationStatus = "EmailPending"`, `RoleID = "Student Pending"`, `IsActive = false`, and a 24h confirmation link is emailed (`IAccountEmailService`; only the token's SHA-256 is stored in `EmailVerificationTokens`). Re-registering over an unconfirmed row whose link expired replaces it.
-2. Student clicks the link (`/Account/ConfirmEmail`) → `VerificationStatus = "Pending"`; only now does it reach ITC's queue and notify admins
-3. Admin approves → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`
-4. Admin can reject with a reason, or toggle `IsActive` at any time
+   Before submitting, the Register page shows a "Is everything correct?" pop-up with the entered details, because a student can't change their program afterwards (only ITC can, on Edit User).
+2. Student clicks the link (`/Account/ConfirmEmail`) → `VerificationStatus = "Verified"`, `RoleID = "Student"`, `IsActive = true`, audited as `Verify` with no actor. Owning an `@adamson.edu.ph` inbox is the proof of enrollment; there is no ITC approval queue (removed 2026-10-31; migration `AutoApprovePendingStudents` verified everyone who was still `Pending`). `VerifiedByID` stays null to mark a verification by email.
+3. ITC reviews after the fact at `/Admin/Registrations` (students verified by email in the last `AdminController.RegistrationReviewWindow`, 30 days) and corrects a program or deactivates the account on Edit User. Admins can toggle `IsActive` at any time. `Pending` and `Rejected` remain only on old rows (a rejected student still sees the reason at login).
 
 Status values are constants in `VerificationStatuses.cs`. Accounts created on Admin → Add User have no password field: `IAccountEmailService` generates a 12-character temporary password, emails it, and sets `MustChangePassword` + `TempPasswordExpiresAt` (72h). Login refuses an expired one; otherwise the session flag `PasswordChangeRequired.SessionKey` sends every page load to `/Account/SetPassword` until the user picks their own (middleware in `Program.cs`, runs before the ProgramCompletion one). A password an admin types on Edit User is temporary too. Edit User's "Resend login details" (`AdminController.ResendCredentials`) issues a new one; if the email fails, nothing is saved.
 
