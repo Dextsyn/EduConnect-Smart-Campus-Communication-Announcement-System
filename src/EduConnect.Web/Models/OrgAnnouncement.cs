@@ -22,10 +22,12 @@ namespace EduConnect.Web.Models
         [Required]
         public string Body { get; set; }
 
+        // File attachments are no longer accepted; this stays so older
+        // posts keep their Attachment link.
         [MaxLength(500)]
         public string? AttachmentURL { get; set; }
 
-        // One inline photo, shown in the post. AttachmentURL is for files.
+        // One inline photo, shown in the post.
         [MaxLength(500)]
         public string? PhotoURL { get; set; }
 

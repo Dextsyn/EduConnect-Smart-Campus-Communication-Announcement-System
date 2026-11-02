@@ -368,30 +368,17 @@ namespace EduConnect.Web.Controllers
             if (!ModelState.IsValid)
                 return View(vm);
 
-            // Validate both files before uploading either, so a rejected
-            // form leaves nothing behind in storage.
             var photoError = ValidateImage(vm.Photo);
             if (photoError != null)
+            {
                 ModelState.AddModelError("Photo", photoError);
-
-            var hasAttachment = vm.Attachment != null && vm.Attachment.Length > 0;
-            var attachmentExt = hasAttachment
-                ? Path.GetExtension(vm.Attachment!.FileName).ToLowerInvariant() : "";
-            if (hasAttachment && !AllowedAttachmentExtensions.Contains(attachmentExt))
-                ModelState.AddModelError("Attachment",
-                    "File type not allowed. Accepted: PDF, Word, Excel, PowerPoint, text, ZIP.");
-
-            if (!ModelState.IsValid)
                 return View(vm);
+            }
 
             string? photoUrl = null;
             if (vm.Photo != null && vm.Photo.Length > 0)
                 photoUrl = await UploadPostFileAsync(vm.Photo,
                     Path.GetExtension(vm.Photo.FileName).ToLowerInvariant());
-
-            string? attachmentUrl = null;
-            if (hasAttachment)
-                attachmentUrl = await UploadPostFileAsync(vm.Attachment!, attachmentExt);
 
             var posterId = GetUserID();
             _context.OrgAnnouncements.Add(new OrgAnnouncement
@@ -401,7 +388,6 @@ namespace EduConnect.Web.Controllers
                 Title = vm.Title,
                 Body = vm.Body,
                 PhotoURL = photoUrl,
-                AttachmentURL = attachmentUrl,
                 IsPinned = vm.IsPinned,
                 ExpiresAt = vm.ExpiresAt
             });
@@ -968,10 +954,6 @@ namespace EduConnect.Web.Controllers
             { ".jpg", ".jpeg", ".png", ".webp" };
         private static readonly string[] AllowedLogoContentTypes =
             { "image/jpeg", "image/png", "image/webp" };
-
-        // Pictures go through a post's Photo, so files exclude images.
-        private static readonly string[] AllowedAttachmentExtensions =
-            { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".zip" };
 
         private async Task<string> UploadPostFileAsync(IFormFile file, string extension)
         {

@@ -402,7 +402,7 @@ namespace EduConnect.Tests
             Assert.Null(org.CollegeID);
         }
 
-        // ─── Posting: photo, files, notifications ─
+        // ─── Posting: photo, notifications ─
 
         private User Officer()
         {
@@ -433,18 +433,6 @@ namespace EduConnect.Tests
 
             Assert.IsType<ViewResult>(await controller.Post(_org.OrgID, vm));
             Assert.True(controller.ModelState["Photo"]!.Errors.Count > 0);
-            Assert.Empty(_db.NewContext().OrgAnnouncements);
-        }
-
-        [Fact]
-        public async Task Image_as_file_attachment_is_rejected()
-        {
-            var vm = APost();
-            vm.Attachment = Upload("p.jpg", "image/jpeg");
-            var controller = Controller(Officer(), RoleNames.Student);
-
-            Assert.IsType<ViewResult>(await controller.Post(_org.OrgID, vm));
-            Assert.True(controller.ModelState["Attachment"]!.Errors.Count > 0);
             Assert.Empty(_db.NewContext().OrgAnnouncements);
         }
 
