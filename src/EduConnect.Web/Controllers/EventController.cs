@@ -417,8 +417,7 @@ namespace EduConnect.Web.Controllers
             // The linked announcement keeps its own audience: link it only
             // for viewers who could open it (School Wide reaches everyone).
             var showAnnouncement = ev.AnnouncementID != null &&
-                (roleName == RoleNames.Administrator ||
-                 await _context.Announcements
+                (await _context.Announcements
                     .Where(a => a.AnnouncementID == ev.AnnouncementID &&
                                 a.Status == "Published" &&
                                 (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now))

@@ -3,6 +3,7 @@ using EduConnect.Web.Models;
 using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
@@ -42,6 +43,20 @@ namespace EduConnect.Web.Controllers
             _audience = audience;
         }
 
+        // ─── ADMINISTRATORS STAY OUT ───────────
+        // Administrators manage users, accounts and the system, not
+        // announcements: every page here sends them to the Admin dashboard.
+        // One filter covers every action, including ones added later.
+        public override void OnActionExecuting(ActionExecutingContext context)
+        {
+            if (GetRoleName() == RoleNames.Administrator)
+            {
+                context.Result = RedirectToAction("Index", "Admin");
+                return;
+            }
+            base.OnActionExecuting(context);
+        }
+
         // ─── CHECK LOGIN HELPER ────────────────
         private bool IsLoggedIn() =>
             HttpContext.Session.GetString("UserID") != null;
@@ -53,15 +68,15 @@ namespace EduConnect.Web.Controllers
         private string GetRoleName() =>
             HttpContext.Session.GetString("RoleName");
 
-        // Fail closed: only the Administrator reads every announcement;
-        // everyone else — Deans and Chairpersons included — sees their
-        // own scope (their own posts included). Naming the scoped roles
-        // instead would silently expose any role missing from the list.
+        // Fail closed: everyone — Deans and Chairpersons included — sees
+        // their own scope (their own posts included), and the Administrator
+        // sees nothing. Naming the scoped roles instead would silently
+        // expose any role missing from the list.
         private async Task<IQueryable<Announcement>> ReadableByAsync(
             IQueryable<Announcement> query, int userID, string? roleName)
         {
             if (roleName == RoleNames.Administrator)
-                return query;
+                return query.Where(a => false);
             var viewer = await _audience.GetViewerAsync(userID);
             return query.Where(_audience.VisibleTo(viewer));
         }
@@ -799,10 +814,10 @@ namespace EduConnect.Web.Controllers
             if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
 
-            // Administrators may have authored announcements before they
-            // lost the ability to announce; they can still archive those,
-            // but editing needs a tag picker only authoring roles have, so
-            // the views offer no Edit link and a typed URL lands on Details.
+            // An author whose role can no longer announce can't edit: that
+            // needs a target picker only authoring roles have. (Old posts
+            // by Administrators stay as they are; Administrators can't
+            // reach this controller at all.)
             if (!CanCreate())
                 return RedirectToAction("Details", new { id });
 
@@ -1170,10 +1185,7 @@ namespace EduConnect.Web.Controllers
             if (announcement == null)
                 return NotFound();
 
-            // The author archives their own post; an Administrator can
-            // take down any post.
-            if (!CanEditAnnouncement(announcement) &&
-                GetRoleName() != RoleNames.Administrator)
+            if (!CanEditAnnouncement(announcement))
                 return RedirectToAction("Index");
 
             var wasPending = announcement.ApprovalStatus is "PendingChair" or "PendingDean";

@@ -106,5 +106,14 @@ namespace EduConnect.Tests
             Assert.DoesNotContain("Not for CCIT", reply);
             Assert.Contains("Which announcement", reply);
         }
+
+        // The assistant answers about announcements and events, so the
+        // roles that see neither don't get it.
+        [Theory]
+        [InlineData(RoleNames.Administrator, false)]
+        [InlineData(RoleNames.Staff, false)]
+        [InlineData(RoleNames.Student, true)]
+        public void Assistant_IsNotOfferedToAdministrators(string role, bool allowed) =>
+            Assert.Equal(allowed, EduConnect.Web.Controllers.ChatbotController.IsRoleAllowed(role));
     }
 }

@@ -293,6 +293,15 @@ namespace EduConnect.Tests
         }
 
         [Fact]
+        public async Task Recipients_SchoolWide_SkipsAdministrators()
+        {
+            // Administrators manage accounts and the system, not announcements.
+            var admin = _db.AddUser(RoleNames.Administrator);
+
+            Assert.DoesNotContain(admin.UserID, await RecipientsOf("ALL"));
+        }
+
+        [Fact]
         public async Task Recipients_SkipInactiveUsersAndAuthor()
         {
             var pending = _db.AddUser(RoleNames.StudentPending, _ccit.CollegeID, _itis.DepartmentID, _bsit.ProgramID, isActive: false);

@@ -5,7 +5,10 @@ using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EduConnect.Tests
@@ -126,12 +129,35 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task Details_AuthorReviewersAndAdmin_StillOpenIt()
+        public async Task Details_AuthorAndReviewers_StillOpenIt()
         {
             Assert.True(await CanOpen(_forBsit, _faculty));
             Assert.True(await CanOpen(_forBsit, _chair));
             Assert.True(await CanOpen(_forBsit, _dean));
-            Assert.True(await CanOpen(_forBsit, _admin));
+        }
+
+        // Administrators manage users, accounts and the system: every
+        // announcement page sends them back to the Admin dashboard.
+        [Fact]
+        public void Administrator_IsSentBackFromEveryAnnouncementPage()
+        {
+            var controller = Announcements(_admin);
+            var context = new ActionExecutingContext(
+                new ActionContext(controller.HttpContext, new RouteData(), new ActionDescriptor()),
+                new List<IFilterMetadata>(), new Dictionary<string, object?>(), controller);
+
+            controller.OnActionExecuting(context);
+
+            var redirect = Assert.IsType<RedirectToActionResult>(context.Result);
+            Assert.Equal("Admin", redirect.ControllerName);
+        }
+
+        [Fact]
+        public async Task Administrator_ReadsNoAnnouncements()
+        {
+            // Even reached directly, the read rule gives them nothing.
+            Assert.False(await CanOpen(_schoolWide, _admin));
+            Assert.False(await CanOpen(_forBsit, _admin));
         }
 
         [Fact]
@@ -221,11 +247,11 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task Delete_AdministratorArchivesSomeoneElsesPost()
+        public async Task Delete_AdministratorCannotArchive()
         {
             await Announcements(_admin).Delete(_forItis.AnnouncementID);
 
-            Assert.Equal("Archived",
+            Assert.Equal("Published",
                 _db.NewContext().Announcements.Find(_forItis.AnnouncementID)!.Status);
         }
 
