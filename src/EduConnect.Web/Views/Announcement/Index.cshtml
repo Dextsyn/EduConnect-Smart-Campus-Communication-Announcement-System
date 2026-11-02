@@ -247,10 +247,9 @@ else
                                         View
                                     </a>
                                 }
-                                @if (roleName == RoleNames.Administrator ||
-                                     item.AuthorID == currentUserID)
+                                @if (item.AuthorID == currentUserID)
                                 {
-                                    @if (roleName != RoleNames.Administrator && !item.IsLockedByReview)
+                                    @if (!item.IsLockedByReview)
                                     {
                                         <a href="/Announcement/Edit/@item.AnnouncementID"
                                            class="btn btn-outline-secondary btn-sm"

@@ -152,7 +152,11 @@ namespace EduConnect.Web.Services
                 .Select(t => new { t.TagID, t.DepartmentTag.ShortName })
                 .ToListAsync();
 
-            var active = _context.Users.Where(u => u.IsActive && u.UserID != excludeUserId);
+            // Administrators manage accounts and the system, not
+            // announcements, so they are never notified of one.
+            var active = _context.Users.Where(u =>
+                u.IsActive && u.UserID != excludeUserId &&
+                u.Role.RoleName != RoleNames.Administrator);
 
             if (tags.Any(t => t.ShortName == SchoolWide))
                 return await active.Select(u => u.UserID).ToListAsync();

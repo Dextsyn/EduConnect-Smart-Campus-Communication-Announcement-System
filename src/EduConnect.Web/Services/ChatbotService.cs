@@ -164,12 +164,10 @@ namespace EduConnect.Web.Services
         }
 
         /// <summary>
-        /// Published, unexpired announcements. Everyone except the Administrator is scoped by
-        /// <see cref="IAudienceService.VisibleTo"/>; when <paramref name="forceDepartmentScope"/> is true
-        /// the Administrator is scoped too, so "my department" means the same thing for every role.
+        /// Published, unexpired announcements, scoped for every role by
+        /// <see cref="IAudienceService.VisibleTo"/>. (Administrators don't get the assistant.)
         /// </summary>
-        private async Task<IQueryable<Announcement>> BuildVisibleAnnouncementsQueryAsync(
-            int userId, string roleName, bool forceDepartmentScope = false)
+        private async Task<IQueryable<Announcement>> BuildVisibleAnnouncementsQueryAsync(int userId)
         {
             var query = _context.Announcements
                 .Include(a => a.Category)
@@ -178,15 +176,9 @@ namespace EduConnect.Web.Services
                 .Where(a => a.Status == "Published" &&
                     (a.ExpiresAt == null || a.ExpiresAt > DateTime.Now));
 
-            // Same scope as the announcement list: everyone but the
-            // Administrator is limited to what reaches them.
-            if (forceDepartmentScope || roleName != RoleNames.Administrator)
-            {
-                var viewer = await _audience.GetViewerAsync(userId);
-                query = query.Where(_audience.VisibleTo(viewer));
-            }
-
-            return query;
+            // Same scope as the announcement list: what reaches the viewer.
+            var viewer = await _audience.GetViewerAsync(userId);
+            return query.Where(_audience.VisibleTo(viewer));
         }
 
         // ────────────────────────────────────────────────────────────
@@ -197,7 +189,7 @@ namespace EduConnect.Web.Services
         {
             // Only the latest few, taken after the audience filter so the cap
             // never lets in an announcement the user isn't targeted for.
-            var query = await BuildVisibleAnnouncementsQueryAsync(userId, roleName);
+            var query = await BuildVisibleAnnouncementsQueryAsync(userId);
             var candidates = await query
                 .OrderByDescending(a => a.PublishedAt)
                 .ThenByDescending(a => a.AnnouncementID)
@@ -313,7 +305,7 @@ namespace EduConnect.Web.Services
         {
             var scopeToDepartment = intent == ChatIntent.DepartmentAnnouncements;
 
-            var query = await BuildVisibleAnnouncementsQueryAsync(userId, roleName, scopeToDepartment);
+            var query = await BuildVisibleAnnouncementsQueryAsync(userId);
 
             // Widen the slice for the intent the user actually asked about.
             var announcementTake = intent is ChatIntent.RecentAnnouncements or ChatIntent.DepartmentAnnouncements
@@ -325,12 +317,8 @@ namespace EduConnect.Web.Services
                 .Take(announcementTake)
                 .ToListAsync();
 
-            // Emergency announcements are scoped like everything else:
-            // BuildVisibleAnnouncementsQueryAsync limits everyone except the
-            // Administrator to what IAudienceService.VisibleTo lets them see.
-            // Omitting forceDepartmentScope here only skips the Administrator's
-            // intent-driven narrowing, not the scope itself.
-            var emergencyQuery = await BuildVisibleAnnouncementsQueryAsync(userId, roleName);
+            // Emergency announcements are scoped like everything else.
+            var emergencyQuery = await BuildVisibleAnnouncementsQueryAsync(userId);
             var emergencies = await emergencyQuery
                 .Where(a => a.IsEmergency)
                 .OrderByDescending(a => a.PublishedAt)

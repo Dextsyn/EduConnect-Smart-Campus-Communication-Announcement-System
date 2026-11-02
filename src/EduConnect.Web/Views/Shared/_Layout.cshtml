@@ -160,8 +160,12 @@
     <!-- BOTTOM TAB BAR (phone only) -->
     <nav class="ec-bottom-nav d-md-none" aria-label="Primary">
         <a href="/" class="ec-tab"><i class="bi bi-house"></i>Home</a>
-        <a href="/Announcement" class="ec-tab"><i class="bi bi-megaphone"></i>News</a>
-        <a href="/Event" class="ec-tab"><i class="bi bi-calendar-event"></i>Events</a>
+        @* Administrators manage accounts and the system: no News or Events. *@
+        @if (Context.Session.GetString("RoleName") != RoleNames.Administrator)
+        {
+            <a href="/Announcement" class="ec-tab"><i class="bi bi-megaphone"></i>News</a>
+            <a href="/Event" class="ec-tab"><i class="bi bi-calendar-event"></i>Events</a>
+        }
         <a href="/Notification" class="ec-tab"><i class="bi bi-bell"></i>Alerts</a>
         <button type="button" class="ec-tab" data-bs-toggle="offcanvas" data-bs-target="#ecDrawer">
             <i class="bi bi-grid"></i>Menu

@@ -23,7 +23,13 @@ namespace EduConnect.Web.Controllers
             HttpContext.Session.GetString("RoleName") ?? "";
 
         private static readonly HashSet<string> BlockedRoles =
-            new(StringComparer.OrdinalIgnoreCase) { RoleNames.Staff, RoleNames.StudentPending };
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                // The assistant answers about announcements and events.
+                // Administrators manage accounts and the system, and Staff
+                // see neither.
+                RoleNames.Administrator, RoleNames.Staff, RoleNames.StudentPending
+            };
 
         public static bool IsRoleAllowed(string? roleName) =>
             !string.IsNullOrWhiteSpace(roleName) && !BlockedRoles.Contains(roleName.Trim());
