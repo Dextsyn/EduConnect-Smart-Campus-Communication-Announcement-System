@@ -80,18 +80,6 @@
 
             <div class="row g-3 mb-4">
                 <div class="col-12 col-md-6">
-                    <label asp-for="Attachment" class="form-label fw-semibold">
-                        <i class="bi bi-paperclip me-1"></i>
-                        File attachment <span class="text-muted fw-normal">(optional)</span>
-                    </label>
-                    <input asp-for="Attachment"
-                           type="file"
-                           class="form-control"
-                           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" />
-                    <div class="form-text">PDF, Word, Excel, PowerPoint, text, ZIP</div>
-                    <span asp-validation-for="Attachment" class="text-danger small"></span>
-                </div>
-                <div class="col-12 col-md-6">
                     <label asp-for="ExpiresAt" class="form-label fw-semibold">
                         Expires At <span class="text-muted fw-normal">(optional)</span>
                     </label>
