@@ -32,7 +32,7 @@
                 else
                 {
                     <div class="text-muted small text-truncate">
-                        @(Model.Org.College?.Name ?? "University-wide")
+                        @(Model.Org.College?.Name ?? "OSA-affiliated")
                         · @Model.FollowerCount @(Model.FollowerCount == 1 ? "follower" : "followers")
                         @if (Model.LatestTitle != null)
                         {

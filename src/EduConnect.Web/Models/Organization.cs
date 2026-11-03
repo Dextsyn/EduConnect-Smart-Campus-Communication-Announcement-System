@@ -27,7 +27,7 @@ namespace EduConnect.Web.Models
         // Legacy: pointed at what is now a college; CollegeID replaces it.
 
         // The college is a label only — organizations stay visible to
-        // everyone. NULL = university wide organization.
+        // everyone. NULL = OSA-affiliated (no college).
         public int? CollegeID { get; set; }
 
         [Required]
