@@ -3,6 +3,7 @@ using EduConnect.Web.Models;
 using EduConnect.Web.Services;
 using EduConnect.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Web.Controllers
@@ -33,6 +34,17 @@ namespace EduConnect.Web.Controllers
             _logger = logger;
             _blobStorageService = blobStorageService;
             _sanctions = sanctions;
+        }
+
+        // Staff handle safety reports (/Staff); they don't file them.
+        public override void OnActionExecuting(ActionExecutingContext context)
+        {
+            if (HttpContext.Session.GetString("RoleName") == RoleNames.Staff)
+            {
+                context.Result = RedirectToAction("Index", "Staff");
+                return;
+            }
+            base.OnActionExecuting(context);
         }
 
         private bool IsLoggedIn() =>
