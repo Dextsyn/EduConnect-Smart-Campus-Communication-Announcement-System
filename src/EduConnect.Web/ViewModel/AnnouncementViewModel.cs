@@ -42,6 +42,15 @@ namespace EduConnect.Web.ViewModels
         public DateTime? ExpiresAt { get; set; }
         public bool IsEmergency { get; set; } = false;
 
+        // Saved to Announcement.AISummary (NVARCHAR(255)). Smart tag fills
+        // it; the poster may edit or clear it.
+        [MaxLength(250)]
+        public string? AISummary { get; set; }
+
+        // The Smart tag run behind this form, so saving can log what the
+        // poster kept (ISmartTagService.RecordOutcomeAsync).
+        public int? SmartTagLogID { get; set; }
+
         // Chairperson only: a Dean-level matter goes to the college's Deans
         // for final approval instead of being published.
         public bool RequiresDeanApproval { get; set; }

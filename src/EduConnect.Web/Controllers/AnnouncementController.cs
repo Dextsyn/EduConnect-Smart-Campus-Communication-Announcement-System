@@ -673,6 +673,7 @@ namespace EduConnect.Web.Controllers
                 IsEmergency = model.IsEmergency,
                 AttachmentURL = photoURL,
                 ExpiresAt = model.ExpiresAt,
+                AISummary = CleanSummary(model.AISummary),
                 Status = status,
                 ApprovalStatus = approvalStatus,
                 PublishedAt = publishedAt,
@@ -708,6 +709,7 @@ namespace EduConnect.Web.Controllers
             }
             SaveTargets(announcement, model);
             await _context.SaveChangesAsync();
+            await RecordSmartTagOutcomeAsync(announcement, model);
 
             if (announcement.Status == "Published")
                 await NotifyAsync(announcement, userID);
@@ -847,6 +849,7 @@ namespace EduConnect.Web.Controllers
                 IsEmergency = announcement.IsEmergency,
                 CanSetEmergency = CanSetEmergency(),
                 ExpiresAt = announcement.ExpiresAt,
+                AISummary = announcement.AISummary,
                 ExistingPhotoURL = announcement.AttachmentURL,
                 SelectedTagIDs = announcement.AnnouncementTags
                     .Select(at => at.TagID)
@@ -1090,6 +1093,7 @@ namespace EduConnect.Web.Controllers
             announcement.Priority = model.Priority;
             announcement.IsEmergency = model.IsEmergency;
             announcement.ExpiresAt = model.ExpiresAt;
+            announcement.AISummary = CleanSummary(model.AISummary);
             announcement.UpdatedAt = DateTime.Now;
 
             // ─── Replace tags and targets ──────
@@ -1129,6 +1133,7 @@ namespace EduConnect.Web.Controllers
                 ViewBag.IsFaculty = IsFaculty();
                 return View(model);
             }
+            await RecordSmartTagOutcomeAsync(announcement, model);
 
             if (deanRouting != null)
             {
@@ -1150,6 +1155,57 @@ namespace EduConnect.Web.Controllers
                 return RedirectToAction("MyAnnouncements");
 
             return RedirectToAction("Index");
+        }
+
+        // ═══════════════════════════════════════
+        //  POST: /Announcement/SmartTag
+        //  AI picks category, priority, expiry,
+        //  summary and audience from the text
+        // ═══════════════════════════════════════
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SmartTag(
+            string? title, string? body,
+            [FromServices] ISmartTagService smartTag)
+        {
+            if (!IsLoggedIn() || !CanCreate())
+                return StatusCode(403);
+
+            title = (title ?? "").Trim();
+            body = (body ?? "").Trim();
+            if (title.Length + body.Length < 20)
+                return BadRequest(new { error = "Write a title and message first, then click Smart tag." });
+            if (body.Length > 8000)
+                body = body[..8000];
+
+            var suggestion = await smartTag.SuggestAsync(GetUserID(), title, body);
+            return Json(suggestion);
+        }
+
+        // An empty summary is stored as null, so the chatbot can make one later.
+        private static string? CleanSummary(string? summary)
+        {
+            if (string.IsNullOrWhiteSpace(summary)) return null;
+            summary = summary.Trim();
+            return summary.Length > SmartTagService.MaxSummaryLength
+                ? summary[..SmartTagService.MaxSummaryLength]
+                : summary;
+        }
+
+        private async Task RecordSmartTagOutcomeAsync(Announcement announcement, AnnouncementFormViewModel model)
+        {
+            if (model.SmartTagLogID is not int logId) return;
+            var smartTag = HttpContext?.RequestServices?.GetService<ISmartTagService>();
+            if (smartTag == null) return;
+            await smartTag.RecordOutcomeAsync(logId, announcement.AnnouncementID, new SmartTagFinal(
+                announcement.CategoryID,
+                announcement.Priority,
+                announcement.ExpiresAt,
+                announcement.AISummary,
+                model.TargetCollegeIDs ?? new(),
+                model.TargetDepartmentIDs ?? new(),
+                model.TargetProgramIDs ?? new(),
+                model.SelectedTagIDs ?? new()));
         }
 
         private async Task DeletePhotoBlobAsync(string? url)
