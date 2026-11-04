@@ -72,6 +72,35 @@
                               class="text-danger small"></span>
                     </div>
 
+                    <!-- Smart tag -->
+                    <div class="mb-4 d-flex align-items-center gap-2 flex-wrap">
+                        <button type="button" id="btnSmartTag"
+                                class="btn btn-outline-primary btn-sm"
+                                data-url="@Url.Action("SmartTag", "Announcement")">
+                            <i class="bi bi-stars me-1"></i>Smart tag
+                        </button>
+                        <small id="smartTagStatus" class="text-muted" role="status">
+                            Let AI pick the category, priority, expiry, summary and audience from your text.
+                        </small>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="mb-4">
+                        <label asp-for="AISummary"
+                               class="form-label fw-semibold">
+                            Summary
+                            <span class="text-muted fw-normal">(optional)</span>
+                        </label>
+                        <textarea asp-for="AISummary"
+                                  class="form-control"
+                                  rows="2"
+                                  maxlength="250"
+                                  placeholder="Click Smart tag to write one, or type your own."></textarea>
+                        <span asp-validation-for="AISummary"
+                              class="text-danger small"></span>
+                    </div>
+                    <input asp-for="SmartTagLogID" type="hidden" />
+
                     <!-- Photo Upload -->
                     <div class="mb-4">
                         <label asp-for="Photo"
@@ -314,6 +343,7 @@
 </form>
 
 @section Scripts {
+<script src="~/js/smart-tag.js" asp-append-version="true" defer></script>
 <style>
     .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .cat-card {
@@ -344,6 +374,9 @@
     .priority-pill.med.active  { border-color: #f59e0b; background: #fffbeb; color: #d97706; }
     .priority-pill.high.active { border-color: #ef4444; background: #fef2f2; color: #dc2626; }
     #expiryInput:disabled { opacity: .45; }
+    .ec-smart-note { font-size: .78rem; color: #475569; margin-top: 6px; }
+    .ec-smart-badge { display: inline-block; background: #eef2ff; color: #4338ca; border-radius: 6px; padding: 0 6px; font-weight: 600; }
+    .ec-smart-filled { outline: 2px dashed #a5b4fc; outline-offset: 3px; border-radius: 8px; }
 </style>
 <script>
     document.addEventListener('DOMContentLoaded', function () {

@@ -27,6 +27,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton(provider =>
     new Client(apiKey: provider.GetRequiredService<IConfiguration>()["GeminiSettings:ApiKey"] ?? ""));
 builder.Services.AddScoped<EduConnect.Web.Services.IChatbotService, EduConnect.Web.Services.ChatbotService>();
+builder.Services.AddScoped<EduConnect.Web.Services.ISmartTagModel, EduConnect.Web.Services.GeminiSmartTagModel>();
+builder.Services.AddScoped<EduConnect.Web.Services.ISmartTagService, EduConnect.Web.Services.SmartTagService>();
 builder.Services.AddHostedService<EduConnect.Web.Services.ChatExpiryService>();
 builder.Services.AddSignalR();
 
