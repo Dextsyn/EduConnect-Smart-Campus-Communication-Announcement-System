@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using EduConnect.Web.Data;
 using EduConnect.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EduConnect.Web.Services
 {
@@ -20,9 +21,19 @@ namespace EduConnect.Web.Services
         private readonly IAudienceService _audience;
         private readonly ISmartTagModel _model;
         private readonly ILogger<SmartTagService> _logger;
+        private readonly IMemoryCache _cache;
+        private readonly int _dailyLimit;
+        private readonly int _maxInputChars;
 
         // Tests pin "now" so date handling is deterministic.
         public Func<DateTime> Now { get; set; } = () => DateTime.Now;
+
+        // A per-author, per-day count of AI calls. Kept in memory: a restart
+        // resets it, which is acceptable for a cost guard on one instance.
+        private sealed class Counter
+        {
+            public int Value;
+        }
 
         private static readonly JsonSerializerOptions Json = new()
         {
@@ -31,28 +42,52 @@ namespace EduConnect.Web.Services
         };
 
         public SmartTagService(ApplicationDbContext context, IAudienceService audience,
-            ISmartTagModel model, ILogger<SmartTagService> logger)
+            ISmartTagModel model, ILogger<SmartTagService> logger,
+            IMemoryCache cache, IConfiguration config)
         {
             _context = context;
             _audience = audience;
             _model = model;
             _logger = logger;
+            _cache = cache;
+            _dailyLimit = Math.Max(0, config.GetValue("SmartTag:DailyLimitPerUser", 20));
+            _maxInputChars = Math.Max(200, config.GetValue("SmartTag:MaxInputChars", 4000));
         }
 
         public async Task<SmartTagSuggestion> SuggestAsync(int authorId, string title, string body)
         {
             var options = await GetOptionsAsync(authorId);
             var text = $"{title}\n\n{body}";
+            if (text.Length > _maxInputChars)
+                text = text[.._maxInputChars];
+
+            // Reserve one AI call before making it, so quick repeat clicks
+            // can't slip past the limit.
+            var today = Now().Date;
+            var counter = _cache.GetOrCreate($"smarttag:{authorId}:{today:yyyyMMdd}", entry =>
+            {
+                // Relative, so it agrees with Now() (the key carries the date).
+                entry.AbsoluteExpirationRelativeToNow = today.AddDays(1) - Now();
+                return new Counter();
+            })!;
+            var used = Interlocked.Increment(ref counter.Value);
+            var allowed = used <= _dailyLimit;
 
             SmartTagSuggestion? suggestion = null;
             int? tokens = null;
-            var reply = await _model.AskAsync(BuildSystemPrompt(options, Now()), text);
-            if (reply != null)
+            if (allowed)
             {
-                suggestion = ParseModelReply(reply.Json, options, Now());
-                tokens = reply.TokensUsed;
+                var reply = await _model.AskAsync(BuildSystemPrompt(options, Now()), text);
+                if (reply != null)
+                {
+                    suggestion = ParseModelReply(reply.Json, options, Now());
+                    tokens = reply.TokensUsed;
+                }
             }
             suggestion ??= SuggestByRules(text, options, Now());
+            suggestion.DailyLimit = _dailyLimit;
+            suggestion.AiRemaining = Math.Max(0, _dailyLimit - used);
+            suggestion.LimitReached = !allowed;
 
             var log = new AIProcessingLog
             {
@@ -101,7 +136,7 @@ namespace EduConnect.Web.Services
                     if (targets.CanTargetDepartments && !dept.IsImplicit)
                         options.Departments.Add(new SmartTagChoice(dept.DepartmentID, dept.Name, dept.ShortName));
                     options.Programs.AddRange(dept.Programs.Select(p =>
-                        new SmartTagChoice(p.ProgramID, p.Name, p.ShortName)));
+                        new SmartTagChoice(p.ProgramID, p.Name, p.ShortName, dept.DepartmentID)));
                 }
             }
 
@@ -114,7 +149,7 @@ namespace EduConnect.Web.Services
                 .Where(d => d.IsActive && tagIDs.Contains(d.TagID) &&
                             !_context.Colleges.Any(c => c.LegacyTagID == d.TagID))
                 .OrderBy(d => d.TagName)
-                .Select(d => new SmartTagChoice(d.TagID, d.TagName, d.ShortName))
+                .Select(d => new SmartTagChoice(d.TagID, d.TagName, d.ShortName, null))
                 .ToListAsync();
 
             return options;
@@ -226,10 +261,26 @@ namespace EduConnect.Web.Services
             s.DepartmentIDs = Allowed(reply.DepartmentIds, options.Departments);
             s.ProgramIDs = Allowed(reply.ProgramIds, options.Programs);
             s.TagIDs = Allowed(reply.TagIds, options.Tags);
+            Narrow(s, options);
             if (s.HasAudience)
                 s.AudienceReason = Clean(reply.AudienceReason);
 
             return s;
+        }
+
+        // Keeps the narrowest picks: a department goes when one of its
+        // programs is picked, and the college goes when anything inside it
+        // is (the author's options only ever hold their own college).
+        // Ticking both would reach the whole broader group.
+        public static void Narrow(SmartTagSuggestion s, SmartTagOptions options)
+        {
+            var programDepts = options.Programs
+                .Where(p => s.ProgramIDs.Contains(p.ID) && p.ParentID != null)
+                .Select(p => p.ParentID!.Value)
+                .ToHashSet();
+            s.DepartmentIDs.RemoveAll(programDepts.Contains);
+            if (s.DepartmentIDs.Count > 0 || s.ProgramIDs.Count > 0)
+                s.CollegeIDs.Clear();
         }
 
         private static string StripFence(string json)
@@ -299,6 +350,7 @@ namespace EduConnect.Web.Services
             Collect(options.Programs, s.ProgramIDs);
             Collect(options.Departments, s.DepartmentIDs);
             Collect(options.Colleges, s.CollegeIDs);
+            Narrow(s, options);
 
             var schoolWide = options.Tags.FirstOrDefault(t => t.ShortName == AudienceService.SchoolWide);
             var phrase = SchoolWidePhrases.FirstOrDefault(lower.Contains);

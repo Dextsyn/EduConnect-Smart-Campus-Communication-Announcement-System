@@ -103,7 +103,11 @@
         if (logField) logField.value = s.logID ?? '';
 
         if (s.source === 'ai')
-            setStatus('Filled in by AI. Check each field before you save.');
+            setStatus('Filled in by AI. Check each field before you save. ' +
+                s.aiRemaining + ' of ' + s.dailyLimit + ' AI smart tags left today.');
+        else if (s.limitReached)
+            setStatus('You have used all ' + s.dailyLimit + ' AI smart tags for today, so keyword rules filled in ' +
+                'what they could. Summary was skipped. The AI is available again tomorrow.', 'warn');
         else
             setStatus('The AI is unavailable right now, so keyword rules filled in what they could. Summary was skipped.', 'warn');
     }

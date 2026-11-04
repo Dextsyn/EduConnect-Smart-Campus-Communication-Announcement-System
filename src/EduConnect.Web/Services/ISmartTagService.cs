@@ -4,7 +4,8 @@ namespace EduConnect.Web.Services
 {
     // What the poster may pick on the announcement form. Smart tagging
     // chooses only from these, so it can never widen an audience.
-    public record SmartTagChoice(int ID, string Name, string? ShortName);
+    // ParentID: a program's department (null for everything else).
+    public record SmartTagChoice(int ID, string Name, string? ShortName, int? ParentID = null);
 
     public class SmartTagOptions
     {
@@ -24,6 +25,12 @@ namespace EduConnect.Web.Services
     {
         public string Source { get; set; } = "ai";    // "ai" or "rules"
         public int? LogID { get; set; }
+
+        // The author's daily AI allowance (SmartTag:DailyLimitPerUser).
+        // Past it, keyword rules answer instead and no tokens are spent.
+        public int DailyLimit { get; set; }
+        public int AiRemaining { get; set; }
+        public bool LimitReached { get; set; }
 
         public int? CategoryID { get; set; }
         public string? CategoryReason { get; set; }

@@ -41,7 +41,11 @@ namespace EduConnect.Web.Services
                             Parts = new List<Part> { new Part { Text = systemPrompt } }
                         },
                         ResponseMimeType = "application/json",
-                        Temperature = 0.2
+                        Temperature = 0.2,
+                        // Caps what one click can cost. Thinking is off: it
+                        // was most of the tokens and of the wait per click.
+                        MaxOutputTokens = _config.GetValue("SmartTag:MaxOutputTokens", 1024),
+                        ThinkingConfig = new ThinkingConfig { ThinkingBudget = 0 }
                     });
 
                 return string.IsNullOrWhiteSpace(response.Text)

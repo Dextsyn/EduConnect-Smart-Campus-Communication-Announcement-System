@@ -2,6 +2,8 @@ using System.Text.Json;
 using EduConnect.Web;
 using EduConnect.Web.Models;
 using EduConnect.Web.Services;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EduConnect.Tests
@@ -44,16 +46,86 @@ namespace EduConnect.Tests
         private sealed class FakeModel : ISmartTagModel
         {
             public string? Reply { get; set; }
+            public int Calls { get; private set; }
             public string Name => "fake-model";
-            public Task<SmartTagModelReply?> AskAsync(string systemPrompt, string userText) =>
-                Task.FromResult(Reply == null ? null : new SmartTagModelReply(Reply, 42));
+            public Task<SmartTagModelReply?> AskAsync(string systemPrompt, string userText)
+            {
+                Calls++;
+                return Task.FromResult(Reply == null ? null : new SmartTagModelReply(Reply, 42));
+            }
         }
 
-        private SmartTagService Service(FakeModel model) =>
-            new(_db.Context, new AudienceService(_db.Context), model, NullLogger<SmartTagService>.Instance)
+        private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+
+        private SmartTagService Service(FakeModel model, int dailyLimit = 20) =>
+            new(_db.Context, new AudienceService(_db.Context), model, NullLogger<SmartTagService>.Instance,
+                _cache,
+                new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["SmartTag:DailyLimitPerUser"] = dailyLimit.ToString()
+                    })
+                    .Build())
             {
                 Now = () => Today
             };
+
+        [Fact]
+        public async Task Past_the_daily_limit_rules_answer_without_calling_the_ai()
+        {
+            var model = new FakeModel { Reply = "{\"priority\": 1}" };
+            var service = Service(model, dailyLimit: 2);
+
+            var first = await service.SuggestAsync(_faculty.UserID, "Library hours", "The library is open until 8 PM.");
+            var second = await service.SuggestAsync(_faculty.UserID, "Library hours", "The library is open until 8 PM.");
+            var third = await service.SuggestAsync(_faculty.UserID, "Library hours", "The library is open until 8 PM.");
+
+            Assert.Equal(2, model.Calls);
+            Assert.Equal(("ai", 1), (first.Source, first.AiRemaining));
+            Assert.Equal(("ai", 0), (second.Source, second.AiRemaining));
+            Assert.Equal("rules", third.Source);
+            Assert.True(third.LimitReached);
+            Assert.False(second.LimitReached);
+
+            // Another author has their own allowance.
+            var other = _db.AddUser(RoleNames.Faculty, _ccit.CollegeID, _itis.DepartmentID);
+            var theirs = await service.SuggestAsync(other.UserID, "Library hours", "The library is open until 8 PM.");
+            Assert.Equal("ai", theirs.Source);
+        }
+
+        [Fact]
+        public async Task Broader_picks_around_a_narrower_one_are_dropped()
+        {
+            var model = new FakeModel
+            {
+                Reply = JsonSerializer.Serialize(new
+                {
+                    collegeIds = new[] { _ccit.CollegeID },
+                    departmentIds = new[] { _itis.DepartmentID },
+                    programIds = new[] { _bsit.ProgramID }
+                })
+            };
+
+            var s = await Service(model).SuggestAsync(_faculty.UserID, "BSIT OJT", "All BSIT students in IT&IS of CCIT.");
+
+            Assert.Empty(s.CollegeIDs);
+            Assert.Empty(s.DepartmentIDs);
+            Assert.Equal(new[] { _bsit.ProgramID }, s.ProgramIDs);
+        }
+
+        [Fact]
+        public async Task The_limit_resets_the_next_day()
+        {
+            var model = new FakeModel { Reply = "{\"priority\": 1}" };
+            var service = Service(model, dailyLimit: 1);
+            await service.SuggestAsync(_faculty.UserID, "Library hours", "The library is open until 8 PM.");
+
+            service.Now = () => Today.AddDays(1);
+            var tomorrow = await service.SuggestAsync(_faculty.UserID, "Library hours", "The library is open until 8 PM.");
+
+            Assert.Equal("ai", tomorrow.Source);
+            Assert.Equal(2, model.Calls);
+        }
 
         [Fact]
         public async Task Ai_picks_outside_the_authors_scope_are_dropped()
@@ -79,7 +151,8 @@ namespace EduConnect.Tests
             Assert.Null(s.CategoryID);   // Emergency is never offered
             Assert.Null(s.Priority);     // out of range
             Assert.Equal(new DateTime(2026, 11, 15, 23, 59, 0), s.ExpiresAt);
-            Assert.Equal(new[] { _itis.DepartmentID }, s.DepartmentIDs);   // Faculty: own department only
+            // Faculty: own department only, and BSIT (inside it) is narrower.
+            Assert.Empty(s.DepartmentIDs);
             Assert.Equal(new[] { _bsit.ProgramID }, s.ProgramIDs);
             Assert.Equal("BSIT and BSCS orientation on Nov 15.", s.Summary);
 
