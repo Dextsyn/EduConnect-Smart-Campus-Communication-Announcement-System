@@ -456,7 +456,7 @@
 
             let strength = 0;
             if (val.length >= 8) strength++;
-            if (/[A-Z]/.test(val)) strength++;
+            if (/[A-Z]/.test(val) && /[a-z]/.test(val)) strength++;
             if (/[0-9]/.test(val)) strength++;
             if (/[^A-Za-z0-9]/.test(val)) strength++;
 

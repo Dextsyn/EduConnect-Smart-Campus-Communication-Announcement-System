@@ -103,14 +103,18 @@ namespace EduConnect.Tests
 
         [Theory]
         [InlineData("Passw0rd!", true)]
-        [InlineData("abc123#xyz", true)]
-        [InlineData("1234567$", true)]          // exactly 8
+        [InlineData("abC123#xyz", true)]
+        [InlineData("Abcde1$x", true)]          // exactly 8
         [InlineData("Ab1!", false)]             // too short
         [InlineData("Pass1!x", false)]          // 7 characters
         [InlineData("Password!", false)]        // no number
         [InlineData("Password1", false)]        // no special character
         [InlineData("Password 1", false)]       // a space isn't a special character
-        public void Password_EightCharsWithNumberAndSpecial(string password, bool valid)
+        [InlineData("password1!", false)]       // no upper-case letter
+        [InlineData("PASSWORD1!", false)]       // no lower-case letter
+        [InlineData("abc123#xyz", false)]       // met the old rule, no upper case
+        [InlineData("1234567$", false)]         // met the old rule, no letters
+        public void Password_EightCharsWithUpperLowerNumberAndSpecial(string password, bool valid)
         {
             Assert.Equal(valid, Valid(new RegisterViewModel(), nameof(RegisterViewModel.Password), password));
             Assert.Equal(valid, Valid(new AdminUserFormViewModel(), nameof(AdminUserFormViewModel.Password), password));
