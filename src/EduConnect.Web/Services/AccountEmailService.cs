@@ -42,6 +42,8 @@ namespace EduConnect.Web.Services
         // No look-alikes (0/O, 1/l/I) so the password can be typed from the email.
         private const string PasswordAlphabet =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+        private const string PasswordUpper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        private const string PasswordLower = "abcdefghijkmnopqrstuvwxyz";
         private const string PasswordDigits = "23456789";
         // Easy to tell apart and to type on a phone keyboard.
         private const string PasswordSpecials = "!@#$%&*?";
@@ -125,9 +127,12 @@ namespace EduConnect.Web.Services
         public string IssueTemporaryPassword(User user)
         {
             // Meets PersonInput.PasswordPattern like any other password: at
-            // least one digit and one special character, the rest random,
-            // all shuffled so they don't sit at fixed positions.
-            var chars = (RandomNumberGenerator.GetString(PasswordAlphabet, PasswordLength - 2)
+            // least one upper-case letter, lower-case letter, digit and
+            // special character, the rest random, all shuffled so they don't
+            // sit at fixed positions.
+            var chars = (RandomNumberGenerator.GetString(PasswordAlphabet, PasswordLength - 4)
+                         + RandomNumberGenerator.GetString(PasswordUpper, 1)
+                         + RandomNumberGenerator.GetString(PasswordLower, 1)
                          + RandomNumberGenerator.GetString(PasswordDigits, 1)
                          + RandomNumberGenerator.GetString(PasswordSpecials, 1)).ToCharArray();
             RandomNumberGenerator.Shuffle(chars.AsSpan());

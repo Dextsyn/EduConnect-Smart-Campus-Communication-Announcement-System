@@ -35,16 +35,17 @@ namespace EduConnect.Web
         public const string SuffixError = "Choose a suffix from the list.";
 
         // Every password someone sets (Register, Add/Edit User, Change and
-        // Reset Password): at least 8 characters, with at least one digit
-        // and one special character (anything but a letter, digit or
-        // space). Login doesn't apply it, so older passwords still work.
-        public const string PasswordPattern = @"^(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}$";
+        // Reset and Set Password): at least 8 characters, with at least one
+        // upper-case letter, one lower-case letter, one digit and one special
+        // character (anything but a letter, digit or space). Login doesn't
+        // apply it, so passwords set before the rule still work.
+        public const string PasswordPattern = @"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}$";
 
         public const string PasswordError =
-            "Password must be at least 8 characters and include a number and a special character (such as ! @ # $).";
+            "Password must be at least 8 characters and include an upper-case letter, a lower-case letter, a number and a special character (such as ! @ # $).";
 
         public const string PasswordHint =
-            "At least 8 characters, with a number and a special character (such as ! @ # $).";
+            "At least 8 characters, with an upper-case letter, a lower-case letter, a number and a special character (such as ! @ # $).";
 
         public static readonly IReadOnlyList<string> Suffixes =
             new[] { "Jr.", "Sr.", "II", "III", "IV", "V" };
