@@ -3,14 +3,16 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using EduConnect.Web.Models;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduConnect.Web
 {
     // The one definition of a valid person name, student number and name
-    // suffix. Every form that takes them (Register, Add User, Edit User,
-    // Profile) uses these, through [RegularExpression] so the same pattern
-    // also drives client-side validation.
+    // suffix. Every form that takes them (Register, Add User, Edit User)
+    // uses these: names through [PersonName], the rest through
+    // [RegularExpression], so the same pattern also drives client-side
+    // validation.
     public static class PersonInput
     {
         // Letters, including accented Latin letters such as ñ and é, in words
@@ -24,6 +26,13 @@ namespace EduConnect.Web
 
         public const string NameError =
             "Use letters only. Spaces, hyphens (-), apostrophes (') and periods (.) are allowed between letters.";
+
+        // A name with a digit gets this instead of NameError, so the person
+        // sees exactly what is wrong.
+        public const string NameDigitsError = "Names can't contain numbers.";
+
+        public static bool HasDigit(string? value) =>
+            value != null && value.Any(c => c is >= '0' and <= '9');
 
         // [0-9], not \d: .NET's \d also matches non-ASCII digits.
         public const string StudentNumberPattern = @"^[0-9]{9}$";
@@ -84,6 +93,43 @@ namespace EduConnect.Web
                 u.StudentID == studentNumber &&
                 u.VerificationStatus != "Rejected" &&
                 u.UserID != exceptUserId);
+    }
+
+    // A first or last name: blank (left to [Required]), or matching
+    // PersonInput.NamePattern. A name with a digit fails with NameDigitsError,
+    // anything else that doesn't match with NameError. On the client the
+    // "personname" rule (wwwroot/js/person-name-validation.js, and the
+    // Register page's own script) applies the same two checks.
+    [AttributeUsage(AttributeTargets.Property)]
+    public sealed class PersonNameAttribute : ValidationAttribute, IClientModelValidator
+    {
+        private static readonly Regex Pattern = new(PersonInput.NamePattern);
+
+        public PersonNameAttribute() : base(PersonInput.NameError) { }
+
+        protected override ValidationResult? IsValid(object? value, ValidationContext context)
+        {
+            if (value is not string s || s.Length == 0) return ValidationResult.Success;
+            if (PersonInput.HasDigit(s))
+                return new ValidationResult(PersonInput.NameDigitsError, MemberNames(context));
+            return Pattern.IsMatch(s)
+                ? ValidationResult.Success
+                : new ValidationResult(PersonInput.NameError, MemberNames(context));
+        }
+
+        private static string[]? MemberNames(ValidationContext context) =>
+            context.MemberName == null ? null : new[] { context.MemberName };
+
+        public void AddValidation(ClientModelValidationContext context)
+        {
+            Set(context, "data-val", "true");
+            Set(context, "data-val-personname", PersonInput.NameError);
+            Set(context, "data-val-personname-pattern", PersonInput.NamePattern);
+            Set(context, "data-val-personname-digits", PersonInput.NameDigitsError);
+        }
+
+        private static void Set(ClientModelValidationContext context, string key, string value) =>
+            context.Attributes.TryAdd(key, value);
     }
 
     // Blank, or one of PersonInput.Suffixes. Forms offer a dropdown, so this
