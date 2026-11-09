@@ -13,7 +13,9 @@ namespace EduConnect.Web.ViewModels
         public List<OrgDirectoryRow> Following { get; set; } = new();
         public List<OrgDirectoryRow> Discover { get; set; } = new();
         public bool CanFollow { get; set; }
-        public int? OfficerOrgID { get; set; }
+        // The orgs the viewer may post for (one New Post button, or a
+        // menu when there are several).
+        public List<Organization> OfficerOrgs { get; set; } = new();
     }
 
     public class OrgDirectoryRow

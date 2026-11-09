@@ -28,13 +28,16 @@ namespace EduConnect.Web.Services
                 m.Organization.IsActive &&
                 EligibleStudents().Any(u => u.UserID == userId));
 
-        public Task<Organization?> OfficerOrgAsync(int userId) =>
+        public Task<List<Organization>> OfficerOrgsAsync(int userId) =>
             _context.OrgMembers
                 .Where(m => m.UserID == userId &&
                             m.OrgRole == OrgRoles.Officer &&
-                            m.IsActive)
+                            m.IsActive &&
+                            m.Organization.IsActive &&
+                            EligibleStudents().Any(u => u.UserID == userId))
                 .Select(m => m.Organization)
-                .FirstOrDefaultAsync();
+                .OrderBy(o => o.OrgName)
+                .ToListAsync();
 
         public Task<bool> IsMemberAsync(int userId, int orgId) =>
             ActiveMembers(orgId).AnyAsync(m => m.UserID == userId);

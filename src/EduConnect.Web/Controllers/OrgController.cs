@@ -111,7 +111,6 @@ namespace EduConnect.Web.Controllers
             bool mine(OrgDirectoryRow r) =>
                 r.Relation == OrgRelation.Member || r.Relation == OrgRelation.Following;
 
-            var officerOrg = await _orgAccess.OfficerOrgAsync(userId);
             var vm = new OrgDirectoryViewModel
             {
                 // Viewers who can't follow get one list, which keeps any
@@ -119,8 +118,7 @@ namespace EduConnect.Web.Controllers
                 Following = canFollow ? rows.Where(mine).ToList() : new(),
                 Discover = canFollow ? rows.Where(r => !mine(r)).ToList() : rows,
                 CanFollow = canFollow,
-                OfficerOrgID = officerOrg != null && await IsOfficerOf(officerOrg.OrgID)
-                    ? officerOrg.OrgID : null
+                OfficerOrgs = await _orgAccess.OfficerOrgsAsync(userId)
             };
 
             return View(vm);
@@ -698,11 +696,17 @@ namespace EduConnect.Web.Controllers
             var matches = Match(members.Select(m => m.Person).ToList(), words);
             var matchedIds = matches.Select(m => m.UserID).ToList();
             var placements = await _placement.GetPlacementLabelsAsync(matchedIds);
-            var officerElsewhere = await _context.OrgMembers
-                .Where(m => matchedIds.Contains(m.UserID) && m.OrgID != orgId &&
-                            m.OrgRole == OrgRoles.Officer && m.IsActive)
-                .Select(m => new { m.UserID, m.Organization.OrgName })
-                .ToDictionaryAsync(m => m.UserID, m => m.OrgName);
+            // Shown for information only: a student can be an officer of
+            // several organizations.
+            var officerElsewhere = (await _context.OrgMembers
+                    .Where(m => matchedIds.Contains(m.UserID) && m.OrgID != orgId &&
+                                m.OrgRole == OrgRoles.Officer && m.IsActive &&
+                                m.Organization.IsActive)
+                    .Select(m => new { m.UserID, m.Organization.OrgName })
+                    .ToListAsync())
+                .GroupBy(m => m.UserID)
+                .ToDictionary(g => g.Key,
+                    g => string.Join(", ", g.Select(m => m.OrgName).OrderBy(n => n)));
             var byUser = members.ToDictionary(m => m.Person.UserID);
 
             return Json(new
@@ -806,12 +810,6 @@ namespace EduConnect.Web.Controllers
                 return MembersError(orgId,
                     $"{FullName(row.User)}'s account is not an active, verified student account.");
 
-            var elsewhere = await _orgAccess.OfficerOrgAsync(row.UserID);
-            if (elsewhere != null && elsewhere.OrgID != orgId)
-                return MembersError(orgId,
-                    $"{FullName(row.User)} is already an officer of {elsewhere.OrgName}. " +
-                    "A student can be an officer of one organization only.");
-
             position = string.IsNullOrWhiteSpace(position) ? null : position.Trim();
             if (position?.Length > 100)
                 return MembersError(orgId, "The title can be at most 100 characters.");
@@ -828,17 +826,7 @@ namespace EduConnect.Web.Controllers
                 (position == null ? "" : $" ({position})"),
                 before, MemberSnapshot(row));
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                // IX_OrgMembers_OneOfficerOrgPerUser: another admin made
-                // them an officer elsewhere a moment ago.
-                return MembersError(orgId,
-                    $"{FullName(row.User)} is already an officer of another organization.");
-            }
+            await _context.SaveChangesAsync();
 
             TempData["Success"] = wasOfficer
                 ? $"{FullName(row.User)}'s title updated."

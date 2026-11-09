@@ -1195,10 +1195,6 @@ namespace EduConnect.Web.Migrations
                     b.HasIndex("OrgID", "UserID")
                         .IsUnique();
 
-                    b.HasIndex(new[] { "UserID" }, "IX_OrgMembers_OneOfficerOrgPerUser")
-                        .IsUnique()
-                        .HasFilter("[OrgRole] = 'Officer' AND [IsActive] = 1");
-
                     b.HasIndex(new[] { "UserID" }, "IX_OrgMembers_UserID");
 
                     b.ToTable("OrgMembers");

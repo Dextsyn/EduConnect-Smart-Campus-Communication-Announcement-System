@@ -55,7 +55,7 @@
         <p class="text-muted small mb-3">
             Officers post this organization's announcements directly, and its
             members are notified. Pick officers from the organization's members.
-            A student can be an officer of one organization only.
+            A student can be an officer of more than one organization.
         </p>
 
         @if (Model.Officers.Any())
@@ -307,6 +307,12 @@
         detail.className = 'text-muted';
         detail.textContent = r.studentID + ' · ' + r.placement + ' · ' + r.email;
         who.append(name, detail);
+        if (r.officerOf) {
+            const also = document.createElement('small');
+            also.className = 'd-block text-muted';
+            also.textContent = 'Also an officer of ' + r.officerOf;
+            who.append(also);
+        }
         el.append(who);
 
         if (badgeText) {
@@ -327,7 +333,6 @@
         q => 'No member matches “' + q + '”. Add them as a member below first.',
         r => {
             if (r.isOfficer) return item(r, 'Already an officer', 'bg-primary', false);
-            if (r.officerOf) return item(r, 'Officer of ' + r.officerOf, 'bg-secondary', false);
             return item(r, 'Select', 'bg-light text-primary border', true, pick => {
                 document.getElementById('assignMemberId').value = pick.memberID;
                 document.getElementById('assignName').textContent = pick.name;

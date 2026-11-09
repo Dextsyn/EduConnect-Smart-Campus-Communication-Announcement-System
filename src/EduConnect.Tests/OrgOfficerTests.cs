@@ -193,7 +193,7 @@ namespace EduConnect.Tests
         }
 
         [Fact]
-        public async Task A_student_is_an_officer_of_one_org_only()
+        public async Task A_student_can_be_an_officer_of_several_orgs()
         {
             var s = Student();
             Join(_otherOrg, s, OrgRoles.Officer);
@@ -202,17 +202,24 @@ namespace EduConnect.Tests
             var controller = AsAdmin();
             await controller.AssignOfficer(_org.OrgID, row.MemberID, null);
 
-            Assert.Equal(OrgRoles.Member, Reload(row).OrgRole);
-            Assert.Contains("IT Society", (string)controller.TempData["Error"]!);
+            Assert.Equal(OrgRoles.Officer, Reload(row).OrgRole);
+            Assert.Null(controller.TempData["Error"]);
+            var access = new OrgAccess(_db.NewContext());
+            Assert.True(await access.IsOfficerAsync(s.UserID, _org.OrgID));
+            Assert.True(await access.IsOfficerAsync(s.UserID, _otherOrg.OrgID));
         }
 
         [Fact]
-        public void The_database_also_refuses_a_second_officer_post()
+        public async Task Officer_orgs_lists_every_org_they_can_post_for()
         {
             var s = Student();
             Join(_otherOrg, s, OrgRoles.Officer);
+            Join(_org, s, OrgRoles.Officer);
 
-            Assert.Throws<DbUpdateException>(() => Join(_org, s, OrgRoles.Officer));
+            var orgs = await new OrgAccess(_db.NewContext()).OfficerOrgsAsync(s.UserID);
+
+            Assert.Equal(new[] { _org.OrgID, _otherOrg.OrgID }.OrderBy(i => i),
+                orgs.Select(o => o.OrgID).OrderBy(i => i));
         }
 
         [Fact]
