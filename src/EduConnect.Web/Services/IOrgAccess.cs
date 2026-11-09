@@ -16,9 +16,9 @@ namespace EduConnect.Web.Services
         // Officer row in this active organization.
         Task<bool> IsOfficerAsync(int userId, int orgId);
 
-        // The organization the user is currently an officer of, if any.
-        // A student may be an officer of one organization only.
-        Task<Organization?> OfficerOrgAsync(int userId);
+        // The active organizations the user may post for, by name. A
+        // student can be an officer of several organizations.
+        Task<List<Organization>> OfficerOrgsAsync(int userId);
 
         // An active member row (any role but the retired Adviser) on an
         // active user.
