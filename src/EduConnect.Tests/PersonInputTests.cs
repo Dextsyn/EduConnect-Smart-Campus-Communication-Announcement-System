@@ -53,6 +53,41 @@ namespace EduConnect.Tests
             Assert.False(Valid(new AdminUserFormViewModel(), nameof(AdminUserFormViewModel.FirstName), name));
         }
 
+        private static List<string?> Errors(object model, string property, object? value)
+        {
+            var errors = new List<ValidationResult>();
+            Validator.TryValidateProperty(value,
+                new ValidationContext(model) { MemberName = property }, errors);
+            return errors.Select(e => e.ErrorMessage).ToList();
+        }
+
+        [Theory]
+        [InlineData("Juan2")]
+        [InlineData("J0hn")]
+        [InlineData("Dela Cruz 3")]
+        [InlineData("Juan2!")]
+        public void Name_WithDigit_SaysNumbersAreNotAllowed(string name)
+        {
+            Assert.Equal(new[] { PersonInput.NameDigitsError },
+                Errors(new RegisterViewModel(), nameof(RegisterViewModel.FirstName), name));
+            Assert.Equal(new[] { PersonInput.NameDigitsError },
+                Errors(new AdminUserFormViewModel(), nameof(AdminUserFormViewModel.LastName), name));
+        }
+
+        [Fact]
+        public void Name_WithSymbol_KeepsTheLettersOnlyMessage()
+        {
+            Assert.Equal(new[] { PersonInput.NameError },
+                Errors(new RegisterViewModel(), nameof(RegisterViewModel.LastName), "Juan!"));
+        }
+
+        [Fact]
+        public void Name_Blank_IsLeftToRequired()
+        {
+            Assert.Equal(new[] { "First name is required" },
+                Errors(new RegisterViewModel(), nameof(RegisterViewModel.FirstName), ""));
+        }
+
         [Fact]
         public void Name_IsTrimmedAndSpacesCollapsed()
         {

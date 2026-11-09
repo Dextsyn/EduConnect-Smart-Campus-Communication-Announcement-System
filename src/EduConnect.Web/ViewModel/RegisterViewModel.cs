@@ -10,7 +10,7 @@ namespace EduConnect.Web.ViewModels
 
         [Required(ErrorMessage = "First name is required")]
         [MaxLength(50)]
-        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        [PersonName]
         public string FirstName
         {
             get => _firstName;
@@ -19,7 +19,7 @@ namespace EduConnect.Web.ViewModels
 
         [Required(ErrorMessage = "Last name is required")]
         [MaxLength(50)]
-        [RegularExpression(PersonInput.NamePattern, ErrorMessage = PersonInput.NameError)]
+        [PersonName]
         public string LastName
         {
             get => _lastName;

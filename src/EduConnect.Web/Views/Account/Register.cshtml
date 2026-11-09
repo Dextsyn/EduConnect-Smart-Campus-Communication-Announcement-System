@@ -415,22 +415,63 @@
         })();
 
         // Same rules as the server (PersonInput). This page doesn't load
-        // jQuery Validation, so the browser's own validity check shows them.
+        // jQuery Validation, so the browser's own validity check blocks the
+        // submit.
         (function () {
-            const rules = [
-                ['FirstName', @Json.Serialize(PersonInput.NamePattern), @Json.Serialize(PersonInput.NameError), true],
-                ['LastName', @Json.Serialize(PersonInput.NamePattern), @Json.Serialize(PersonInput.NameError), true],
-                ['StudentID', @Json.Serialize(PersonInput.StudentNumberPattern), @Json.Serialize(PersonInput.StudentNumberError), false]
-            ];
-            for (const [id, pattern, message, isName] of rules) {
-                const input = document.getElementById(id);
-                const re = new RegExp(pattern);
-                const check = () => {
-                    const v = isName ? input.value.trim().replace(/\s+/g, ' ') : input.value.trim();
-                    input.setCustomValidity(v && !re.test(v) ? message : '');
-                };
-                input.addEventListener('input', check);
-                check();
+            const input = document.getElementById('StudentID');
+            const re = new RegExp(@Json.Serialize(PersonInput.StudentNumberPattern));
+            const check = () => {
+                const v = input.value.trim();
+                input.setCustomValidity(v && !re.test(v) ? @Json.Serialize(PersonInput.StudentNumberError) : '');
+            };
+            input.addEventListener('input', check);
+            check();
+        })();
+
+        // First and last name ([PersonName]): the problem shows in red under
+        // the box as soon as it is typed, and on submit under every name
+        // that is wrong, instead of the browser's bubble on the first one.
+        (function () {
+            const form = document.getElementById('registerForm');
+            const re = new RegExp(@Json.Serialize(PersonInput.NamePattern));
+            const letters = @Json.Serialize(PersonInput.NameError);
+            const digits = @Json.Serialize(PersonInput.NameDigitsError);
+            const names = ['FirstName', 'LastName'].map(id => document.getElementById(id));
+            const messageFor = input =>
+                form.querySelector('[data-valmsg-for="' + input.name + '"]');
+
+            const problem = input => {
+                const v = input.value.trim().replace(/\s+/g, ' ');
+                if (!v) return '';
+                if (/[0-9]/.test(v)) return digits;
+                return re.test(v) ? '' : letters;
+            };
+            const show = (input, text) => {
+                messageFor(input).textContent = text;
+                input.classList.toggle('is-invalid', !!text);
+            };
+
+            for (const input of names) {
+                // A server error on the field (after a post) shows in red too.
+                if (messageFor(input).textContent.trim()) input.classList.add('is-invalid');
+
+                input.addEventListener('input', function () {
+                    const text = problem(input);
+                    input.setCustomValidity(text);
+                    show(input, text);
+                });
+                input.addEventListener('invalid', function (e) {
+                    e.preventDefault();   // no bubble; the red text says it
+                    show(input, problem(input));
+                    // The browser only scrolls to a field whose bubble it
+                    // shows, so bring the first wrong field into view here.
+                    const first = Array.from(form.elements).find(el => el.willValidate && !el.validity.valid);
+                    if (first === input) {
+                        input.scrollIntoView({ block: 'center' });
+                        input.focus({ preventScroll: true });
+                    }
+                });
+                input.setCustomValidity(problem(input));
             }
         })();
 
